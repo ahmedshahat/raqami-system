@@ -4564,8 +4564,8 @@ class TransactionUtil extends Util
 
         if (in_array('stock_adjustment', $transaction_types)) {
             $query->addSelect(
-                DB::raw("SUM(IF(transactions.type='stock_adjustment', final_total, 0)) as total_adjustment"),
-                DB::raw("SUM(IF(transactions.type='stock_adjustment', total_amount_recovered, 0)) as total_recovered")
+                DB::raw("SUM(IF(transactions.type='stock_adjustment' AND transactions.construction_material_document_id IS NULL, final_total, 0)) as total_adjustment"),
+                DB::raw("SUM(IF(transactions.type='stock_adjustment' AND transactions.construction_material_document_id IS NULL, total_amount_recovered, 0)) as total_recovered")
             );
         }
 
@@ -5899,7 +5899,8 @@ class TransactionUtil extends Util
     {
         $transaction_data = $request->only(['ref_no', 'transaction_date',
             'location_id', 'final_total', 'expense_for', 'additional_notes',
-            'expense_category_id', 'tax_id', 'contact_id', ]);
+            'expense_category_id', 'tax_id', 'contact_id',
+            'construction_project_id', 'construction_boq_item_id', ]);
 
         $transaction_data['business_id'] = $business_id;
         $transaction_data['created_by'] = $user_id;
@@ -5990,6 +5991,10 @@ class TransactionUtil extends Util
 
         if ($request->has('expense_category_id')) {
             $transaction_data['expense_category_id'] = $request->input('expense_category_id');
+        }
+        if ($request->exists('construction_project_id')) {
+            $transaction_data['construction_project_id'] = $request->input('construction_project_id') ?: null;
+            $transaction_data['construction_boq_item_id'] = $request->input('construction_boq_item_id') ?: null;
         }
         $final_total = $request->has('final_total') ? $request->input('final_total') : $transaction->final_total;
         if ($request->has('final_total')) {

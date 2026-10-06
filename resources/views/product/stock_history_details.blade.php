@@ -27,6 +27,12 @@
 				</td>
 			</tr>
 			<tr>
+				<th>@lang('construction::lang.material_returns_from_projects')</th>
+				<td>
+					<span class="display_currency" data-is_quantity="true">{{$stock_details['total_construction_return'] ?? 0}}</span> {{$stock_details['unit']}}
+				</td>
+			</tr>
+			<tr>
 				<th>@lang('lang_v1.stock_transfers') (@lang('lang_v1.in'))</th>
 				<td>
 					<span class="display_currency" data-is_quantity="true">{{$stock_details['total_purchase_transfer']}}</span> {{$stock_details['unit']}}
@@ -47,6 +53,12 @@
 				<th>@lang('report.total_stock_adjustment')</th>
 				<td>
 					<span class="display_currency" data-is_quantity="true">{{$stock_details['total_adjusted']}}</span> {{$stock_details['unit']}}
+				</td>
+			</tr>
+			<tr>
+				<th>@lang('construction::lang.material_issued_to_projects')</th>
+				<td>
+					<span class="display_currency" data-is_quantity="true">{{$stock_details['total_construction_issue'] ?? 0}}</span> {{$stock_details['unit']}}
 				</td>
 			</tr>
 			<tr>

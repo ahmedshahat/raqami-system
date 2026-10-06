@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'construction_project' => 'Construction project',
+    'construction_project_item' => 'Project item',
+    'no_construction_project' => 'No construction project',
+    'general_project_expense' => 'General project expense (no item)',
+    'construction_project_optional_hint' => 'Optional; leave blank to record a regular expense.',
+    'construction_project_item_optional_hint' => 'Optional; leave blank to record a general project expense.',
+    'construction_item_requires_project' => 'Select a project before selecting a project item.',
+    'construction_item_project_mismatch' => 'The selected project item does not belong to the selected project.',
 
     /*
     |--------------------------------------------------------------------------

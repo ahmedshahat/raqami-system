@@ -18,6 +18,7 @@ use DB;
 use Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
 
 class ExpenseController extends Controller
@@ -120,6 +121,15 @@ class ExpenseController extends Controller
                 $contact_id = request()->get('contact_id');
                 if (! empty($contact_id)) {
                     $expenses->where('transactions.contact_id', $contact_id);
+                }
+            }
+
+            if ($this->canLinkExpensesToConstruction($business_id)) {
+                if (request()->boolean('construction_only')) {
+                    $expenses->whereNotNull('transactions.construction_project_id');
+                }
+                if (request()->filled('construction_project_id')) {
+                    $expenses->where('transactions.construction_project_id', request()->integer('construction_project_id'));
                 }
             }
 
@@ -296,8 +306,14 @@ class ExpenseController extends Controller
                         ->pluck('name', 'id')
                         ->toArray();
 
+        $construction_expense_integration_enabled = $this->canLinkExpensesToConstruction($business_id);
+        $construction_project_items_enabled = $this->canLinkExpensesToConstructionItems($business_id);
+        $construction_projects = $construction_expense_integration_enabled
+            ? $this->constructionProjects($business_id)
+            : collect();
+
         return view('expense.index')
-            ->with(compact('categories', 'business_locations', 'users', 'contacts', 'sub_categories'));
+            ->with(compact('categories', 'business_locations', 'users', 'contacts', 'sub_categories', 'construction_projects', 'construction_expense_integration_enabled', 'construction_project_items_enabled'));
     }
 
     /**
@@ -336,6 +352,12 @@ class ExpenseController extends Controller
         $payment_types = $this->transactionUtil->payment_types(null, false, $business_id);
 
         $contacts = Contact::contactDropdown($business_id, false, false);
+        $construction_expense_integration_enabled = $this->canLinkExpensesToConstruction($business_id);
+        $construction_project_items_enabled = $this->canLinkExpensesToConstructionItems($business_id);
+        $construction_projects = $construction_expense_integration_enabled
+            ? $this->constructionProjects($business_id)
+            : collect();
+        $construction_project_items = collect();
 
         //Accounts
         $accounts = [];
@@ -345,11 +367,11 @@ class ExpenseController extends Controller
 
         if (request()->ajax()) {
             return view('expense.add_expense_modal')
-                ->with(compact('expense_categories', 'business_locations', 'users', 'taxes', 'payment_line', 'payment_types', 'accounts', 'bl_attributes', 'contacts'));
+                ->with(compact('expense_categories', 'business_locations', 'users', 'taxes', 'payment_line', 'payment_types', 'accounts', 'bl_attributes', 'contacts', 'construction_projects', 'construction_project_items', 'construction_expense_integration_enabled', 'construction_project_items_enabled'));
         }
 
         return view('expense.create')
-            ->with(compact('expense_categories', 'business_locations', 'users', 'taxes', 'payment_line', 'payment_types', 'accounts', 'bl_attributes', 'contacts'));
+            ->with(compact('expense_categories', 'business_locations', 'users', 'taxes', 'payment_line', 'payment_types', 'accounts', 'bl_attributes', 'contacts', 'construction_projects', 'construction_project_items', 'construction_expense_integration_enabled', 'construction_project_items_enabled'));
     }
 
     /**
@@ -364,8 +386,10 @@ class ExpenseController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
+        $business_id = $request->session()->get('user.business_id');
+        $this->validateConstructionLink($request, $business_id);
+
         try {
-            $business_id = $request->session()->get('user.business_id');
 
             //Check if subscribed or not
             if (! $this->moduleUtil->isSubscribed($business_id)) {
@@ -458,6 +482,14 @@ class ExpenseController extends Controller
         $taxes = TaxRate::forBusinessDropdown($business_id, true, true);
 
         $contacts = Contact::contactDropdown($business_id, false, false);
+        $construction_expense_integration_enabled = $this->canLinkExpensesToConstruction($business_id);
+        $construction_project_items_enabled = $this->canLinkExpensesToConstructionItems($business_id);
+        $construction_projects = $construction_expense_integration_enabled
+            ? $this->constructionProjects($business_id)
+            : collect();
+        $construction_project_items = $construction_project_items_enabled
+            ? $this->constructionProjectItemOptions($business_id, $expense->construction_project_id)
+            : collect();
 
         //Sub-category
         $sub_categories = [];
@@ -470,7 +502,7 @@ class ExpenseController extends Controller
         }
 
         return view('expense.edit')
-            ->with(compact('expense', 'expense_categories', 'business_locations', 'users', 'taxes', 'contacts', 'sub_categories'));
+            ->with(compact('expense', 'expense_categories', 'business_locations', 'users', 'taxes', 'contacts', 'sub_categories', 'construction_projects', 'construction_project_items', 'construction_expense_integration_enabled', 'construction_project_items_enabled'));
     }
 
     /**
@@ -486,13 +518,14 @@ class ExpenseController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
+        $business_id = $request->session()->get('user.business_id');
+        $this->validateConstructionLink($request, $business_id);
+
         try {
             //Validate document size
             $request->validate([
                 'document' => 'file|max:' . (config('constants.document_size_limit') / 1000),
             ]);
-
-            $business_id = $request->session()->get('user.business_id');
 
             //Check if subscribed or not
             if (!$this->moduleUtil->isSubscribed($business_id)) {
@@ -517,6 +550,127 @@ class ExpenseController extends Controller
         }
 
         return redirect('expenses')->with('status', $output);
+    }
+
+    public function constructionProjectItems(Request $request, int $project)
+    {
+        abort_unless(auth()->user()->can('expense.add') || auth()->user()->can('expense.edit'), 403, 'Unauthorized action.');
+        $businessId = $request->session()->get('user.business_id');
+        abort_unless($this->canLinkExpensesToConstructionItems($businessId), 404);
+        abort_unless(DB::table('construction_projects')->where('business_id', $businessId)
+            ->whereNull('deleted_at')->where('id', $project)->exists(), 404);
+
+        return response()->json($this->constructionProjectItemOptions($businessId, $project)
+            ->map(fn ($description, $id) => ['id' => (int) $id, 'text' => $description])
+            ->values());
+    }
+
+    private function constructionProjects(int $businessId)
+    {
+        return DB::table('construction_projects')->where('business_id', $businessId)
+            ->whereNull('deleted_at')
+            ->orderBy('name')
+            ->get(['id', 'code', 'name'])
+            ->mapWithKeys(fn ($project) => [$project->id => $project->code.' — '.$project->name]);
+    }
+
+    private function constructionProjectItemOptions(int $businessId, ?int $projectId)
+    {
+        if (! $projectId) {
+            return collect();
+        }
+
+        $project = DB::table('construction_projects')->where('business_id', $businessId)
+            ->whereNull('deleted_at')->where('id', $projectId)->first(['id']);
+        if (! $project) {
+            return collect();
+        }
+
+        $versionId = DB::table('construction_contracts')->where('business_id', $businessId)
+            ->where('project_id', $project->id)->where('is_primary', true)->value('boq_version_id')
+            ?: DB::table('construction_boq_versions')->where('business_id', $businessId)
+                ->where('project_id', $project->id)->orderByDesc('version_number')->value('id');
+        if (! $versionId) {
+            return collect();
+        }
+
+        return DB::table('construction_boq_items')->where('business_id', $businessId)
+            ->where('project_id', $project->id)
+            ->where('boq_version_id', $versionId)
+            ->where('row_type', 'item')
+            ->orderBy('sort_order')->orderBy('id')
+            ->get(['id', 'code', 'description'])
+            ->mapWithKeys(fn ($item) => [$item->id => $item->code.' — '.$item->description]);
+    }
+
+    private function validateConstructionLink(Request $request, int $businessId): void
+    {
+        if (! $this->canLinkExpensesToConstruction($businessId)) {
+            $request->request->remove('construction_project_id');
+            $request->request->remove('construction_boq_item_id');
+
+            return;
+        }
+
+        if (! $this->canLinkExpensesToConstructionItems($businessId)) {
+            $request->request->remove('construction_boq_item_id');
+        }
+
+        $projectId = $request->input('construction_project_id');
+        $request->validate([
+            'construction_project_id' => [
+                'nullable', 'integer',
+                Rule::exists('construction_projects', 'id')->where(fn ($query) => $query
+                    ->where('business_id', $businessId)->whereNull('deleted_at')),
+            ],
+            'construction_boq_item_id' => [
+                'nullable', 'integer',
+                function ($attribute, $value, $fail) use ($projectId, $businessId) {
+                    if (! $value) {
+                        return;
+                    }
+                    if (! $projectId) {
+                        $fail(__('expense.construction_item_requires_project'));
+                        return;
+                    }
+                    $valid = DB::table('construction_boq_items')->where('business_id', $businessId)
+                        ->where('project_id', $projectId)->where('row_type', 'item')->where('id', $value)->exists();
+                    if (! $valid) {
+                        $fail(__('expense.construction_item_project_mismatch'));
+                    }
+                },
+            ],
+        ]);
+    }
+
+    private function constructionModuleEnabled(int $businessId): bool
+    {
+        if (! $this->moduleUtil->isModuleInstalled('Construction')) {
+            return false;
+        }
+
+        return app()->environment('local')
+            || (bool) $this->moduleUtil->hasThePermissionInSubscription($businessId, 'construction_module');
+    }
+
+    private function canLinkExpensesToConstruction(int $businessId): bool
+    {
+        if (! $this->constructionModuleEnabled($businessId)) {
+            return false;
+        }
+
+        return $this->moduleUtil->is_admin(auth()->user(), $businessId)
+            || (auth()->user()->can('construction.access') && auth()->user()->can('construction.project.view'));
+    }
+
+    private function canLinkExpensesToConstructionItems(int $businessId): bool
+    {
+        if (! $this->canLinkExpensesToConstruction($businessId)) {
+            return false;
+        }
+
+        return $this->moduleUtil->is_admin(auth()->user(), $businessId)
+            || auth()->user()->can('construction.boq.view');
     }
 
     /**

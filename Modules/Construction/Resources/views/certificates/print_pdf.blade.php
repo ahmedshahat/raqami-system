@@ -1,0 +1,1 @@
+@include('construction::certificates.print')

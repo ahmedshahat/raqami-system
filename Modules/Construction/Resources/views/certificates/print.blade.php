@@ -1,0 +1,52 @@
+@php
+    $approved = in_array($certificate->status, ['approved', 'partially_approved', 'posted', 'paid']);
+    $current = (float) ($approved ? $certificate->current_approved_gross : $certificate->current_submitted_gross);
+    $linkedContract = $certificate->contract ?: $project->primaryContract;
+    $companyAddress = collect([$businessLocation?->landmark, $businessLocation?->city, $businessLocation?->state, $businessLocation?->country])->filter()->implode('، ');
+    $logoSource = null;
+    if ($business->logo) {
+        $logoFile = public_path('uploads/business_logos/'.$business->logo);
+        if (is_file($logoFile)) {
+            $extension = strtolower(pathinfo($logoFile, PATHINFO_EXTENSION));
+            $mime = match ($extension) {'jpg', 'jpeg' => 'image/jpeg', 'svg' => 'image/svg+xml', 'webp' => 'image/webp', default => 'image/png'};
+            $logoSource = $pdfMode ? 'data:'.$mime.';base64,'.base64_encode(file_get_contents($logoFile)) : asset('uploads/business_logos/'.$business->logo);
+        }
+    }
+@endphp
+<!doctype html><html lang="{{ app()->getLocale() }}" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ $certificate->number }} — {{ $project->name }}</title><style>
+@if(empty($pdfMode))@page{size:A4 landscape;margin:8mm}@endif
+body{direction:rtl;margin:0;color:#26364d}.page{max-width:277mm;margin:auto}.accent{height:5px;background:#1769d2}
+.header,.details,.items,.summary,.signatures{width:100%;border-collapse:collapse;direction:rtl}
+.header{border-bottom:1px solid #dce5f0;margin-bottom:1mm}.header td{padding:3px;vertical-align:middle}
+.logo{width:18mm}.logo img{max-width:17mm;max-height:17mm}
+.company{color:#123d91}.contact{text-align:left;color:#66758b}
+.title{text-align:center;margin:1mm 0}.title h1{margin:0;color:#172f55}.title span{color:#1769d2}.draft{color:#b42318}
+.details{margin-bottom:2mm;border:1px solid #dfe7f0;table-layout:fixed}.details td{width:25%;padding:3px 6px;border-bottom:1px solid #e9eef5;vertical-align:top;overflow-wrap:break-word}
+.details .print-label{display:block;color:#8290a4}.details .print-value{display:block;color:#273b5c}
+.items{table-layout:fixed}.items th,.items td{border:1px solid #d7e0eb;vertical-align:middle}
+.items th{background:#1769d2;color:#fff;text-align:center}.items td{text-align:center}.items td.desc{text-align:right}
+.items tr:nth-child(even) td{background:#f8fbff}
+.section-title{margin:2mm 0 1mm;color:#173b70}
+.summary{width:52%;margin-right:auto}.summary td{padding:1px 8px;border-bottom:1px solid #e7edf5}.summary td:last-child{text-align:left;direction:ltr}
+.summary tr.net td{background:#eafaf4;color:#087453;border:0}
+.signatures{margin-top:1mm}.signatures td{width:25%;height:8mm;padding:2px 6px;text-align:center;vertical-align:top;border:1px solid #e3eaf2;color:#234168}
+.signatures .print-label{display:block;margin-top:1mm;color:#8794a6}
+.print-footer{margin-top:1mm;padding-top:1mm;border-top:1px solid #e3eaf2;color:#8a97a8}.print-footer table{width:100%;border-collapse:collapse}.print-footer td:last-child{text-align:left;direction:ltr}
+.toolbar{display:flex;gap:8px;justify-content:center;padding:12px;background:#eef4fc}.toolbar button{padding:9px 16px;border:0;border-radius:9px;background:#1769d2;color:#fff;cursor:pointer}
+@media print{.toolbar{display:none}.page{max-width:none}.print-footer{position:fixed;bottom:0;left:0;right:0}}
+@include('construction::partials.print_typography')
+.items th,.items td{padding:3px 4px!important}
+</style></head><body>
+@if(!$pdfMode)<div class="toolbar"><button onclick="window.print()">@lang('construction::lang.print')</button></div>@endif
+<div class="page"><div class="accent"></div><table class="header"><tr>@if($logoSource)<td class="logo"><img src="{{ $logoSource }}" alt=""></td>@endif<td><div class="company print-company-name">{{ $business->name }}</div>@if($businessLocation?->name)<div>{{ $businessLocation->name }}</div>@endif</td><td class="contact print-company-contact">@if($companyAddress)<div>{{ $companyAddress }}</div>@endif
+@if($businessLocation?->mobile || $businessLocation?->alternate_number)<div>{{ $businessLocation->mobile ?: $businessLocation->alternate_number }}</div>@endif
+@if($businessLocation?->email)<div>{{ $businessLocation->email }}</div>@endif
+@if($business->tax_number_1)<div>@lang('construction::lang.tax_registration_number'): {{ $business->tax_number_1 }}</div>@endif</td></tr></table>
+<div class="title"><h1 class="print-document-title">@lang('construction::lang.certificate_print_title')</h1><span class="print-document-reference">{{ $certificate->number }}</span>@if(!$approved)<div class="draft">@lang('construction::lang.draft_unapproved')</div>@endif</div>
+<table class="details"><tr><td><div class="print-label">@lang('construction::lang.project_name')</div><div class="print-value">{{ $project->name }}</div></td><td><div class="print-label">@lang('construction::lang.project_code')</div><div class="print-value">{{ $project->code }}</div></td><td><div class="print-label">@lang('construction::lang.customer')</div><div class="print-value">{{ $project->customer?->supplier_business_name ?: $project->customer?->name }}</div></td>@if($linkedContract)<td><div class="print-label">@lang('construction::lang.contract_number')</div><div class="print-value">{{ $linkedContract->contract_number }}</div></td>@endif</tr><tr>@if($linkedContract?->signed_at)<td><div class="print-label">@lang('construction::lang.contract_date')</div><div class="print-value">{{ @format_date($linkedContract->signed_at) }}</div></td>@endif<td><div class="print-label">@lang('construction::lang.certificate_date')</div><div class="print-value">{{ @format_date($certificate->certificate_date) }}</div></td>@if($certificate->measurement)<td><div class="print-label">@lang('construction::lang.measurement_number')</div><div class="print-value">{{ $certificate->measurement->number }}</div></td>@endif @if($linkedContract?->title)<td><div class="print-label">@lang('construction::lang.contract_title')</div><div class="print-value">{{ $linkedContract->title }}</div></td>@endif</tr></table>
+<table class="items print-table"><thead><tr><th>@lang('construction::lang.boq_code')</th><th style="width:22%">@lang('construction::lang.boq_description')</th><th>@lang('construction::lang.unit')</th><th>@lang('construction::lang.contract_quantity')</th><th>@lang('construction::lang.previous_quantity')</th><th>@lang('construction::lang.current_quantity')</th><th>@lang('construction::lang.cumulative_quantity')</th><th>@lang('construction::lang.sales_unit_price')</th><th>@lang('construction::lang.current_work_value')</th><th>@lang('construction::lang.cumulative_value')</th></tr></thead><tbody>@foreach($certificate->items as $item)@php $quantity = (float) ($approved ? $item->approved_quantity : $item->submitted_quantity); $amount = (float) ($approved ? $item->approved_amount : $item->submitted_amount); @endphp<tr><td>{{ $item->boqItem->code }}</td><td class="desc">{{ $item->boqItem->description }}</td><td>{{ $item->boqItem->unit }}</td><td class="num print-number">{{ @format_quantity((float) $item->boqItem->contract_quantity) }}</td><td class="num print-number">{{ @format_quantity((float) $item->previous_quantity) }}</td><td class="num print-number">{{ @format_quantity($quantity) }}</td><td class="num print-number">{{ @format_quantity((float) $item->previous_quantity + $quantity) }}</td><td class="num print-number">@include('construction::partials.money', ['value' => $item->unit_price])</td><td class="num print-number">@include('construction::partials.money', ['value' => $amount])</td><td class="num print-number">@include('construction::partials.money', ['value' => (float) $item->previous_amount + $amount])</td></tr>@endforeach</tbody></table>
+<div class="section-title print-section-title">@lang('construction::lang.deductions_and_adjustments')</div><table class="summary print-summary print-keep-together"><tr><td>@lang('construction::lang.current_work_value')</td><td>@include('construction::partials.money', ['value' => $current])</td></tr><tr><td>@lang('construction::lang.previous_gross')</td><td>@include('construction::partials.money', ['value' => $certificate->previous_gross])</td></tr><tr><td>@lang('construction::lang.cumulative_gross')</td><td>@include('construction::partials.money', ['value' => (float) $certificate->previous_gross + $current])</td></tr><tr><td>@lang('construction::lang.retention_value') {{ @num_format((float) $certificate->retention_percent) }}%</td><td>@if((float)$certificate->retention_value > 0)− @endif @include('construction::partials.money', ['value' => $certificate->retention_value])</td></tr><tr><td>@lang('construction::lang.advance_recovery_value')</td><td>@if((float)$certificate->advance_recovery_value > 0)− @endif @include('construction::partials.money', ['value' => $certificate->advance_recovery_value])</td></tr><tr><td>@lang('construction::lang.other_deductions_value')</td><td>@if((float)$certificate->other_deductions_value > 0)− @endif @include('construction::partials.money', ['value' => $certificate->other_deductions_value])</td></tr><tr><td>@lang('construction::lang.tax_value')</td><td>@if((float)$certificate->tax_value > 0)+ @endif @include('construction::partials.money', ['value' => $certificate->tax_value])</td></tr><tr class="net print-total"><td>@lang('construction::lang.net_due')</td><td>@include('construction::partials.money', ['value' => $certificate->net_due])</td></tr></table>
+<table class="signatures print-signature print-keep-together"><tr><td>@lang('construction::lang.prepared_by')<div class="print-label">................................</div></td><td>@lang('construction::lang.project_engineer')<div class="print-label">{{ $project->manager?->first_name }} {{ $project->manager?->last_name }}</div></td><td>@lang('construction::lang.contractor_approval')<div class="print-label">................................</div></td><td>@lang('construction::lang.owner_approval')<div class="print-label">................................</div></td></tr></table>
+@if(empty($pdfMode))<footer class="print-footer"><table><tr><td>{{ $business->name }}</td><td>{{ $certificate->number }}</td></tr></table></footer>@endif</div>
+@if($autoPrint)<script>window.addEventListener('load', function(){document.fonts.ready.then(function(){window.print()})})</script>@endif
+</body></html>

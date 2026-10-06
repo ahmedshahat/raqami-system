@@ -1,0 +1,10 @@
+{
+    "name": "raqmy/construction",
+    "description": "Construction contracting management module for Raqmy ERP",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Modules\\Construction\\": ""
+        }
+    }
+}

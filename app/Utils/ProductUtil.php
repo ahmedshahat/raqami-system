@@ -1850,6 +1850,7 @@ class ProductUtil extends Util
             DB::raw("(SELECT SUM(IF(transactions.type='stock_adjustment', SAL.quantity, 0) ) FROM transactions 
                   JOIN stock_adjustment_lines AS SAL ON transactions.id=SAL.transaction_id
                   WHERE transactions.type='stock_adjustment' AND transactions.location_id=vld.location_id 
+                    AND transactions.construction_material_document_id IS NULL
                     AND (SAL.variation_id=variations.id)) as total_adjusted"),
             DB::raw("(SELECT SUM( COALESCE(pl.quantity - ($pl_query_string), 0) * purchase_price_inc_tax) FROM transactions 
                   JOIN purchase_lines AS pl ON transactions.id=pl.transaction_id
@@ -1985,13 +1986,32 @@ class ProductUtil extends Util
             $product_name = $purchase_details->product.' ('.$purchase_details->sku.')';
         }
 
+        $movementTotals = DB::table('stock_adjustment_lines as sal')
+            ->join('transactions as movement', 'movement.id', '=', 'sal.transaction_id')
+            ->where('movement.business_id', $business_id)
+            ->where('movement.location_id', $location_id)
+            ->where('sal.variation_id', $variation_id)
+            ->selectRaw('COALESCE(SUM(CASE WHEN movement.construction_material_document_id IS NULL THEN sal.quantity ELSE 0 END), 0) as total_adjusted')
+            ->selectRaw('COALESCE(SUM(CASE WHEN movement.construction_material_document_id IS NOT NULL THEN sal.quantity ELSE 0 END), 0) as total_construction_issue')
+            ->first();
+        $constructionReturn = DB::table('construction_material_document_lines as material_lines')
+            ->join('construction_material_documents as material_docs', 'material_docs.id', '=', 'material_lines.document_id')
+            ->where('material_docs.business_id', $business_id)
+            ->where('material_docs.location_id', $location_id)
+            ->where('material_docs.type', 'return')
+            ->where('material_docs.status', 'approved')
+            ->where('material_lines.variation_id', $variation_id)
+            ->sum('material_lines.quantity');
+
         $output = [
             'variation' => $product_name,
             'unit' => $purchase_details->unit,
             'second_unit' => $purchase_details->second_unit,
             'total_purchase' => $purchase_details->total_purchase,
             'total_purchase_return' => $purchase_details->total_purchase_return,
-            'total_adjusted' => $purchase_details->total_adjusted,
+            'total_adjusted' => $movementTotals->total_adjusted,
+            'total_construction_issue' => $movementTotals->total_construction_issue,
+            'total_construction_return' => $constructionReturn,
             'total_opening_stock' => $purchase_details->total_opening_stock,
             'total_purchase_transfer' => $purchase_details->total_purchase_transfer,
             'total_sold' => $sell_details->total_sold,
@@ -2017,6 +2037,8 @@ class ProductUtil extends Util
                                 ->leftjoin('transaction_sell_lines as rsl',
                                         'rsl.transaction_id', '=', 'return.id')
                                 ->leftjoin('contacts as c', 'transactions.contact_id', '=', 'c.id')
+                                ->leftjoin('construction_material_documents as cmd', 'cmd.id', '=', 'transactions.construction_material_document_id')
+                                ->leftjoin('construction_projects as cp', 'cp.id', '=', 'cmd.project_id')
                                 ->where('transactions.location_id', $location_id)
                                 ->where(function ($q) use ($variation_id) {
                                     $q->where('sl.variation_id', $variation_id)
@@ -2045,9 +2067,34 @@ class ProductUtil extends Util
                                     'c.supplier_business_name',
                                     'pl.secondary_unit_quantity as purchase_secondary_unit_quantity',
                                     'sl.secondary_unit_quantity as sell_secondary_unit_quantity'
+                                    , 'cmd.id as construction_document_id'
+                                    , 'cp.code as construction_project_code'
+                                    , 'cp.name as construction_project_name'
                                 )
                                 ->orderBy('transactions.transaction_date', 'asc')
                                 ->get();
+
+        $materialReturns = DB::table('construction_material_documents as cmd')
+            ->join('construction_material_document_lines as cml', 'cml.document_id', '=', 'cmd.id')
+            ->join('construction_projects as cp', 'cp.id', '=', 'cmd.project_id')
+            ->where('cmd.business_id', $business_id)
+            ->where('cmd.location_id', $location_id)
+            ->where('cmd.type', 'return')
+            ->where('cmd.status', 'approved')
+            ->where('cml.variation_id', $variation_id)
+            ->selectRaw("cmd.id as transaction_id, 'construction_material_return' as transaction_type")
+            ->selectRaw('NULL as sell_line_quantity, NULL as purchase_line_quantity, NULL as sell_return, NULL as purchase_return')
+            ->selectRaw('cml.quantity as stock_adjusted, NULL as combined_purchase_return, NULL as return_parent_id')
+            ->selectRaw("CONCAT(cmd.document_date, ' ', TIME(cmd.created_at)) as transaction_date")
+            ->selectRaw("'approved' as status, NULL as invoice_no")
+            ->addSelect('cmd.number as ref_no', 'cmd.notes as additional_notes')
+            ->selectRaw('NULL as contact_name, NULL as supplier_business_name, NULL as purchase_secondary_unit_quantity, NULL as sell_secondary_unit_quantity')
+            ->addSelect('cmd.id as construction_document_id', 'cp.code as construction_project_code', 'cp.name as construction_project_name')
+            ->get();
+
+        $stock_history = $stock_history->concat($materialReturns)
+            ->sortBy(fn ($row) => $row->transaction_date.'|'.($row->transaction_type === 'construction_material_return' ? '1' : '0'))
+            ->values();
 
         $stock_history_array = [];
         $stock = 0;
@@ -2095,12 +2142,27 @@ class ProductUtil extends Util
             } elseif ($stock_line->transaction_type == 'stock_adjustment') {
                 $quantity_change = -1 * $stock_line->stock_adjusted;
                 $stock += $quantity_change;
+                $isConstructionIssue = ! empty($stock_line->construction_document_id);
                 $stock_history_array[] = array_merge($temp_array, [
                     'quantity_change' => $quantity_change,
                     'stock' => $this->roundQuantity($stock),
-                    'type' => 'stock_adjustment',
-                    'type_label' => __('stock_adjustment.stock_adjustment'),
+                    'type' => $isConstructionIssue ? 'construction_material_issue' : 'stock_adjustment',
+                    'type_label' => $isConstructionIssue ? __('construction::lang.material_issue_stock_history') : __('stock_adjustment.stock_adjustment'),
                     'ref_no' => $stock_line->ref_no,
+                    'contact_name' => $isConstructionIssue ? trim($stock_line->construction_project_code.' — '.$stock_line->construction_project_name) : $stock_line->contact_name,
+                    'stock_in_second_unit' => $this->roundQuantity($stock_in_second_unit),
+                ]);
+            } elseif ($stock_line->transaction_type == 'construction_material_return') {
+                $quantity_change = (float) $stock_line->stock_adjusted;
+                $stock += $quantity_change;
+                $stock_history_array[] = array_merge($temp_array, [
+                    'quantity_change' => $quantity_change,
+                    'stock' => $this->roundQuantity($stock),
+                    'type' => 'construction_material_return',
+                    'type_label' => __('construction::lang.material_return_stock_history'),
+                    'ref_no' => $stock_line->ref_no,
+                    'additional_notes' => $stock_line->additional_notes,
+                    'contact_name' => trim($stock_line->construction_project_code.' — '.$stock_line->construction_project_name),
                     'stock_in_second_unit' => $this->roundQuantity($stock_in_second_unit),
                 ]);
             } elseif ($stock_line->transaction_type == 'opening_stock') {

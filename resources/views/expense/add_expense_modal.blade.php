@@ -59,7 +59,12 @@
                         {!! Form::label('expense_for', __('expense.expense_for').':') !!} @show_tooltip(__('tooltip.expense_for'))
                         {!! Form::select('expense_for', $users, null, ['class' => 'form-control select2', 'placeholder' => __('messages.please_select')]); !!}
                     </div>
-                </div>                
+                </div>
+                <div class="clearfix"></div>
+                @if($construction_expense_integration_enabled)
+                    @include('expense.partials.construction_fields')
+                @endif
+                <div class="clearfix"></div>
                 <div class="col-md-6">
                     <div class="form-group">
                         {!! Form::label('expense_tax_id', __('product.applicable_tax') . ':' ) !!}

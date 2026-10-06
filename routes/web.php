@@ -324,6 +324,7 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::resource('expense-categories', ExpenseCategoryController::class);
 
     //Expenses...
+    Route::get('expenses/construction-projects/{project}/items', [ExpenseController::class, 'constructionProjectItems'])->name('expenses.construction-project-items');
     Route::resource('expenses', ExpenseController::class);
     Route::get('import-expense', [ExpenseController::class, 'importExpense']);
     Route::post('store-import-expense', [ExpenseController::class, 'storeExpenseImport']);

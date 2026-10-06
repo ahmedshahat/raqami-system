@@ -1,0 +1,1 @@
+@if($isSaudiRiyal)<img class="sar-currency-icon" src="{{ $symbolSource }}" alt="ريال سعودي" width="10" height="11">@elseif($money['symbol'] !== '')<span class="print-money-symbol">{{ $money['symbol'] }}</span>@endif

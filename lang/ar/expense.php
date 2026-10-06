@@ -1,6 +1,14 @@
 <?php
 
 return [
+    'construction_project' => 'مشروع المقاولات',
+    'construction_project_item' => 'بند المشروع',
+    'no_construction_project' => 'بدون مشروع مقاولات',
+    'general_project_expense' => 'مصروف عام للمشروع (بدون بند)',
+    'construction_project_optional_hint' => 'اختياري؛ اتركه فارغًا لتسجيل مصروف عادي.',
+    'construction_project_item_optional_hint' => 'اختياري؛ عند تركه فارغًا يُسجل المصروف كمصروف عام للمشروع.',
+    'construction_item_requires_project' => 'يجب اختيار مشروع قبل اختيار بند المشروع.',
+    'construction_item_project_mismatch' => 'بند المشروع المختار لا ينتمي إلى المشروع المحدد.',
 
     /*
     |--------------------------------------------------------------------------

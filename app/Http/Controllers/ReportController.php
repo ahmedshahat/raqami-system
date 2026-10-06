@@ -690,6 +690,7 @@ class ReportController extends Controller
                 DB::raw("(SELECT SUM(IF(transactions.type='stock_adjustment', SAL.quantity, 0) ) FROM transactions 
                         LEFT JOIN stock_adjustment_lines AS SAL ON transactions.id=SAL.transaction_id
                         WHERE transactions.status='received' AND transactions.type='stock_adjustment' $location_filter 
+                        AND transactions.construction_material_document_id IS NULL
                         AND (SAL.variation_id=v.id)) as total_adjusted")
                 // DB::raw("(SELECT SUM(quantity) FROM transaction_sell_lines LEFT JOIN transactions ON transaction_sell_lines.transaction_id=transactions.id WHERE transactions.status='final' $location_filter AND
                 //     transaction_sell_lines.variation_id=v.id) as total_sold")
@@ -1091,7 +1092,8 @@ class ReportController extends Controller
         //Return the details in ajax call
         if ($request->ajax()) {
             $query = Transaction::where('business_id', $business_id)
-                            ->where('type', 'stock_adjustment');
+                            ->where('type', 'stock_adjustment')
+                            ->whereNull('construction_material_document_id');
 
             //Check for permitted locations of a user
             $permitted_locations = auth()->user()->permitted_locations();
@@ -2191,6 +2193,8 @@ class ReportController extends Controller
                         '=',
                         'tspl.purchase_line_id'
                     )
+                    ->leftJoin('stock_adjustment_lines as report_sal', 'report_sal.id', '=', 'tspl.stock_adjustment_line_id')
+                    ->leftJoin('transactions as report_adjustment', 'report_adjustment.id', '=', 'report_sal.transaction_id')
                     ->join('transactions as t', 'pl.transaction_id', '=', 't.id');
 
             $permitted_locations = auth()->user()->permitted_locations();
@@ -2250,7 +2254,7 @@ class ReportController extends Controller
                 //         AND (TSL.product_id=products.id OR TPL.product_id=products.id)) as total_sold"),
 
                 DB::raw('COALESCE(SUM(IF(tspl.sell_line_id IS NULL, 0, (tspl.quantity - tspl.qty_returned)) ), 0) as total_sold'),
-                DB::raw('COALESCE(SUM(IF(tspl.stock_adjustment_line_id IS NULL, 0, tspl.quantity ) ), 0) as total_adjusted'),
+                DB::raw('COALESCE(SUM(IF(tspl.stock_adjustment_line_id IS NULL OR report_adjustment.construction_material_document_id IS NOT NULL, 0, tspl.quantity ) ), 0) as total_adjusted'),
                 'products.type',
                 'units.short_name as unit'
             )
@@ -3296,6 +3300,8 @@ class ReportController extends Controller
                     as SAL', 'SAL.id', '=', 'transaction_sell_lines_purchase_lines.stock_adjustment_line_id')
                 ->leftJoin('transactions as sale', 'SL.transaction_id', '=', 'sale.id')
                 ->leftJoin('transactions as stock_adjustment', 'SAL.transaction_id', '=', 'stock_adjustment.id')
+                ->leftJoin('construction_material_documents as material_document', 'material_document.id', '=', 'stock_adjustment.construction_material_document_id')
+                ->leftJoin('construction_projects as material_project', 'material_project.id', '=', 'material_document.project_id')
                 ->join('purchase_lines as PL', 'PL.id', '=', 'transaction_sell_lines_purchase_lines.purchase_line_id')
                 ->join('transactions as purchase', 'PL.transaction_id', '=', 'purchase.id')
                 ->join('business_locations as bl', 'purchase.location_id', '=', 'bl.id')
@@ -3329,6 +3335,9 @@ class ReportController extends Controller
                     'stock_adjustment.transaction_date as stock_adjustment_date',
                     'sale.invoice_no as sale_invoice_no',
                     'stock_adjustment.ref_no as stock_adjustment_ref_no',
+                    'stock_adjustment.construction_material_document_id',
+                    'material_project.code as material_project_code',
+                    'material_project.name as material_project_name',
                     'customers.name as customer',
                     'customers.supplier_business_name as customer_business_name',
                     'transaction_sell_lines_purchase_lines.quantity as quantity',
@@ -3415,7 +3424,10 @@ class ReportController extends Controller
                 ->editColumn('sell_date', '@if(!empty($sell_line_id)) {{@format_datetime($sell_date)}} @else {{@format_datetime($stock_adjustment_date)}} @endif')
 
                 ->editColumn('sale_invoice_no', function ($row) {
-                    $invoice_no = ! empty($row->sell_line_id) ? $row->sale_invoice_no : $row->stock_adjustment_ref_no.'<br><small>('.__('stock_adjustment.stock_adjustment').'</small)>';
+                    $movementLabel = ! empty($row->construction_material_document_id)
+                        ? __('construction::lang.material_issue_stock_history').' — '.$row->material_project_code
+                        : __('stock_adjustment.stock_adjustment');
+                    $invoice_no = ! empty($row->sell_line_id) ? $row->sale_invoice_no : $row->stock_adjustment_ref_no.'<br><small>('.$movementLabel.'</small)>';
 
                     return $invoice_no;
                 })
@@ -3423,7 +3435,10 @@ class ReportController extends Controller
                     $html = '<span data-is_quantity="true" class="display_currency quantity" data-currency_symbol=false data-orig-value="'.(float) $row->quantity.'" data-unit="'.$row->unit.'" >'.(float) $row->quantity.'</span> '.$row->unit;
 
                     if (empty($row->sell_line_id)) {
-                        $html .= '<br><small>('.__('stock_adjustment.stock_adjustment').'</small)>';
+                        $movementLabel = ! empty($row->construction_material_document_id)
+                            ? __('construction::lang.material_issue_stock_history').' — '.$row->material_project_code
+                            : __('stock_adjustment.stock_adjustment');
+                        $html .= '<br><small>('.$movementLabel.'</small)>';
                     }
                     if ($row->qty_returned > 0) {
                         $html .= '<small><i>(<span data-is_quantity="true" class="display_currency" data-currency_symbol=false>'.(float) $row->quantity.'</span> '.$row->unit.' '.__('lang_v1.returned').')</i></small>';

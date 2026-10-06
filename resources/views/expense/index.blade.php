@@ -70,6 +70,14 @@
                         {!! Form::select('expense_payment_status', ['paid' => __('lang_v1.paid'), 'due' => __('lang_v1.due'), 'partial' => __('lang_v1.partial')], null, ['class' => 'form-control select2', 'style' => 'width:100%', 'placeholder' => __('lang_v1.all')]); !!}
                     </div>
                 </div>
+                @if($construction_expense_integration_enabled)
+                <div class="col-md-3">
+                    <div class="form-group">
+                        {!! Form::label('construction_project_filter', __('expense.construction_project').':') !!}
+                        {!! Form::select('construction_project_filter', $construction_projects, request('construction_project_id'), ['class' => 'form-control select2', 'style' => 'width:100%', 'placeholder' => __('lang_v1.all')]); !!}
+                    </div>
+                </div>
+                @endif
             @endcomponent
         </div>
     </div>

@@ -794,8 +794,16 @@ class SellController extends Controller
         $status_color_in_activity = Transaction::sales_order_statuses();
         $sales_orders = $sell->salesOrders();
 
-        return view('sale_pos.show')
-            ->with(compact(
+        $constructionCertificate = null;
+        if ($sell->source === 'construction_certificate' && \Illuminate\Support\Facades\Schema::hasTable('construction_customer_certificates')) {
+            $constructionCertificate = \Modules\Construction\Entities\ConstructionCustomerCertificate::query()
+                ->where('business_id', $business_id)
+                ->where('invoice_transaction_id', $sell->id)
+                ->with(['project', 'contract', 'measurement'])
+                ->first();
+        }
+
+        $viewData = compact(
                 'taxes',
                 'sell',
                 'payment_types',
@@ -808,8 +816,18 @@ class SellController extends Controller
                 'statuses',
                 'status_color_in_activity',
                 'sales_orders',
-                'line_taxes'
-            ));
+                'line_taxes',
+                'constructionCertificate'
+            );
+
+        if ($constructionCertificate && request()->boolean('construction')) {
+            return view('construction::certificates.invoice', $viewData + [
+                'project' => $constructionCertificate->project,
+                'certificate' => $constructionCertificate,
+            ]);
+        }
+
+        return view('sale_pos.show')->with($viewData);
     }
 
     /**
