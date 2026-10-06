@@ -21,11 +21,16 @@ class ConstructionSubcontractCertificate extends Model
     public function items() { return $this->hasMany(ConstructionSubcontractCertificateItem::class, 'certificate_id')->orderBy('id'); }
     public function payments() { return $this->hasMany(ConstructionSubcontractPayment::class, 'certificate_id')->latest('payment_date')->latest('id'); }
     public function activePayments() { return $this->hasMany(ConstructionSubcontractPayment::class, 'certificate_id')->where('status', 'recorded'); }
+    public function retentionReleases() { return $this->hasMany(ConstructionSubcontractRetentionRelease::class, 'certificate_id')->latest('release_date')->latest('id'); }
+    public function activeRetentionReleases() { return $this->hasMany(ConstructionSubcontractRetentionRelease::class, 'certificate_id')->where('status', 'recorded'); }
     public function createdBy() { return $this->belongsTo(User::class, 'created_by'); }
     public function approvedBy() { return $this->belongsTo(User::class, 'approved_by'); }
     public function isEditable(): bool { return $this->status === 'draft'; }
     public function paidValue(): float { return round((float) $this->activePayments()->sum('amount'), 4); }
-    public function remainingValue(): float { return round(max(0, (float) $this->net_value - $this->paidValue()), 4); }
+    public function releasedRetentionValue(): float { return round((float) $this->activeRetentionReleases()->sum('amount'), 4); }
+    public function retentionRemainingValue(): float { return round(max(0, (float) $this->retention_value - $this->releasedRetentionValue()), 4); }
+    public function payableValue(): float { return round((float) $this->net_value + $this->releasedRetentionValue(), 4); }
+    public function remainingValue(): float { return round(max(0, $this->payableValue() - $this->paidValue()), 4); }
     public function paymentStatus(): string
     {
         $paid = $this->paidValue();

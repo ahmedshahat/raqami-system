@@ -18,6 +18,7 @@ use Modules\Construction\Http\Controllers\LaborController;
 use Modules\Construction\Http\Controllers\SubcontractorController;
 use Modules\Construction\Http\Controllers\SubcontractCertificateController;
 use Modules\Construction\Http\Controllers\SubcontractPaymentController;
+use Modules\Construction\Http\Controllers\SubcontractRetentionReleaseController;
 
 Route::middleware([
     'web',
@@ -89,6 +90,8 @@ Route::middleware([
     Route::post('subcontractors/{subcontract}/certificates/{certificate}/payments', [SubcontractPaymentController::class, 'store'])->name('subcontractors.certificates.payments.store');
     Route::get('subcontractors/{subcontract}/certificates/{certificate}/payments/{payment}/preview', [SubcontractPaymentController::class, 'preview'])->name('subcontractors.certificates.payments.preview');
     Route::get('subcontractors/{subcontract}/certificates/{certificate}/payments/{payment}/print', [SubcontractPaymentController::class, 'print'])->name('subcontractors.certificates.payments.print');
+    Route::post('subcontractors/{subcontract}/certificates/{certificate}/retention-releases', [SubcontractRetentionReleaseController::class, 'store'])->name('subcontractors.certificates.retention-releases.store');
+    Route::post('subcontractors/{subcontract}/certificates/{certificate}/retention-releases/{release}/cancel', [SubcontractRetentionReleaseController::class, 'cancel'])->name('subcontractors.certificates.retention-releases.cancel');
     Route::get('reports', [DashboardController::class, 'reports'])->name('reports.index');
     Route::get('print-font/{weight}', [PrintFontController::class, 'show'])->name('print-font');
     Route::get('quotes', [QuoteController::class, 'index'])->name('quotes.index');

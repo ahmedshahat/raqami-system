@@ -36,7 +36,7 @@ class SubcontractPaymentController extends BaseController
         $payment = DB::transaction(function () use ($contract, $certificate, $validated) {
             $certificate = ConstructionSubcontractCertificate::where('business_id', $this->businessId())->lockForUpdate()->findOrFail($certificate->id);
             $paid = (float) ConstructionSubcontractPayment::where('certificate_id', $certificate->id)->where('status', 'recorded')->sum('amount');
-            $remaining = round(max(0, (float) $certificate->net_value - $paid), 4);
+            $remaining = round(max(0, $certificate->payableValue() - $paid), 4);
             if ((float) $validated['amount'] > $remaining + 0.0001) {
                 throw ValidationException::withMessages(['amount' => __('construction::lang.payment_exceeds_remaining', ['remaining' => (new Util())->num_f($remaining)])]);
             }

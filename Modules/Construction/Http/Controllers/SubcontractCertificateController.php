@@ -222,7 +222,7 @@ class SubcontractCertificateController extends BaseController
     private function loadCertificate(ConstructionSubcontract $contract, ConstructionSubcontractCertificate $certificate): void
     {
         $contract->load(['project:id,code,name', 'subcontractor:id,name,supplier_business_name,mobile', 'items']);
-        $certificate->load(['items.subcontractItem', 'payments.account:id,name', 'payments.createdBy:id,surname,first_name,last_name', 'createdBy:id,surname,first_name,last_name', 'approvedBy:id,surname,first_name,last_name']);
+        $certificate->load(['items.subcontractItem', 'payments.account:id,name', 'payments.createdBy:id,surname,first_name,last_name', 'retentionReleases.createdBy:id,surname,first_name,last_name', 'retentionReleases.cancelledBy:id,surname,first_name,last_name', 'createdBy:id,surname,first_name,last_name', 'approvedBy:id,surname,first_name,last_name']);
     }
 
     private function printData(int $subcontract, int $certificate): array

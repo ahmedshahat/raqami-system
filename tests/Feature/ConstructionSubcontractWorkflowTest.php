@@ -9,6 +9,7 @@ use Modules\Construction\Entities\ConstructionProject;
 use Modules\Construction\Entities\ConstructionSubcontract;
 use Modules\Construction\Entities\ConstructionSubcontractCertificate;
 use Modules\Construction\Entities\ConstructionSubcontractPayment;
+use Modules\Construction\Entities\ConstructionSubcontractRetentionRelease;
 use Tests\TestCase;
 
 class ConstructionSubcontractWorkflowTest extends TestCase
@@ -124,6 +125,53 @@ class ConstructionSubcontractWorkflowTest extends TestCase
         $this->assertEquals(3225, $certificate->paidValue());
         $this->assertEquals(0, $certificate->remainingValue());
         $this->assertSame('paid', $certificate->paymentStatus());
+
+        $costBeforeRelease = $this->get(route('construction.costs.index', ['project_id' => $project->id]))->assertOk();
+        $costBeforeRelease->assertSee('data-cost-source="subcontracts" data-cost-value="3500"', false);
+
+        $this->post(route('construction.subcontractors.certificates.retention-releases.store', [$contract->id, $certificate->id]), [
+            'release_date' => now()->toDateString(),
+            'retention_amount' => 100,
+            'notes' => 'Partial retention release',
+        ])->assertRedirect();
+        $release = ConstructionSubcontractRetentionRelease::where('certificate_id', $certificate->id)->latest('id')->firstOrFail();
+        $this->assertEquals(100, $certificate->releasedRetentionValue());
+        $this->assertEquals(75, $certificate->retentionRemainingValue());
+        $this->assertEquals(3325, $certificate->payableValue());
+        $this->assertEquals(100, $certificate->remainingValue());
+        $this->assertSame('partially_paid', $certificate->paymentStatus());
+
+        $this->post(route('construction.subcontractors.certificates.retention-releases.cancel', [$contract->id, $certificate->id, $release->id]), [
+            'cancellation_reason' => 'Release entered too early',
+        ])->assertRedirect();
+        $this->assertSame('cancelled', $release->fresh()->status);
+        $this->assertEquals(0, $certificate->releasedRetentionValue());
+        $this->assertEquals(175, $certificate->retentionRemainingValue());
+        $this->assertEquals(0, $certificate->remainingValue());
+
+        $this->post(route('construction.subcontractors.certificates.retention-releases.store', [$contract->id, $certificate->id]), [
+            'release_date' => now()->toDateString(),
+            'retention_amount' => 175,
+        ])->assertRedirect();
+        $finalRelease = ConstructionSubcontractRetentionRelease::where('certificate_id', $certificate->id)->where('status', 'recorded')->latest('id')->firstOrFail();
+        $this->post(route('construction.subcontractors.certificates.retention-releases.store', [$contract->id, $certificate->id]), [
+            'release_date' => now()->toDateString(),
+            'retention_amount' => 1,
+        ])->assertRedirect()->assertSessionHasErrors('retention_amount');
+
+        $this->post(route('construction.subcontractors.certificates.payments.store', [$contract->id, $certificate->id]), [
+            'payment_date' => now()->toDateString(), 'amount' => 175, 'method' => 'cash',
+        ])->assertRedirect();
+        $this->assertEquals(3400, $certificate->paidValue());
+        $this->assertEquals(0, $certificate->remainingValue());
+        $this->assertSame('paid', $certificate->paymentStatus());
+        $this->post(route('construction.subcontractors.certificates.retention-releases.cancel', [$contract->id, $certificate->id, $finalRelease->id]), [
+            'cancellation_reason' => 'Blocked after payment',
+        ])->assertRedirect()->assertSessionHasErrors('cancellation_reason');
+        $this->assertSame('recorded', $finalRelease->fresh()->status);
+
+        $costAfterRelease = $this->get(route('construction.costs.index', ['project_id' => $project->id]))->assertOk();
+        $costAfterRelease->assertSee('data-cost-source="subcontracts" data-cost-value="3500"', false);
 
         $this->post(route('construction.subcontractors.certificates.store', $contract->id), [
             'certificate_date' => now()->addDay()->toDateString(),
