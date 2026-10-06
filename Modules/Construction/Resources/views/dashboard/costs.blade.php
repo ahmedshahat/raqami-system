@@ -45,6 +45,11 @@
             <div><small>@lang('construction::lang.cost_labor')</small><strong>@include('construction::partials.money', ['value' => $summary['labor']])</strong><p>{{ $summary['labor_lines'] }} @lang('construction::lang.labor_lines')</p></div>
             <i class="fas fa-arrow-left ct-cost-card__arrow"></i>
         </a>
+        <a href="{{ route('construction.subcontractors.index', array_filter(['project_id' => $selectedProjectId])) }}" class="ct-cost-card ct-cost-card--subcontracts" data-cost-source="subcontracts" data-cost-value="{{ $summary['subcontracts'] }}" data-document-count="{{ $summary['subcontract_certificates'] }}">
+            <span class="ct-cost-card__icon"><i class="fas fa-people-carry"></i></span>
+            <div><small>@lang('construction::lang.cost_subcontracts')</small><strong>@include('construction::partials.money', ['value' => $summary['subcontracts']])</strong><p>{{ $summary['subcontract_certificates'] }} @lang('construction::lang.approved_subcontract_certificates')</p></div>
+            <i class="fas fa-arrow-left ct-cost-card__arrow"></i>
+        </a>
     </div>
 
     <section id="ct-cost-expenses" class="ct-cost-panel">

@@ -182,16 +182,20 @@ class ProjectController extends BaseController
             ->join('construction_labor_sheet_lines as lines', 'lines.sheet_id', '=', 'sheets.id')
             ->where('sheets.business_id', $this->businessId())->where('sheets.project_id', $project->id)->where('sheets.status', 'approved')
             ->sum('lines.total_cost');
+        $subcontractTotal = (float) DB::table('construction_subcontract_certificates')
+            ->where('business_id', $this->businessId())->where('project_id', $project->id)->where('status', 'approved')
+            ->sum('gross_value');
         $projectValue = (float) ($project->contracts->firstWhere('is_primary', true)?->original_value
             ?: $project->boqVersions->first()?->sales_total
             ?: $project->quote?->total
             ?: 0);
-        $registeredCostTotal = (float) $expenseStats->expense_total + $materialTotal + $laborTotal;
+        $registeredCostTotal = (float) $expenseStats->expense_total + $materialTotal + $laborTotal + $subcontractTotal;
         $projectCostSummary = [
             'project_value' => $projectValue,
             'expense_total' => (float) $expenseStats->expense_total,
             'material_total' => $materialTotal,
             'labor_total' => $laborTotal,
+            'subcontract_total' => $subcontractTotal,
             'registered_total' => $registeredCostTotal,
             'expense_count' => (int) $expenseStats->expense_count,
             'expense_percent' => $projectValue > 0 ? max(0, round(($registeredCostTotal / $projectValue) * 100, 1)) : 0,

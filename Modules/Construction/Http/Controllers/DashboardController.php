@@ -9,6 +9,7 @@ use Modules\Construction\Entities\ConstructionProject;
 use Modules\Construction\Entities\ConstructionQuote;
 use Modules\Construction\Entities\ConstructionMaterialDocument;
 use Modules\Construction\Entities\ConstructionLaborSheet;
+use Modules\Construction\Entities\ConstructionSubcontractCertificate;
 
 class DashboardController extends BaseController
 {
@@ -151,12 +152,23 @@ class DashboardController extends BaseController
             ->selectRaw('COUNT(labor_lines.id) as lines_count')
             ->first();
 
+        $subcontractStats = ConstructionSubcontractCertificate::query()
+            ->where('business_id', $businessId)
+            ->where('status', 'approved')
+            ->when($selectedProjectId, fn ($query) => $query->where('project_id', $selectedProjectId))
+            ->selectRaw('COALESCE(SUM(gross_value), 0) as total')
+            ->selectRaw('COUNT(*) as certificates_count')
+            ->first();
+
         $summary = [
-            'total' => (float) $expenseStats->net_total + (float) $materialStats->net_total + (float) $laborStats->total,
+            'total' => (float) $expenseStats->net_total + (float) $materialStats->net_total
+                + (float) $laborStats->total + (float) $subcontractStats->total,
             'expenses' => (float) $expenseStats->net_total,
             'materials' => (float) $materialStats->net_total,
             'labor' => (float) $laborStats->total,
             'labor_lines' => (int) $laborStats->lines_count,
+            'subcontracts' => (float) $subcontractStats->total,
+            'subcontract_certificates' => (int) $subcontractStats->certificates_count,
             'records_count' => (int) $expenseStats->records_count,
             'projects_count' => (int) $expenseStats->projects_count,
             'material_issue_lines' => (int) $materialStats->issue_lines,

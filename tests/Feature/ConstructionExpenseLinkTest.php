@@ -12,6 +12,8 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Mockery;
 use Modules\Construction\Entities\ConstructionProject;
+use Modules\Construction\Entities\ConstructionSubcontract;
+use Modules\Construction\Entities\ConstructionSubcontractCertificate;
 use Tests\TestCase;
 
 class ConstructionExpenseLinkTest extends TestCase
@@ -179,6 +181,66 @@ class ConstructionExpenseLinkTest extends TestCase
 
         $this->getJson(route('expenses.construction-project-items', $project->id))->assertNotFound();
         $this->assertSame([], $constructionQueries, 'Disabled integration must not query Construction project or item tables.');
+    }
+
+    public function test_costs_include_only_approved_subcontract_certificates_and_respect_project_filtering(): void
+    {
+        [$business, $user, $contact] = $this->context();
+        $this->actingAs($user);
+        [$projectA] = $this->projectWithItem($business->id, $user->id, $contact->id, 'SUBCOST-A');
+        [$projectB] = $this->projectWithItem($business->id, $user->id, $contact->id, 'SUBCOST-B');
+
+        $subcontractA = ConstructionSubcontract::create([
+            'business_id' => $business->id,
+            'project_id' => $projectA->id,
+            'subcontractor_id' => $contact->id,
+            'number' => 'SC-COST-A-'.uniqid(),
+            'title' => 'Approved subcontract cost A',
+            'total_value' => 1500,
+            'status' => 'approved',
+            'created_by' => $user->id,
+        ]);
+        $subcontractB = ConstructionSubcontract::create([
+            'business_id' => $business->id,
+            'project_id' => $projectB->id,
+            'subcontractor_id' => $contact->id,
+            'number' => 'SC-COST-B-'.uniqid(),
+            'title' => 'Approved subcontract cost B',
+            'total_value' => 800,
+            'status' => 'approved',
+            'created_by' => $user->id,
+        ]);
+
+        $this->subcontractCertificate($subcontractA, $user->id, 'SC-IP-A1', 600, 'approved');
+        $this->subcontractCertificate($subcontractA, $user->id, 'SC-IP-A2', 900, 'draft');
+        $this->subcontractCertificate($subcontractB, $user->id, 'SC-IP-B1', 400, 'approved');
+
+        $filteredA = $this->get(route('construction.costs.index', ['project_id' => $projectA->id]))->assertOk();
+        $filteredA->assertSee('data-cost-source="subcontracts" data-cost-value="600" data-document-count="1"', false)
+            ->assertDontSee('data-cost-value="900"', false);
+
+        $filteredB = $this->get(route('construction.costs.index', ['project_id' => $projectB->id]))->assertOk();
+        $filteredB->assertSee('data-cost-source="subcontracts" data-cost-value="400" data-document-count="1"', false);
+
+        $projectPage = $this->get(route('construction.projects.show', $projectA->id))->assertOk();
+        $projectPage->assertSee('data-cost-source="subcontracts" data-cost-value="600"', false);
+    }
+
+    private function subcontractCertificate(ConstructionSubcontract $subcontract, int $userId, string $number, float $grossValue, string $status): ConstructionSubcontractCertificate
+    {
+        return ConstructionSubcontractCertificate::create([
+            'business_id' => $subcontract->business_id,
+            'project_id' => $subcontract->project_id,
+            'subcontract_id' => $subcontract->id,
+            'number' => $number.'-'.uniqid(),
+            'certificate_date' => now()->toDateString(),
+            'gross_value' => $grossValue,
+            'net_value' => $grossValue,
+            'status' => $status,
+            'created_by' => $userId,
+            'approved_by' => $status === 'approved' ? $userId : null,
+            'approved_at' => $status === 'approved' ? now() : null,
+        ]);
     }
 
     private function context(): array

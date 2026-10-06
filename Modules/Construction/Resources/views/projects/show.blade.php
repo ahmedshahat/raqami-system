@@ -155,6 +155,7 @@
                     <div><span>@lang('construction::lang.registered_expenses')</span><strong>@include('construction::partials.money', ['value' => $projectCostSummary['expense_total']])</strong></div>
                     <div><span>@lang('construction::lang.cost_materials')</span><strong>@include('construction::partials.money', ['value' => $projectCostSummary['material_total']])</strong></div>
                     <div><span>@lang('construction::lang.cost_labor')</span><strong>@include('construction::partials.money', ['value' => $projectCostSummary['labor_total']])</strong></div>
+                    <div data-cost-source="subcontracts" data-cost-value="{{ $projectCostSummary['subcontract_total'] }}"><span>@lang('construction::lang.cost_subcontracts')</span><strong>@include('construction::partials.money', ['value' => $projectCostSummary['subcontract_total']])</strong></div>
                     <div><span>@lang('construction::lang.expenses_to_project_value')</span><strong>{{ @num_format($projectCostSummary['expense_percent']) }}%</strong></div>
                 </div>
                 <div class="ct-project-cost-progress" role="progressbar" aria-valuenow="{{ min(100, $projectCostSummary['expense_percent']) }}" aria-valuemin="0" aria-valuemax="100"><span style="width:{{ min(100, $projectCostSummary['expense_percent']) }}%"></span></div>

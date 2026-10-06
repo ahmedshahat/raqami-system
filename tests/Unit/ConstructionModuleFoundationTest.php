@@ -12,7 +12,7 @@ class ConstructionModuleFoundationTest extends TestCase
     public function test_module_configuration_and_routes_are_registered(): void
     {
         $this->assertSame('Construction', config('construction.name'));
-        $this->assertSame('0.11.0', config('construction.module_version'));
+        $this->assertSame('0.11.1', config('construction.module_version'));
         $this->assertTrue(Route::has('construction.dashboard'));
         $this->assertTrue(Route::has('construction.install.index'));
         $this->assertTrue(Route::has('construction.install.store'));
