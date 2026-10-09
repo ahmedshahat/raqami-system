@@ -51,6 +51,7 @@ class ConstructionNavigationTest extends TestCase
             route('construction.costs.index'),
             route('construction.subcontractors.index'),
             route('construction.reports.index'),
+            route('construction.settings.index'),
             route('construction.overview.index'),
             route('construction.projects.show', $project->id),
             route('construction.projects.boq.show', [$project->id, $boq->id]),
@@ -82,6 +83,7 @@ class ConstructionNavigationTest extends TestCase
             route('construction.costs.index'),
             route('construction.subcontractors.index'),
             route('construction.reports.index'),
+            route('construction.settings.index'),
         ];
 
         foreach ($pages as $url) {
@@ -139,12 +141,13 @@ class ConstructionNavigationTest extends TestCase
             route('construction.costs.index'),
             route('construction.subcontractors.index'),
             route('construction.reports.index'),
+            route('construction.settings.index'),
         ] as $url) {
             $this->get($url)->assertOk()->assertDontSee('ct-hero ct-hero--compact', false);
         }
     }
 
-    public function test_sidebar_contains_only_the_seven_requested_first_level_items(): void
+    public function test_sidebar_contains_the_eight_requested_first_level_items(): void
     {
         $business = Business::whereHas('locations')->whereIn('id', Unit::select('business_id'))->firstOrFail();
         $user = User::findOrFail($business->owner_id);
@@ -165,6 +168,7 @@ class ConstructionNavigationTest extends TestCase
             route('construction.costs.index'),
             route('construction.subcontractors.index'),
             route('construction.reports.index'),
+            route('construction.settings.index'),
         ];
         foreach ($expectedRoutes as $route) {
             $this->assertSame(1, substr_count($sidebar, 'href="'.$route.'"'), $route);

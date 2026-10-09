@@ -27,7 +27,7 @@ body{font-size:13.5px!important;line-height:1.8!important}
 .print-signature .print-label{font-size:12px!important}
 .print-footer,.print-footer td{font-size:10.5px!important;line-height:1.5!important}
 .print-number{direction:ltr;unicode-bidi:isolate;text-align:left;white-space:nowrap}
-.print-money{display:inline-block;direction:ltr;white-space:nowrap;unicode-bidi:isolate}
+.print-money{display:inline-flex;align-items:baseline;gap:3px;direction:inherit;white-space:nowrap;unicode-bidi:isolate}
 .print-money .sar-currency-icon{display:inline-block;width:.72em;height:.81em;margin-left:2px;vertical-align:-.08em}
 .print-money-symbol{margin-left:3px}
 .print-money--before .print-money-symbol{margin-left:0;margin-right:3px}

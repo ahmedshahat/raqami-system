@@ -23,6 +23,8 @@ class AdminSidebarMenu
         }
 
         Menu::create('admin-sidebar-menu', function ($menu) {
+            // Sidebar priority: daily operations first, then inventory/finance,
+            // operational modules and integrations, followed by administration.
             $enabled_modules = !empty(session('business.enabled_modules')) ? session('business.enabled_modules') : [];
 
             $common_settings = !empty(session('business.common_settings')) ? session('business.common_settings') : [];
@@ -46,6 +48,16 @@ class AdminSidebarMenu
             <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
             <path d="M10 12h4v4h-4z" />
           </svg>', 'active' => request()->segment(1) == 'home'])->order(5);
+
+            if ($is_admin) {
+                $menu->url(route('dashboard.v2'), __('dashboard_v2.title'), ['icon' => '<svg xmlns="http://www.w3.org/2000/svg" class="tw-size-5 tw-shrink-0" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M4 4h6v8h-6z" />
+            <path d="M14 4h6v5h-6z" />
+            <path d="M4 16h6v4h-6z" />
+            <path d="M14 13h6v7h-6z" />
+          </svg>', 'active' => request()->segment(1) == 'dashboard-v2', 'data-feature-highlight' => 'true'])->order(6);
+            }
 
             //User management dropdown
             if (auth()->user()->can('user.view') || auth()->user()->can('user.create') || auth()->user()->can('roles.view')) {
@@ -82,7 +94,7 @@ class AdminSidebarMenu
                     <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     <path d="M21 21v-2a4 4 0 0 0 -3 -3.85"></path>
                   </svg>', ]
-                )->order(10);
+                )->order(85);
             }
 
             //Contacts dropdown
@@ -135,7 +147,7 @@ class AdminSidebarMenu
                     <path d="M4 12h3"></path>
                     <path d="M4 16h3"></path>
                   </svg>', 'id' => 'tour_step4']
-                )->order(15);
+                )->order(25);
             }
 
             //Products dropdown
@@ -290,7 +302,7 @@ class AdminSidebarMenu
                     <path d="M16 11l-4 4l-4 -4"></path>
                     <path d="M3 12a9 9 0 0 0 18 0"></path>
                   </svg>', 'id' => 'tour_step6']
-                )->order(25);
+                )->order(15);
             }
             //Sell dropdown
             if ($is_admin || auth()->user()->hasAnyPermission(['sell.view', 'sell.create', 'direct_sell.access', 'view_own_sell_only', 'view_commission_agent_sell', 'access_shipping', 'access_own_shipping', 'access_commission_agent_shipping', 'access_sell_return', 'direct_sell.view', 'direct_sell.update', 'access_own_sell_return'])) {
@@ -341,7 +353,7 @@ class AdminSidebarMenu
                             $sub->url(
                                 action([\App\Http\Controllers\SellController::class, 'create'], ['status' => 'draft']),
                                 __('lang_v1.add_draft'),
-                                ['icon' => '', 'active' => request()->get('status') == 'draft']
+                                ['icon' => '', 'active' => request()->segment(1) == 'sells' && request()->segment(2) == 'create' && request()->get('status') == 'draft']
                             );
                         }
                         if (in_array('add_sale', $enabled_modules) && ($is_admin || auth()->user()->hasAnyPermission(['draft.view_all', 'draft.view_own']))) {
@@ -355,7 +367,7 @@ class AdminSidebarMenu
                             $sub->url(
                                 action([\App\Http\Controllers\SellController::class, 'create'], ['status' => 'quotation']),
                                 __('lang_v1.add_quotation'),
-                                ['icon' => '', 'active' => request()->get('status') == 'quotation']
+                                ['icon' => '', 'active' => request()->segment(1) == 'sells' && request()->segment(2) == 'create' && request()->get('status') == 'quotation']
                             );
                         }
                         if (in_array('add_sale', $enabled_modules) && ($is_admin || auth()->user()->hasAnyPermission(['quotation.view_all', 'quotation.view_own']))) {
@@ -412,7 +424,7 @@ class AdminSidebarMenu
                     <path d="M16 7l-4 -4l-4 4"></path>
                     <path d="M3 12a9 9 0 0 0 18 0"></path>
                   </svg>', 'id' => 'tour_step7']
-                )->order(30);
+                )->order(10);
             }
 
             //Stock transfer dropdown
@@ -443,7 +455,7 @@ class AdminSidebarMenu
                     <path d="M5 17h-2v-4m-1 -8h11v12m-4 0h6m4 0h2v-6h-8m0 -5h5l3 5"></path>
                     <path d="M3 9l4 0"></path>
                   </svg>']
-                )->order(35);
+                )->order(30);
             }
 
             //stock adjustment dropdown
@@ -473,7 +485,7 @@ class AdminSidebarMenu
                     <path d="M4 6v6a8 3 0 0 0 16 0v-6"></path>
                     <path d="M4 12v6a8 3 0 0 0 16 0v-6"></path>
                   </svg>']
-                )->order(40);
+                )->order(35);
             }
 
             //Expense dropdown
@@ -510,7 +522,7 @@ class AdminSidebarMenu
                     <path d="M14.8 8a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1"></path>
                     <path d="M12 6v10"></path>
                   </svg>']
-                )->order(45);
+                )->order(40);
             }
             //Accounts dropdown
             if (auth()->user()->can('account.access') && in_array('account', $enabled_modules)) {
@@ -551,7 +563,7 @@ class AdminSidebarMenu
                     <path d="M7 15l.01 0"></path>
                     <path d="M11 15l2 0"></path>
                   </svg>']
-                )->order(50);
+                )->order(45);
             }
 
             //Reports dropdown
@@ -749,7 +761,7 @@ class AdminSidebarMenu
                     <path d="M8 11h4"></path>
                     <path d="M8 15h3"></path>
                   </svg>', 'id' => 'tour_step8']
-                )->order(55);
+                )->order(50);
             }
 
             //Backup menu
@@ -760,7 +772,7 @@ class AdminSidebarMenu
                 <path d="M12 18.004h-5.343c-2.572 -.004 -4.657 -2.011 -4.657 -4.487c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.38 0 2.57 .811 3.128 1.986"></path>
                 <path d="M19 22v-6"></path>
                 <path d="M22 19l-3 -3l-3 3"></path>
-              </svg>', 'active' => request()->segment(1) == 'backup'])->order(60);
+              </svg>', 'active' => request()->segment(1) == 'backup'])->order(96);
             }
 
             //Modules menu
@@ -771,22 +783,22 @@ class AdminSidebarMenu
               <path d="M12 4l-8 4l8 4l8 -4l-8 -4"></path>
               <path d="M4 12l8 4l8 -4"></path>
               <path d="M4 16l8 4l8 -4"></path>
-            </svg>', 'active' => request()->segment(1) == 'manage-modules'])->order(60);
+            </svg>', 'active' => request()->segment(1) == 'manage-modules'])->order(97);
             }
 
             //Booking menu
             if (in_array('booking', $enabled_modules) && (auth()->user()->can('crud_all_bookings') || auth()->user()->can('crud_own_bookings'))) {
-                $menu->url(action([\App\Http\Controllers\Restaurant\BookingController::class, 'index']), __('restaurant.bookings'), ['icon' => '<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-calendar-check"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11.5 21h-5.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v6" /><path d="M16 3v4" /><path d="M8 3v4" /><path d="M4 11h16" /><path d="M15 19l2 2l4 -4" /></svg>', 'active' => request()->segment(1) == 'bookings'])->order(65);
+                $menu->url(action([\App\Http\Controllers\Restaurant\BookingController::class, 'index']), __('restaurant.bookings'), ['icon' => '<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-calendar-check"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M11.5 21h-5.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v6" /><path d="M16 3v4" /><path d="M8 3v4" /><path d="M4 11h16" /><path d="M15 19l2 2l4 -4" /></svg>', 'active' => request()->segment(1) == 'bookings'])->order(70);
             }
 
             //Kitchen menu
             if (in_array('kitchen', $enabled_modules)) {
-                $menu->url(action([\App\Http\Controllers\Restaurant\KitchenController::class, 'index']), __('restaurant.kitchen'), ['icon' => '<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-flame"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12c2 -2.96 0 -7 -1 -8c0 3.038 -1.773 4.741 -3 6c-1.226 1.26 -2 3.24 -2 5a6 6 0 1 0 12 0c0 -1.532 -1.056 -3.94 -2 -5c-1.786 3 -2.791 3 -4 2z" /></svg>', 'active' => request()->segment(1) == 'modules' && request()->segment(2) == 'kitchen'])->order(70);
+                $menu->url(action([\App\Http\Controllers\Restaurant\KitchenController::class, 'index']), __('restaurant.kitchen'), ['icon' => '<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-flame"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 12c2 -2.96 0 -7 -1 -8c0 3.038 -1.773 4.741 -3 6c-1.226 1.26 -2 3.24 -2 5a6 6 0 1 0 12 0c0 -1.532 -1.056 -3.94 -2 -5c-1.786 3 -2.791 3 -4 2z" /></svg>', 'active' => request()->segment(1) == 'modules' && request()->segment(2) == 'kitchen'])->order(71);
             }
 
             //Service Staff menu
             if (in_array('service_staff', $enabled_modules)) {
-                $menu->url(action([\App\Http\Controllers\Restaurant\OrderController::class, 'index']), __('restaurant.orders'), ['icon' => '<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="18"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-baseline-density-medium"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h16" /><path d="M4 12h16" /><path d="M4 4h16" /></svg>', 'active' => request()->segment(1) == 'modules' && request()->segment(2) == 'orders'])->order(75);
+                $menu->url(action([\App\Http\Controllers\Restaurant\OrderController::class, 'index']), __('restaurant.orders'), ['icon' => '<svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="18"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-baseline-density-medium"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 20h16" /><path d="M4 12h16" /><path d="M4 4h16" /></svg>', 'active' => request()->segment(1) == 'modules' && request()->segment(2) == 'orders'])->order(72);
             }
 
             //Notification template menu
@@ -796,7 +808,7 @@ class AdminSidebarMenu
                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                     <path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10z"></path>
                     <path d="M3 7l9 6l9 -6"></path>
-                  </svg>', 'active' => request()->segment(1) == 'notification-templates'])->order(80);
+                  </svg>', 'active' => request()->segment(1) == 'notification-templates'])->order(90);
             }
 
             //Settings Dropdown
@@ -881,7 +893,7 @@ class AdminSidebarMenu
                     <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"></path>
                     <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"></path>
                   </svg>', 'id' => 'tour_step3']
-                )->order(85);
+                )->order(95);
             }
         });
 

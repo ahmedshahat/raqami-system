@@ -613,9 +613,9 @@ class SellPosController extends Controller
 
                 
 
-                DB::commit();
-
                 SellCreatedOrModified::dispatch($transaction);
+
+                DB::commit();
 
                 if ($request->input('is_save_and_print') == 1) {
                     $url = $this->transactionUtil->getInvoiceUrl($transaction->id, $business_id);
@@ -1595,7 +1595,9 @@ class SellPosController extends Controller
                 //Begin transaction
                 DB::beginTransaction();
 
+                $transaction = Transaction::where('business_id', $business_id)->findOrFail($id);
                 $output = $this->transactionUtil->deleteSale($business_id, $id);
+                SellCreatedOrModified::dispatch($transaction, true);
 
                 DB::commit();
             } catch (\Exception $e) {

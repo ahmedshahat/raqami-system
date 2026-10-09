@@ -15,6 +15,7 @@ use App\Http\Controllers\CombinedPurchaseReturnController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerGroupController;
 use App\Http\Controllers\DashboardConfiguratorController;
+use App\Http\Controllers\DashboardV2Controller;
 use App\Http\Controllers\DiscountController;
 use App\Http\Controllers\DocumentAndNoteController;
 use App\Http\Controllers\ExpenseCategoryController;
@@ -112,6 +113,8 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('/sign-in-as-user/{id}', [ManageUserController::class, 'signInAsUser'])->name('sign-in-as-user');
 
     Route::get('/home', [HomeController::class, 'index'])->name('home');
+    Route::get('/dashboard-v2', [DashboardV2Controller::class, 'index'])->name('dashboard.v2');
+    Route::get('/dashboard-v2/summary', [DashboardV2Controller::class, 'summary'])->name('dashboard.v2.summary');
     Route::get('/home/get-totals', [HomeController::class, 'getTotals']);
     Route::get('/home/product-stock-alert', [HomeController::class, 'getProductStockAlert']);
     Route::get('/home/purchase-payment-dues', [HomeController::class, 'getPurchasePaymentDues']);

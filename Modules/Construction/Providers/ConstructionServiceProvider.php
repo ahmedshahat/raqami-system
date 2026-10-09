@@ -16,6 +16,10 @@ class ConstructionServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app['events']->listen(\App\Events\TransactionPaymentAdded::class, \Modules\Construction\Listeners\MapCustomerCollection::class);
+        $this->app['events']->listen(\App\Events\TransactionPaymentUpdated::class, \Modules\Construction\Listeners\MapCustomerCollection::class);
+        $this->app['events']->listen(\App\Events\TransactionPaymentDeleted::class, \Modules\Construction\Listeners\MapCustomerCollection::class);
+
         Transaction::resolveRelationUsing('constructionProject', fn (Transaction $transaction) =>
             $transaction->belongsTo(ConstructionProject::class, 'construction_project_id'));
         Transaction::resolveRelationUsing('constructionProjectItem', fn (Transaction $transaction) =>

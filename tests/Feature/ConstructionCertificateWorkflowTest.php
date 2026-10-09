@@ -5,9 +5,16 @@ namespace Tests\Feature;
 use App\Business;
 use App\Contact;
 use App\Currency;
+use App\Events\TransactionPaymentAdded;
+use App\Events\TransactionPaymentDeleted;
+use App\Events\TransactionPaymentUpdated;
+use App\TransactionPayment;
 use App\User;
 use App\Unit;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Modules\Accounting\Entities\AccountingAccountsTransaction;
+use Modules\Construction\Entities\ConstructionAccountingPosting;
+use Modules\Construction\Entities\ConstructionCustomerRetentionRelease;
 use Modules\Construction\Entities\ConstructionProject;
 use Tests\TestCase;
 
@@ -100,6 +107,7 @@ class ConstructionCertificateWorkflowTest extends TestCase
         }
 
         $certificateUrl = route('construction.projects.certificates.show', [$project->id, $certificate->id]);
+        $this->post(route('construction.settings.accounting.create-accounts'))->assertRedirect();
         $this->post(route('construction.projects.certificates.invoice', [$project->id, $certificate->id]))
             ->assertRedirect($certificateUrl);
         $certificate = $certificate->fresh();
@@ -109,6 +117,90 @@ class ConstructionCertificateWorkflowTest extends TestCase
         $this->assertSame($customer->id, $certificate->invoice->contact_id);
         $this->assertSame('due', $certificate->invoice->payment_status);
         $this->assertEquals((float) $certificate->net_due, (float) $certificate->invoice->final_total);
+        $posting = ConstructionAccountingPosting::where('source_type', 'customer_certificate')
+            ->where('source_id', $certificate->id)->where('event', 'invoiced')->firstOrFail();
+        $journalLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $posting->accounting_mapping_id)
+            ->get()->keyBy('map_type');
+        $this->assertEquals((float) $certificate->net_due, (float) $journalLines['construction_customer_receivable']->amount);
+        $this->assertSame('debit', $journalLines['construction_customer_receivable']->type);
+        $this->assertEquals((float) $certificate->retention_value, (float) $journalLines['construction_customer_retention']->amount);
+        $this->assertEquals((float) $certificate->advance_recovery_value, (float) $journalLines['construction_customer_advance_recovery']->amount);
+        $this->assertEquals((float) $certificate->current_approved_gross, (float) $journalLines['construction_customer_revenue']->amount);
+        $this->assertSame('credit', $journalLines['construction_customer_revenue']->type);
+        if ((float) $certificate->tax_value > 0) {
+            $this->assertEquals((float) $certificate->tax_value, (float) $journalLines['construction_customer_tax']->amount);
+        }
+        $this->assertEquals(
+            (float) $journalLines->where('type', 'debit')->sum('amount'),
+            (float) $journalLines->where('type', 'credit')->sum('amount')
+        );
+        $this->post(route('construction.projects.certificates.retention-releases.store', [$project->id, $certificate->id]), [
+            'release_date' => '2026-09-19', 'retention_amount' => 400, 'notes' => 'Partial release',
+        ])->assertRedirect();
+        $retentionRelease = ConstructionCustomerRetentionRelease::where('certificate_id', $certificate->id)->latest('id')->firstOrFail();
+        $retentionPosting = ConstructionAccountingPosting::where('source_type', 'customer_retention_release')
+            ->where('source_id', $retentionRelease->id)->where('event', 'recorded')->firstOrFail();
+        $retentionLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $retentionPosting->accounting_mapping_id)
+            ->get()->keyBy('map_type');
+        $this->assertEquals(400, (float) $retentionLines['construction_customer_retention_recorded_debit']->amount);
+        $this->assertSame('debit', $retentionLines['construction_customer_retention_recorded_debit']->type);
+        $this->assertEquals(400, (float) $retentionLines['construction_customer_retention_recorded_credit']->amount);
+        $this->assertSame('credit', $retentionLines['construction_customer_retention_recorded_credit']->type);
+        $this->assertEquals(600, $certificate->retentionRemainingValue());
+        $this->post(route('construction.projects.certificates.retention-releases.cancel', [$project->id, $certificate->id, $retentionRelease->id]), [
+            'cancellation_reason' => 'Customer changed the release date',
+        ])->assertRedirect();
+        $this->assertSame('cancelled', $retentionRelease->fresh()->status);
+        $this->assertEquals(1000, $certificate->retentionRemainingValue());
+        $retentionReversal = ConstructionAccountingPosting::where('source_type', 'customer_retention_release')
+            ->where('source_id', $retentionRelease->id)->where('event', 'cancelled')->firstOrFail();
+        $retentionReversalLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $retentionReversal->accounting_mapping_id)
+            ->get()->keyBy('map_type');
+        $this->assertEquals(400, (float) $retentionReversalLines['construction_customer_retention_cancelled_debit']->amount);
+        $this->assertEquals(400, (float) $retentionReversalLines['construction_customer_retention_cancelled_credit']->amount);
+        $this->post(route('construction.projects.certificates.retention-releases.store', [$project->id, $certificate->id]), [
+            'release_date' => '2026-09-19', 'retention_amount' => 1001,
+        ])->assertRedirect()->assertSessionHasErrors('retention_amount');
+        $customerPayment = TransactionPayment::create([
+            'business_id' => $business->id,
+            'transaction_id' => $invoiceId,
+            'amount' => 500,
+            'method' => 'cash',
+            'is_return' => 0,
+            'paid_on' => '2026-09-20 10:00:00',
+            'payment_for' => $customer->id,
+            'payment_ref_no' => 'TEST-COL-001',
+            'created_by' => $user->id,
+        ]);
+        event(new TransactionPaymentAdded($customerPayment, ['transaction_type' => 'sell', 'amount' => 500]));
+        $this->assertSame(0, AccountingAccountsTransaction::where('transaction_payment_id', $customerPayment->id)->count());
+        $collectionPosting = ConstructionAccountingPosting::where('source_type', 'customer_collection')
+            ->where('source_id', $customerPayment->id)->where('event', 'recorded')->firstOrFail();
+        $collectionLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $collectionPosting->accounting_mapping_id)
+            ->get()->keyBy('map_type');
+        $this->assertEquals(500, (float) $collectionLines['construction_customer_collection_cash']->amount);
+        $this->assertSame('debit', $collectionLines['construction_customer_collection_cash']->type);
+        $this->assertEquals(500, (float) $collectionLines['construction_customer_collection_receivable']->amount);
+        $this->assertSame('credit', $collectionLines['construction_customer_collection_receivable']->type);
+
+        $customerPayment->update(['amount' => 650]);
+        event(new TransactionPaymentUpdated($customerPayment->fresh(), 'sell'));
+        $this->assertSame(1, ConstructionAccountingPosting::where('source_type', 'customer_collection')
+            ->where('source_id', $customerPayment->id)->where('event', 'recorded')->count());
+        $this->assertEquals(650, (float) AccountingAccountsTransaction::where('acc_trans_mapping_id', $collectionPosting->accounting_mapping_id)
+            ->where('map_type', 'construction_customer_collection_cash')->value('amount'));
+
+        $deletedPayment = $customerPayment->fresh();
+        $customerPayment->delete();
+        event(new TransactionPaymentDeleted($deletedPayment));
+        $reversalPosting = ConstructionAccountingPosting::where('source_type', 'customer_collection')
+            ->where('source_id', $deletedPayment->id)->where('event', 'deleted')->firstOrFail();
+        $reversalLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $reversalPosting->accounting_mapping_id)
+            ->get()->keyBy('map_type');
+        $this->assertEquals(650, (float) $reversalLines['construction_customer_collection_reversal_receivable']->amount);
+        $this->assertSame('debit', $reversalLines['construction_customer_collection_reversal_receivable']->type);
+        $this->assertEquals(650, (float) $reversalLines['construction_customer_collection_reversal_cash']->amount);
+        $this->assertSame('credit', $reversalLines['construction_customer_collection_reversal_cash']->type);
         $this->assertCount(1, $certificate->invoice->sell_lines);
         $invoiceLine = $certificate->invoice->sell_lines->first();
         $this->assertSame('Concrete', $invoiceLine->product->name);
@@ -124,6 +216,7 @@ class ConstructionCertificateWorkflowTest extends TestCase
             ->assertDontSee('CONST-BOQ-'.$item->id);
         $this->get($certificateUrl)
             ->assertOk()
+            ->assertSee(route('journal-entry.show', $posting->accounting_mapping_id), false)
             ->assertSee(__('construction::lang.invoice_created_with_number', ['number' => $certificate->invoice->invoice_no]))
             ->assertSee('view_invoice_url')
             ->assertSee('?construction=1', false)
@@ -139,5 +232,7 @@ class ConstructionCertificateWorkflowTest extends TestCase
         $this->post(route('construction.projects.certificates.invoice', [$project->id, $certificate->id]))
             ->assertRedirect($certificateUrl);
         $this->assertSame($invoiceId, $certificate->fresh()->invoice_transaction_id);
+        $this->assertSame(1, ConstructionAccountingPosting::where('source_type', 'customer_certificate')
+            ->where('source_id', $certificate->id)->where('event', 'invoiced')->count());
     }
 }

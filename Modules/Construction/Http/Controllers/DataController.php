@@ -22,10 +22,14 @@ class DataController extends Controller
             return;
         }
 
-        Menu::modify('admin-sidebar-menu', function ($menu) {
+        $canManageSettings = $isAdmin
+            || auth()->user()->can('construction.settings.manage')
+            || auth()->user()->can('accounting.manage_accounts');
+
+        Menu::modify('admin-sidebar-menu', function ($menu) use ($canManageSettings) {
             $menu->dropdown(
                 __('construction::lang.construction'),
-                function ($sub) {
+                function ($sub) use ($canManageSettings) {
                     $sub->url(
                         route('construction.overview.index'),
                         __('construction::lang.tab_overview'),
@@ -74,6 +78,13 @@ class DataController extends Controller
                         __('construction::lang.nav_reports'),
                         ['icon' => '', 'active' => request()->routeIs('construction.reports.*')]
                     );
+                    if ($canManageSettings) {
+                        $sub->url(
+                            route('construction.settings.index'),
+                            __('construction::lang.settings'),
+                            ['icon' => '', 'active' => request()->routeIs('construction.settings.*')]
+                        );
+                    }
                 },
                 [
                     'icon' => 'fa fa-hard-hat',
@@ -214,6 +225,11 @@ class DataController extends Controller
             [
                 'value' => 'construction.subcontract.approve',
                 'label' => __('construction::lang.approve_subcontracts'),
+                'default' => false,
+            ],
+            [
+                'value' => 'construction.settings.manage',
+                'label' => __('construction::lang.manage_construction_settings'),
                 'default' => false,
             ],
         ];

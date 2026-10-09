@@ -1667,20 +1667,59 @@ class TransactionUtil extends Util
                 $output['qr_code_text'] = $qr_code_text;
             }
         // add this seprate for sell retuen qr text of zatca
-        }else if(in_array($transaction_type, ['sell_return'])){
-
-            $output['show_qr_code'] = ! empty($il->show_qr_code) ? true : false;
-            $zatca_qr = ! empty($il->common_settings['zatca_qr']) ? true : false;
-            if ($zatca_qr) {
-                $total_order_tax = $transaction->tax_amount + $total_line_taxes;
-                $zatca_phase = ! empty($il->common_settings['zatca_phase']) ? $il->common_settings['zatca_phase'] : '';
-                $qr_code_text = $this->_zatca_qr_text($business_details->name, $business_details->tax_number_1, $transaction, $total_order_tax, $zatca_phase);
-            } 
-
-            if ($transaction->status == 'final') {
-                $output['qr_code_text'] = $qr_code_text;
-            }
+        }elseif ($transaction_type === 'sell_return') {
+    
+        $output['show_qr_code'] = ! empty($il->show_qr_code);
+        $output['qr_code_text'] = '';
+    
+        $zatca_qr = ! empty($il->common_settings['zatca_qr']);
+    
+        if ($transaction->status === 'final' && $zatca_qr) {
+    
+            $total_order_tax =
+                ($transaction->tax_amount ?? 0) +
+                ($total_line_taxes ?? 0);
+    
+            $zatca_phase =
+                $il->common_settings['zatca_phase'] ?? '';
+    
+            $output['qr_code_text'] = $this->_zatca_qr_text(
+                $business_details->name,
+                $business_details->tax_number_1,
+                $transaction,
+                $total_order_tax,
+                $zatca_phase
+            );
         }
+    }
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        // else if(in_array($transaction_type, ['sell_return'])){
+
+        //     $output['show_qr_code'] = ! empty($il->show_qr_code) ? true : false;
+        //     $zatca_qr = ! empty($il->common_settings['zatca_qr']) ? true : false;
+        //     if ($zatca_qr) {
+        //         $total_order_tax = $transaction->tax_amount + $total_line_taxes;
+        //         $zatca_phase = ! empty($il->common_settings['zatca_phase']) ? $il->common_settings['zatca_phase'] : '';
+        //         $qr_code_text = $this->_zatca_qr_text($business_details->name, $business_details->tax_number_1, $transaction, $total_order_tax, $zatca_phase);
+        //     } 
+
+        //     if ($transaction->status == 'final') {
+        //         $output['qr_code_text'] = $qr_code_text;
+        //     }
+        // }
+        
+        
+        
+        
+        
         //Module related information.
         $il->module_info = ! empty($il->module_info) ? json_decode($il->module_info, true) : [];
         if (! empty($il->module_info['tables']) && $this->isModuleEnabled('tables')) {
@@ -3542,19 +3581,27 @@ class TransactionUtil extends Util
                     )
                     ->get();
 
+
+
+
             $deleted_sell_lines = [];
             $new_sell_lines = [];
             $processed_sell_lines = [];
 
             foreach ($sell_purchases as $line) {
                 if (empty($line->slpl_id)) {
-                    $new_sell_lines[] = $line;
+                    // Prevent the same new sell line from being added more than once
+                    if (! in_array($line->id, $processed_sell_lines, true)) {
+                        $new_sell_lines[] = $line;
+                        $processed_sell_lines[] = $line->id;
+                    }
                 } else {
-                    //Skip if already processed.
-                    if (in_array($line->slpl_id, $processed_sell_lines)) {
+                    // Process each sell line only once, even if it has multiple purchase mappings
+                    if (in_array($line->id, $processed_sell_lines, true)) {
                         continue;
                     }
-                    $processed_sell_lines[] = $line->slpl_id;
+
+                    $processed_sell_lines[] = $line->id;
 
                     $total_sold_entry = TransactionSellLinesPurchaseLines::where('sell_line_id', $line->id)
                         ->select(DB::raw('SUM(quantity) AS quantity'))
@@ -3562,7 +3609,7 @@ class TransactionUtil extends Util
 
                     if ($total_sold_entry->quantity != $line->quantity) {
                         if ($line->quantity > $total_sold_entry->quantity) {
-                            //If quantity is increased add it to new sell lines by decreasing tsp_quantity
+                            // If quantity is increased, map only the difference
                             $line_temp = $line;
                             $line_temp->quantity = $line_temp->quantity - $total_sold_entry->quantity;
                             $new_sell_lines[] = $line_temp;
@@ -3575,12 +3622,15 @@ class TransactionUtil extends Util
                 }
             }
 
-            //Add mapping for new sell lines and for incremented quantity
+            // Add mapping for new sell lines and for incremented quantity
             if (! empty($new_sell_lines)) {
                 $this->mapPurchaseSell($business, $new_sell_lines);
             }
         }
     }
+
+
+
 
     /**
      * Decrease the purchase quantity from
@@ -3597,23 +3647,23 @@ class TransactionUtil extends Util
                                 ->get();
 
         foreach ($sell_purchase_line as $row) {
-            if ($row->quantity > $decrement_qty) {
-                PurchaseLine::where('id', $row->purchase_line_id)
-                    ->decrement('quantity_sold', $decrement_qty);
-
-                $row->quantity = $row->quantity - $decrement_qty;
-                $row->save();
-                $decrement_qty = 0;
-            } else {
-                PurchaseLine::where('id', $row->purchase_line_id)
-                    ->decrement('quantity_sold', $decrement_qty);
-                $row->delete();
-            }
-
-            $decrement_qty = $decrement_qty - $row->quantity;
             if ($decrement_qty <= 0) {
                 break;
             }
+
+            $qty_to_decrement = min($row->quantity, $decrement_qty);
+
+            PurchaseLine::where('id', $row->purchase_line_id)
+                ->decrement('quantity_sold', $qty_to_decrement);
+
+            if ($row->quantity > $qty_to_decrement) {
+                $row->quantity = $row->quantity - $qty_to_decrement;
+                $row->save();
+            } else {
+                $row->delete();
+            }
+
+            $decrement_qty = $decrement_qty - $qty_to_decrement;
         }
     }
 

@@ -1,19 +1,49 @@
 @extends('construction::layouts.module')
 
-@section('title', __('construction::lang.nav_reports'))
+@section('title', __('construction::lang.financial_position_report'))
 
 @section('module_content')
-<section class="content">
-    <div class="ct-coming-soon">
-        <div class="ct-coming-soon__icon"><i class="fas fa-chart-bar"></i></div>
-        <span>@lang('construction::lang.next_development_stage')</span>
-        <h2>@lang('construction::lang.reports_workspace_title')</h2>
-        <p>@lang('construction::lang.reports_workspace_description')</p>
-        <div class="ct-feature-preview">
-            @foreach(['reports_feature_1', 'reports_feature_2', 'reports_feature_3'] as $feature)
-                <div><i class="fas fa-check"></i><span>@lang('construction::lang.' . $feature)</span></div>
-            @endforeach
+<section class="content ct-financial-report-page">
+    <nav class="ct-report-switcher" aria-label="@lang('construction::lang.construction_reports')">
+        <a class="is-active" href="{{ route('construction.reports.index') }}"><i class="fa fa-chart-line"></i> @lang('construction::lang.financial_position_report')</a>
+        <a href="{{ route('construction.reports.subcontractor-statement.index') }}"><i class="fa fa-file-invoice-dollar"></i> @lang('construction::lang.subcontractor_statement')</a>
+        <a href="{{ route('construction.reports.boq-subcontract-comparison.index') }}"><i class="fa fa-balance-scale"></i> @lang('construction::lang.boq_subcontract_comparison')</a>
+        <a href="{{ route('construction.reports.boq-cost-profitability.index') }}"><i class="fa fa-coins"></i> @lang('construction::lang.boq_cost_profitability')</a>
+        <a href="{{ route('construction.reports.customer-certificates-collection.index') }}"><i class="fa fa-hand-holding-usd"></i> @lang('construction::lang.customer_collection_report')</a>
+        <a href="{{ route('construction.reports.retention-guarantees.index') }}"><i class="fa fa-shield-alt"></i> @lang('construction::lang.retention_guarantees_report')</a>
+    </nav>
+    <header class="ct-financial-report-heading">
+        <div><span><i class="fas fa-chart-line"></i> @lang('construction::lang.owner_accountant_report')</span><h1>@lang('construction::lang.financial_position_report')</h1><p>@lang('construction::lang.financial_position_report_description')</p></div>
+        @if($report)<a class="btn ct-primary-action" target="_blank" href="{{ route('construction.reports.financial-position.print',array_filter(['project_id'=>$selectedProject->id,'date_range'=>$dateRange,'from_date'=>$fromDate,'to_date'=>$toDate])) }}"><i class="fa fa-print"></i> @lang('construction::lang.print_financial_report')</a>@endif
+    </header>
+
+    <form method="GET" action="{{ route('construction.reports.index') }}" class="ct-financial-report-filter ct-date-range-filter {{ $dateRange === 'custom' ? 'is-custom-range' : 'is-preset-range' }}">
+        <div class="form-group"><label>@lang('construction::lang.project') *</label><select name="project_id" class="form-control select2" required><option value="">@lang('construction::lang.select_project')</option>@foreach($projects as $project)<option value="{{ $project->id }}" @selected($selectedProject?->id === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach</select></div>
+        @include('construction::dashboard.partials.date-range-filter')
+        <button class="btn btn-primary"><i class="fa fa-chart-bar"></i> @lang('construction::lang.show_report')</button>
+    </form>
+
+    @if(!$report)
+        <div class="ct-financial-report-empty"><span><i class="fas fa-chart-pie"></i></span><h2>@lang('construction::lang.financial_report_select_project')</h2><p>@lang('construction::lang.financial_report_select_project_hint')</p></div>
+    @else
+        <div class="ct-financial-project-strip"><div><small>@lang('construction::lang.project')</small><strong>{{ $selectedProject->code }} — {{ $selectedProject->name }}</strong></div><div><small>@lang('construction::lang.customer')</small><strong>{{ $selectedProject->customer?->name ?: '—' }}</strong></div><div><small>@lang('construction::lang.report_period')</small><strong>{{ $fromDate ? @format_date($fromDate) : __('construction::lang.project_inception') }} — {{ @format_date($toDate) }}</strong></div></div>
+        @if($report['warnings']->isNotEmpty())<div class="ct-financial-warnings">@foreach($report['warnings'] as $warning)<div><i class="fa fa-exclamation-triangle"></i><span>{{ $warning }}</span></div>@endforeach</div>@endif
+
+        <div class="ct-financial-kpis">
+            <article><span class="is-blue"><i class="fa fa-file-contract"></i></span><small>@lang('construction::lang.adjusted_contract_value')</small><strong>@include('construction::partials.money',['value'=>$report['contract']['value']])</strong><p>@lang('construction::lang.approved_adjustments'): @include('construction::partials.money',['value'=>$report['contract']['adjustments']])</p></article>
+            <article><span class="is-green"><i class="fa fa-check-double"></i></span><small>@lang('construction::lang.approved_customer_work')</small><strong>@include('construction::partials.money',['value'=>$report['customer']['approved_work']])</strong><p>{{ $report['customer']['certificates_count'] }} @lang('construction::lang.approved_certificates')</p></article>
+            <article><span class="is-amber"><i class="fa fa-coins"></i></span><small>@lang('construction::lang.total_actual_cost')</small><strong>@include('construction::partials.money',['value'=>$report['costs']['actual']])</strong><p>{{ @num_format($report['costs']['consumption_percent']) }}% @lang('construction::lang.of_estimated_cost')</p></article>
+            <article class="{{ $report['result']['current'] < 0 ? 'is-negative' : 'is-positive' }}"><span><i class="fa fa-chart-line"></i></span><small>@lang('construction::lang.current_project_result')</small><strong>@include('construction::partials.money',['value'=>$report['result']['current']])</strong><p>{{ @num_format($report['result']['margin_percent']) }}% @lang('construction::lang.current_margin')</p></article>
         </div>
-    </div>
+
+        <div class="ct-financial-grid">
+            <section class="ct-financial-panel"><header><div><span>@lang('construction::lang.cost_analysis')</span><h2>@lang('construction::lang.actual_cost_breakdown')</h2></div><strong>@include('construction::partials.money',['value'=>$report['costs']['actual']])</strong></header><div class="ct-financial-cost-list">@foreach(['materials'=>'fa-cubes','labor'=>'fa-users','subcontracts'=>'fa-people-carry','expenses'=>'fa-receipt'] as $key=>$icon)<div><span><i class="fa {{ $icon }}"></i> @lang('construction::lang.cost_'.$key)</span><strong>@include('construction::partials.money',['value'=>$report['costs'][$key]])</strong><em style="width:{{ $report['costs']['actual'] > 0 ? min(100,round($report['costs'][$key]/$report['costs']['actual']*100)) : 0 }}%"></em></div>@endforeach</div><footer><span>@lang('construction::lang.estimated_cost')</span><strong>@include('construction::partials.money',['value'=>$report['contract']['estimated_cost']])</strong><span>@lang('construction::lang.remaining_cost_budget')</span><strong>@include('construction::partials.money',['value'=>$report['costs']['variance_to_budget']])</strong></footer></section>
+            <section class="ct-financial-panel"><header><div><span>@lang('construction::lang.customer_position')</span><h2>@lang('construction::lang.certification_and_collection')</h2></div><strong>@include('construction::partials.money',['value'=>$report['customer']['receivable']])</strong></header><div class="ct-financial-ledger"><div><span>@lang('construction::lang.customer_net_due')</span><strong>@include('construction::partials.money',['value'=>$report['customer']['net_due']])</strong></div><div><span>@lang('construction::lang.invoiced_amount')</span><strong>@include('construction::partials.money',['value'=>$report['customer']['invoiced']])</strong></div><div><span>@lang('construction::lang.collected_amount')</span><strong class="text-success">@include('construction::partials.money',['value'=>$report['customer']['collected']])</strong></div><div><span>@lang('construction::lang.customer_receivable')</span><strong class="text-danger">@include('construction::partials.money',['value'=>$report['customer']['receivable']])</strong></div><div><span>@lang('construction::lang.customer_retention')</span><strong>@include('construction::partials.money',['value'=>$report['customer']['retention']])</strong></div></div></section>
+            <section class="ct-financial-panel"><header><div><span>@lang('construction::lang.subcontractor_position')</span><h2>@lang('construction::lang.subcontractor_obligations')</h2></div><strong>@include('construction::partials.money',['value'=>$report['subcontracts']['balance']])</strong></header><div class="ct-financial-ledger"><div><span>@lang('construction::lang.approved_subcontract_work')</span><strong>@include('construction::partials.money',['value'=>$report['subcontracts']['gross']])</strong></div><div><span>@lang('construction::lang.subcontractor_payable')</span><strong>@include('construction::partials.money',['value'=>$report['subcontracts']['payable']])</strong></div><div><span>@lang('construction::lang.paid_amount')</span><strong class="text-success">@include('construction::partials.money',['value'=>$report['subcontracts']['paid']])</strong></div><div><span>@lang('construction::lang.remaining_amount')</span><strong class="text-danger">@include('construction::partials.money',['value'=>$report['subcontracts']['balance']])</strong></div><div><span>@lang('construction::lang.remaining_retention')</span><strong>@include('construction::partials.money',['value'=>$report['subcontracts']['retention']])</strong></div></div></section>
+            <section class="ct-financial-panel ct-financial-panel--cash"><header><div><span>@lang('construction::lang.cash_indicator')</span><h2>@lang('construction::lang.partial_cash_position')</h2></div><strong>@include('construction::partials.money',['value'=>$report['cash']['partial_net']])</strong></header><div class="ct-financial-ledger"><div><span>@lang('construction::lang.customer_collections')</span><strong>@include('construction::partials.money',['value'=>$report['cash']['customer_collections']])</strong></div><div><span>@lang('construction::lang.subcontractor_payments')</span><strong>@include('construction::partials.money',['value'=>$report['cash']['subcontractor_payments']])</strong></div></div><p class="ct-financial-disclaimer"><i class="fa fa-info-circle"></i> @lang('construction::lang.partial_cash_position_notice')</p></section>
+        </div>
+
+        <section class="ct-financial-table-panel"><header><div><span>@lang('construction::lang.accountant_details')</span><h2>@lang('construction::lang.subcontractor_summary')</h2></div></header><div class="table-responsive"><table class="table ct-financial-table"><thead><tr><th>@lang('construction::lang.subcontractor')</th><th>@lang('construction::lang.agreement_number')</th><th>@lang('construction::lang.approved_subcontract_work')</th><th>@lang('construction::lang.remaining_retention')</th><th>@lang('construction::lang.subcontractor_payable')</th><th>@lang('construction::lang.paid_amount')</th><th>@lang('construction::lang.remaining_amount')</th></tr></thead><tbody>@forelse($report['subcontractors'] as $row)<tr><td><strong>{{ $row['name'] }}</strong><small>{{ $row['certificates'] }} @lang('construction::lang.certificates')</small></td><td dir="ltr">{{ $row['agreement'] }}</td><td>@include('construction::partials.money',['value'=>$row['gross']])</td><td>@include('construction::partials.money',['value'=>$row['retention']])</td><td>@include('construction::partials.money',['value'=>$row['payable']])</td><td>@include('construction::partials.money',['value'=>$row['paid']])</td><td><strong>@include('construction::partials.money',['value'=>$row['balance']])</strong></td></tr>@empty<tr><td colspan="7" class="text-center text-muted">@lang('construction::lang.no_approved_subcontract_costs')</td></tr>@endforelse</tbody></table></div></section>
+    @endif
 </section>
 @endsection

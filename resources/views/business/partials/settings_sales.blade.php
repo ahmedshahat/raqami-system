@@ -192,4 +192,27 @@
             </div>
         </div>
     </div>
+    <hr>
+    <div class="row">
+        <div class="col-md-12">
+            <h4><i class="fab fa-whatsapp text-success"></i> إرسال صور الفواتير</h4>
+        </div>
+        <div class="col-sm-6">
+            <div class="form-group @error('common_settings.invoice_whatsapp_number') has-error @enderror">
+                {!! Form::label('invoice_whatsapp_number', 'رقم واتساب مستلم الفواتير:') !!}
+                <div class="input-group">
+                    <span class="input-group-addon"><i class="fab fa-whatsapp"></i></span>
+                    {!! Form::text(
+                        'common_settings[invoice_whatsapp_number]',
+                        old('common_settings.invoice_whatsapp_number', $common_settings['invoice_whatsapp_number'] ?? ''),
+                        ['class' => 'form-control', 'id' => 'invoice_whatsapp_number', 'dir' => 'ltr', 'inputmode' => 'tel', 'placeholder' => 'مثال: 201001234567', 'maxlength' => 30]
+                    ); !!}
+                </div>
+                <p class="help-block">أدخل الرقم مع كود الدولة وبدون صفر البداية. مثال مصر: 201001234567</p>
+                @error('common_settings.invoice_whatsapp_number')
+                    <span class="help-block"><strong>{{ $message }}</strong></span>
+                @enderror
+            </div>
+        </div>
+    </div>
 </div>

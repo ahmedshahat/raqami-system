@@ -27,8 +27,12 @@ class AdminlteCustomPresenter extends Presenter
      */
     public function getMenuWithoutDropdownWrapper($item)
     {
+        $titleStyle = ! empty($item->attributes['data-feature-highlight'])
+            ? ' style="display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 8px; background-color: #f1efff; color: #6954c9;"'
+            : '';
+
         return '<a href="' . $item->getUrl() . '" title="" class="tw-flex tw-items-center tw-gap-3 tw-px-3 tw-py-2 tw-text-sm tw-font-medium tw-tracking-tight tw-text-gray-600 tw-transition-all tw-duration-200 tw-rounded-lg tw-whitespace-nowrap hover:tw-text-gray-900 hover:tw-bg-gray-100' . $this->getActiveState($item) . '" ' . $item->getAttributes() . '>' .
-        $this->formatIcon($item->icon) . ' <span class="tw-truncate">' . $item->title . '</span>' .
+        $this->formatIcon($item->icon) . ' <span class="tw-truncate"' . $titleStyle . '>' . $item->title . '</span>' .
             '</a>' . PHP_EOL;
     }
 
@@ -171,5 +175,3 @@ class AdminlteCustomPresenter extends Presenter
         }
     }
 }
-
-

@@ -7,8 +7,10 @@ final class CurrencyFormatter
     public static function parts($amount): array
     {
         $currency = session('currency', []);
-        $precision = max(0, min(6, (int) session('business.currency_precision', 2)));
-        $position = session('business.currency_symbol_placement', 'after');
+        $business = session('business');
+        $precisionSetting = data_get($business, 'currency_precision', session('business.currency_precision', 2));
+        $position = data_get($business, 'currency_symbol_placement', session('business.currency_symbol_placement', 'after'));
+        $precision = max(0, min(6, (int) $precisionSetting));
 
         return [
             'amount' => number_format(

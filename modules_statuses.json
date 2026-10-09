@@ -20,5 +20,7 @@
     "CustomDashboard": true,
     "Gym": true,
     "ZatcaIntegrationKsa": true,
-    "Construction": true
+    "Stocktaking": true,
+    "Construction": true,
+    "BostaShipping": true
 }

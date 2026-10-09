@@ -13,6 +13,7 @@ class ConstructionSubcontractCertificate extends Model
         'certificate_date' => 'date',
         'period_from' => 'date',
         'period_to' => 'date',
+        'retention_due_date' => 'date',
         'approved_at' => 'datetime',
     ];
 
@@ -25,6 +26,12 @@ class ConstructionSubcontractCertificate extends Model
     public function activeRetentionReleases() { return $this->hasMany(ConstructionSubcontractRetentionRelease::class, 'certificate_id')->where('status', 'recorded'); }
     public function createdBy() { return $this->belongsTo(User::class, 'created_by'); }
     public function approvedBy() { return $this->belongsTo(User::class, 'approved_by'); }
+    public function accountingPosting()
+    {
+        return $this->hasOne(ConstructionAccountingPosting::class, 'source_id')
+            ->where('source_type', 'subcontract_certificate')
+            ->where('event', 'approval');
+    }
     public function isEditable(): bool { return $this->status === 'draft'; }
     public function paidValue(): float { return round((float) $this->activePayments()->sum('amount'), 4); }
     public function releasedRetentionValue(): float { return round((float) $this->activeRetentionReleases()->sum('amount'), 4); }

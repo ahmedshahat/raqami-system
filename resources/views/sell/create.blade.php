@@ -16,6 +16,106 @@
 
 @section('title', $title)
 
+@section('css')
+	<style>
+		.direct-sell-table-wrap {
+			overflow-x: visible;
+		}
+
+		.direct-sell-product-table {
+			width: 100% !important;
+			min-width: 0;
+			table-layout: fixed;
+		}
+
+		.direct-sell-product-table th,
+		.direct-sell-product-table td {
+			padding: 10px 8px !important;
+			vertical-align: top !important;
+		}
+
+		.direct-sell-product-table th {
+			vertical-align: middle !important;
+			white-space: normal;
+		}
+
+		.direct-sell-product-table .serial-no-col {
+			width: 3%;
+			text-align: center;
+		}
+
+		.direct-sell-product-table .product-col {
+			width: 22%;
+			line-height: 1.6;
+			overflow-wrap: anywhere;
+		}
+
+		.direct-sell-product-table .quantity-col {
+			width: 16%;
+		}
+
+		.direct-sell-product-table .unit-price-col {
+			width: 11%;
+		}
+
+		.direct-sell-product-table .price-inc-tax-col {
+			width: 11%;
+		}
+
+		.direct-sell-product-table .subtotal-col {
+			width: 12%;
+		}
+
+		.direct-sell-product-table .discount-col {
+			width: 12%;
+		}
+
+		.direct-sell-product-table .tax-col {
+			width: 8%;
+		}
+
+		.direct-sell-product-table .remove-col {
+			width: 5%;
+			text-align: center;
+		}
+
+		.direct-sell-product-table .service-staff-col,
+		.direct-sell-product-table .warranty-col {
+			width: 150px;
+		}
+
+		.direct-sell-product-table .form-control,
+		.direct-sell-product-table .input-group {
+			width: 100% !important;
+		}
+
+		.direct-sell-product-table .input-number {
+			display: table;
+			min-width: 0;
+		}
+
+		.direct-sell-product-table .input-number .input-group-btn {
+			width: 36px;
+		}
+
+		.direct-sell-product-table .input-number .btn {
+			width: 36px;
+			padding-left: 8px;
+			padding-right: 8px;
+		}
+
+		.direct-sell-product-table textarea.form-control {
+			min-height: 58px;
+			resize: vertical;
+		}
+
+		.direct-sell-product-table .help-block {
+			margin: 5px 0 0;
+			line-height: 1.45;
+		}
+	</style>
+@endsection
+
 @section('content')
 <!-- Content Header (Page header) -->
 <section class="content-header">
@@ -364,41 +464,41 @@
 							$hide_tax = 'hide';
 						}
 					@endphp
-					<div class="table-responsive">
-					<table class="table table-condensed table-bordered table-striped table-responsive" id="pos_table">
+					<div class="table-responsive direct-sell-table-wrap">
+					<table class="table table-condensed table-bordered table-striped direct-sell-product-table" id="pos_table">
 						<thead>
 							<tr>
-								<th class="text-center">#</th>
-								<th class="text-center">	
+								<th class="text-center serial-no-col">#</th>
+								<th class="text-center product-col">
 									@lang('sale.product')
 								</th>
-								<th class="text-center">
+								<th class="text-center quantity-col">
 									@lang('sale.qty')
 								</th>
 								@if(!empty($pos_settings['inline_service_staff']))
-									<th class="text-center">
+									<th class="text-center service-staff-col">
 										@lang('restaurant.service_staff')
 									</th>
 								@endif
-								<th class="@if(!auth()->user()->can('edit_product_price_from_sale_screen')) hide @endif">
+								<th class="unit-price-col @if(!auth()->user()->can('edit_product_price_from_sale_screen')) hide @endif">
 									@lang('sale.unit_price')
 								</th>
-								<th class="@if(!auth()->user()->can('edit_product_discount_from_sale_screen')) hide @endif">
+								<th class="discount-col @if(!auth()->user()->can('edit_product_discount_from_sale_screen')) hide @endif">
 									@lang('receipt.discount')
 								</th>
-								<th class="text-center {{$hide_tax}}">
+								<th class="text-center tax-col {{$hide_tax}}">
 									@lang('sale.tax')
 								</th>
-								<th class="text-center {{$hide_tax}}">
+								<th class="text-center price-inc-tax-col {{$hide_tax}}">
 									@lang('sale.price_inc_tax')
 								</th>
 								@if(!empty($common_settings['enable_product_warranty']))
-									<th>@lang('lang_v1.warranty')</th>
+									<th class="warranty-col">@lang('lang_v1.warranty')</th>
 								@endif
-								<th class="text-center">
+								<th class="text-center subtotal-col">
 									@lang('sale.subtotal')
 								</th>
-								<th class="text-center"><i class="fas fa-times" aria-hidden="true"></i></th>
+								<th class="text-center remove-col"><i class="fas fa-times" aria-hidden="true"></i></th>
 							</tr>
 						</thead>
 						<tbody></tbody>

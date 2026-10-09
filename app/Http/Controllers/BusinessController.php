@@ -19,7 +19,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use App\Rules\ReCaptcha;
+use App\Services\BabelWhatsAppService;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class BusinessController extends Controller
 {
@@ -44,19 +46,25 @@ class BusinessController extends Controller
 
     protected $mailDrivers;
 
+    protected $babelWhatsApp;
+
+    protected $theme_colors;
+
     /**
      * Constructor
      *
      * @param  ProductUtils  $product
      * @return void
      */
-    public function __construct(BusinessUtil $businessUtil, RestaurantUtil $restaurantUtil, ModuleUtil $moduleUtil)
+    public function __construct(BusinessUtil $businessUtil, RestaurantUtil $restaurantUtil, ModuleUtil $moduleUtil, BabelWhatsAppService $babelWhatsApp)
     {
         $this->businessUtil = $businessUtil;
         $this->moduleUtil = $moduleUtil;
+        $this->babelWhatsApp = $babelWhatsApp;
 
         $this->theme_colors = [
             'primary' => 'Blue',
+            'dark' => 'Dark Mode - الوضع الداكن',
             // 'black' => 'Black',
             'purple' => 'Purple',
             'green' => 'Green',
@@ -128,6 +136,22 @@ class BusinessController extends Controller
         }
 
         try {
+            // Registration-page defaults. These values are intentionally enforced
+            // server-side so the simplified form cannot be tampered with.
+            $request->merge([
+                'currency_id' => 35, // EGP
+                'country' => 'مصر',
+                'state' => 'القاهرة',
+                'city' => 'مصر الجديدة',
+                'zip_code' => '12345',
+                'landmark' => 'مصر الجديدة',
+                'time_zone' => 'Africa/Cairo',
+                'fy_start_month' => 1,
+                'accounting_method' => 'fifo',
+                'surname' => '',
+                'last_name' => '',
+            ]);
+
             $validator = $request->validate(
                 [
                     'name' => 'required|max:255',
@@ -139,12 +163,22 @@ class BusinessController extends Controller
                     'landmark' => 'required|max:255',
                     'time_zone' => 'required|max:255',
                     'surname' => 'max:10',
-                    'email' => 'sometimes|nullable|email|unique:users|max:255',
+                    'email' => 'required|email|unique:users|max:255',
+                    'mobile' => 'required|max:30',
+                    'mobile_country' => ['required', Rule::in(['EG', 'SA', 'KW', 'LY', 'YE', 'SY', 'JO', 'OM', 'QA', 'BH', 'AE', 'SD', 'DZ', 'TN'])],
                     'first_name' => 'required|max:255',
                     'username' => 'required|min:4|max:255|unique:users',
                     'password' => 'required|min:4|max:255',
+                    'confirm_password' => 'required|same:password',
                     'fy_start_month' => 'required',
                     'accounting_method' => 'required',
+                    'package_id' => [
+                        'nullable',
+                        'integer',
+                        Rule::exists('packages', 'id')->where(function ($query) {
+                            return $query->where('is_active', 1)->whereNull('deleted_at');
+                        }),
+                    ],
                 ],
                 [
                     'name.required' => __('validation.required', ['attribute' => __('business.business_name')]),
@@ -175,6 +209,19 @@ class BusinessController extends Controller
                     return back()->withErrors($recaptcha_validator)->withInput();
                 }
             }
+
+            $normalized_mobile = $this->babelWhatsApp->normalizeNumber(
+                $request->input('mobile'),
+                $request->input('mobile_country')
+            );
+
+            if ($normalized_mobile === null) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'mobile' => 'رقم الهاتف غير صحيح للدولة المختارة.',
+                ]);
+            }
+
+            $request->merge(['mobile' => $normalized_mobile]);
 
 
             DB::beginTransaction();
@@ -222,6 +269,20 @@ class BusinessController extends Controller
 
             DB::commit();
 
+            $welcome_message = "السلام عليكم أستاذ {$user->first_name} 👋\n\n"
+                ."معاك أحمد\n\n"
+                ."شكرًا لتسجيلك النسخة التجريبية لمدة 14 يوم من *رقمي سيستم*\n\n"
+                ."حبيت أعرفك بنفسي\n\n"
+                ."ولو حابب تستغل فترة التجربة بأفضل شكل أنا معاك أساعدك في أي خطوة أثناء استخدام البرنامج\n\n"
+                ."بالمناسبة 😊\n\n"
+                ."إيه نوع نشاطك ؟";
+
+            $this->babelWhatsApp->send(
+                $request->input('mobile'),
+                $welcome_message,
+                $request->input('mobile_country')
+            );
+
             //Module function to be called after after business is created
             if (config('app.env') != 'demo') {
                 $this->moduleUtil->getModuleData('after_business_created', ['business' => $business]);
@@ -243,6 +304,8 @@ class BusinessController extends Controller
             ];
 
             return redirect('login')->with('status', $output);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::emergency('File:'.$e->getFile().'Line:'.$e->getLine().'Message:'.$e->getMessage());
@@ -362,6 +425,11 @@ class BusinessController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
+        $request->validate([
+            'common_settings.invoice_whatsapp_number' => ['nullable', 'string', 'max:30'],
+            'theme_color' => ['nullable', Rule::in(array_keys($this->theme_colors))],
+        ]);
+
         try {
             $notAllowed = $this->businessUtil->notAllowedInDemo();
             if (! empty($notAllowed)) {
@@ -475,7 +543,20 @@ class BusinessController extends Controller
 
             $business_details['custom_labels'] = json_encode($business_details['custom_labels']);
 
-            $business_details['common_settings'] = ! empty($request->input('common_settings')) ? $request->input('common_settings') : [];
+            $common_settings = ! empty($request->input('common_settings')) ? $request->input('common_settings') : [];
+            $invoice_whatsapp_number = trim($common_settings['invoice_whatsapp_number'] ?? '');
+            if ($invoice_whatsapp_number !== '') {
+                $invoice_whatsapp_number = $this->babelWhatsApp->normalizeNumber($invoice_whatsapp_number, 'EG');
+                if ($invoice_whatsapp_number === null) {
+                    return back()->withErrors([
+                        'common_settings.invoice_whatsapp_number' => 'رقم واتساب مستلم الفواتير غير صحيح. أدخل الرقم مع كود الدولة.',
+                    ])->withInput();
+                }
+                $common_settings['invoice_whatsapp_number'] = $invoice_whatsapp_number;
+            } else {
+                unset($common_settings['invoice_whatsapp_number']);
+            }
+            $business_details['common_settings'] = $common_settings;
 
             //Enabled modules
             $enabled_modules = $request->input('enabled_modules');

@@ -31,87 +31,197 @@ class SuperadminSubscriptionsController extends BaseController
      *
      * @return Response
      */
-    public function index()
-    {
-        if (! auth()->user()->can('superadmin')) {
-            abort(403, 'Unauthorized action.');
-        }
-
-
-        if (request()->ajax()) {
-            $superadmin_subscription = Subscription::join('business', 'subscriptions.business_id', '=', 'business.id')
-                ->join('packages', 'subscriptions.package_id', '=', 'packages.id')
-                ->select('business.name as business_name', 'packages.name as package_name', 'subscriptions.status',
-                 'subscriptions.created_at', 'subscriptions.start_date', 'subscriptions.trial_end_date', 'subscriptions.end_date', 'subscriptions.coupon_code','subscriptions.original_price', 'subscriptions.package_price', 'subscriptions.paid_via', 'subscriptions.payment_transaction_id', 'subscriptions.id');
-
-            if(!empty(request()->input('status'))) {
-                $superadmin_subscription->where('subscriptions.status', request()->input('status'));
+        public function index()
+        {
+            if (! auth()->user()->can('superadmin')) {
+                abort(403, 'Unauthorized action.');
             }
-            if(!empty(request()->input('package_id'))) {
-                $superadmin_subscription->where('packages.id', request()->input('package_id'));
+        
+            if (request()->ajax()) {
+                $superadmin_subscription = Subscription::join(
+                        'business',
+                        'subscriptions.business_id',
+                        '=',
+                        'business.id'
+                    )
+                    ->join(
+                        'packages',
+                        'subscriptions.package_id',
+                        '=',
+                        'packages.id'
+                    )
+                    ->select(
+                        'business.name as business_name',
+                        'packages.name as package_name',
+                        'subscriptions.status',
+                        'subscriptions.created_at',
+                        'subscriptions.start_date',
+                        'subscriptions.trial_end_date',
+                        'subscriptions.end_date',
+                        'subscriptions.coupon_code',
+                        'subscriptions.original_price',
+                        'subscriptions.package_price',
+                        'subscriptions.paid_via',
+                        'subscriptions.payment_transaction_id',
+                        'subscriptions.payment_receipt',
+                        'subscriptions.id'
+                    );
+        
+                if (! empty(request()->input('status'))) {
+                    $superadmin_subscription->where(
+                        'subscriptions.status',
+                        request()->input('status')
+                    );
+                }
+        
+                if (! empty(request()->input('package_id'))) {
+                    $superadmin_subscription->where(
+                        'packages.id',
+                        request()->input('package_id')
+                    );
+                }
+        
+                if (
+                    ! empty(request()->start_date) &&
+                    ! empty(request()->end_date)
+                ) {
+                    $start = request()->start_date;
+                    $end = request()->end_date;
+        
+                    $superadmin_subscription
+                        ->whereDate('subscriptions.created_at', '>=', $start)
+                        ->whereDate('subscriptions.created_at', '<=', $end);
+                }
+        
+                return DataTables::of($superadmin_subscription)
+        
+                    ->editColumn('payment_receipt', function ($row) {
+                    if (empty($row->payment_receipt)) {
+                        return '<span class="text-muted" style="white-space: nowrap;">لا يوجد إيصال</span>';
+                    }
+                
+                    $receipt_url = asset($row->payment_receipt);
+                
+                    return '<a href="'.$receipt_url.'"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="btn btn-success btn-xs"
+                        style="white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fa fa-eye"></i>
+                        <span>عرض الإيصال</span>
+                    </a>';
+                })
+        
+                    ->addColumn(
+                        'action',
+                        '<button
+                            data-href="{{ action(\'\Modules\Superadmin\Http\Controllers\SuperadminSubscriptionsController@edit\', [$id]) }}"
+                            class="tw-dw-btn tw-dw-btn-xs tw-dw-btn-outline tw-dw-btn-info change_status"
+                            data-toggle="modal"
+                            data-target="#statusModal"
+                        >
+                            @lang("superadmin::lang.status")
+                        </button>
+        
+                        <button
+                            data-href="{{ action(\'\Modules\Superadmin\Http\Controllers\SuperadminSubscriptionsController@editSubscription\', ["id" => $id]) }}"
+                            class="tw-dw-btn tw-dw-btn-xs tw-dw-btn-outline tw-dw-btn-primary btn-modal tw-m-1"
+                            data-container=".view_modal"
+                        >
+                            @lang("messages.edit")
+                        </button>'
+                    )
+        
+                    ->editColumn(
+                        'created_at',
+                        '{{ @format_datetime($created_at) }}'
+                    )
+        
+                    ->editColumn(
+                        'trial_end_date',
+                        '@if(!empty($trial_end_date))
+                            {{ @format_date($trial_end_date) }}
+                        @endif'
+                    )
+        
+                    ->editColumn(
+                        'start_date',
+                        '@if(!empty($start_date))
+                            {{ @format_date($start_date) }}
+                        @endif'
+                    )
+        
+                    ->editColumn(
+                        'end_date',
+                        '@if(!empty($end_date))
+                            {{ @format_date($end_date) }}
+                        @endif'
+                    )
+        
+                    ->editColumn(
+                        'status',
+                        '@if($status == "approved")
+                            <span class="label bg-light-green">
+                                {{ __("superadmin::lang.".$status) }}
+                            </span>
+                        @elseif($status == "waiting")
+                            <span class="label bg-aqua">
+                                {{ __("superadmin::lang.".$status) }}
+                            </span>
+                        @else
+                            <span class="label bg-red">
+                                {{ __("superadmin::lang.".$status) }}
+                            </span>
+                        @endif'
+                    )
+        
+                    ->editColumn(
+                        'package_price',
+                        '<span
+                            class="display_currency"
+                            data-currency_symbol="true"
+                        >
+                            {{ $package_price }}
+                        </span>'
+                    )
+        
+                    ->editColumn(
+                        'original_price',
+                        '<span
+                            class="display_currency"
+                            data-currency_symbol="true"
+                        >
+                            {{ $original_price }}
+                        </span>'
+                    )
+        
+                    ->removeColumn('id')
+        
+                    ->rawColumns([
+                        'status',
+                        'package_price',
+                        'original_price',
+                        'payment_receipt',
+                        'action',
+                    ])
+        
+                    ->make(true);
             }
 
-            if (!empty(request()->start_date) && !empty(request()->end_date)) {
-                $start = request()->start_date;
-                $end =  request()->end_date;
-                $superadmin_subscription->whereDate('subscriptions.created_at', '>=', $start)
-                    ->whereDate('subscriptions.created_at', '<=', $end);
-            }
-            
-            return DataTables::of($superadmin_subscription)
-                        ->addColumn(
-                            'action',
-                            '<button data-href ="{{action(\'\Modules\Superadmin\Http\Controllers\SuperadminSubscriptionsController@edit\',[$id])}}" class="tw-dw-btn tw-dw-btn-xs tw-dw-btn-outline  tw-dw-btn-info change_status" data-toggle="modal" data-target="#statusModal">
-                            @lang( "superadmin::lang.status")
-                            </button> <button data-href ="{{action(\'\Modules\Superadmin\Http\Controllers\SuperadminSubscriptionsController@editSubscription\',["id" => $id])}}" class="tw-dw-btn tw-dw-btn-xs tw-dw-btn-outline  tw-dw-btn-primary btn-modal tw-m-1" data-container=".view_modal">
-                            @lang( "messages.edit")
-                            </button>'
-                        )
-                        ->editColumn('created_at', '{{@format_datetime($created_at)}}')
-                        ->editColumn('trial_end_date', '@if(!empty($trial_end_date)){{@format_date($trial_end_date)}} @endif')
-                        ->editColumn('start_date', '@if(!empty($start_date)){{@format_date($start_date)}}@endif')
-                        ->editColumn('end_date', '@if(!empty($end_date)){{@format_date($end_date)}}@endif')
-                        ->editColumn(
-                            'status',
-                            '@if($status == "approved")
-                                <span class="label bg-light-green">{{__(\'superadmin::lang.\'.$status)}}
-                                </span>
-                            @elseif($status == "waiting")
-                                <span class="label bg-aqua">{{__(\'superadmin::lang.\'.$status)}}
-                                </span>
-                            @else($status == "declined")
-                                <span class="label bg-red">{{__(\'superadmin::lang.\'.$status)}}
-                                </span>
-                            @endif'
-                        )
-                        ->editColumn(
-                            'package_price',
-                            '<span class="display_currency" data-currency_symbol="true">
-                                {{$package_price}}
-                            </span>'
-                        )
-                        ->editColumn(
-                            'original_price',
-                            '<span class="display_currency" data-currency_symbol="true">
-                                {{$original_price}}
-                            </span>'
-                        )
-                        ->removeColumn('id')
-                        ->rawColumns([2, 8, 9, 12])
-                        ->make(false);
-        }
+    $packages = Package::listPackages()->pluck('name', 'id');
 
-        $packages = Package::listPackages()->pluck('name', 'id');
+    $subscription_statuses = [
+        'approved' => __('superadmin::lang.approved'),
+        'waiting' => __('superadmin::lang.waiting'),
+        'declined' => __('superadmin::lang.declined'),
+    ];
 
-        $subscription_statuses = [
-            'approved' => __('superadmin::lang.approved'),
-            'waiting' => __('superadmin::lang.waiting'),
-            'declined' => __('superadmin::lang.declined'),
-        ];
-
-        return view('superadmin::superadmin_subscription.index')
-                    ->with(compact('packages', 'subscription_statuses'));
-    }
+    return view('superadmin::superadmin_subscription.index')
+        ->with(compact(
+            'packages',
+            'subscription_statuses'
+        ));
+}
 
     /**
      * Show the form for creating a new resource.

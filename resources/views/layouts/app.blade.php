@@ -14,10 +14,11 @@
 
 @php
     $whitelist = ['127.0.0.1', '::1'];
+    $is_dark_mode = session('business.theme_color') === 'dark';
 @endphp
 
 <!DOCTYPE html>
-<html class="tw-bg-white tw-scroll-smooth" lang="{{ app()->getLocale() }}"
+<html class="tw-bg-white tw-scroll-smooth{{ $is_dark_mode ? ' theme-dark-root' : '' }}" @if($is_dark_mode) data-theme="dark" @endif lang="{{ app()->getLocale() }}"
     dir="{{ in_array(session()->get('user.language', config('app.locale')), config('constants.langs_rtl')) ? 'rtl' : 'ltr' }}">
 <head>
     <!-- Tell the browser to be responsive to screen width -->
@@ -34,11 +35,19 @@
 
     @include('layouts.partials.extracss')
 
+    <link rel="stylesheet" href="{{ asset('css/saudi-riyal-symbol.css') }}">
     @yield('css')
+
+    @if($is_dark_mode)
+        @include('layouts.partials.dark_mode_css')
+        @include('layouts.partials.dark_mode_modules_css')
+    @endif
+    @include('layouts.partials.print_mode_css')
+    <script defer src="{{ asset('js/saudi-riyal-symbol.js') }}" data-symbol-src="{{ asset('img/saudi-riyal-new.svg') }}"></script>
 
 </head>
 <body
-    class="tw-font-sans tw-antialiased tw-text-gray-900 tw-bg-gray-100 @if ($pos_layout) hold-transition lockscreen @else hold-transition skin-@if (!empty(session('business.theme_color'))){{ session('business.theme_color') }}@else{{ 'blue-light' }} @endif sidebar-mini @endif" >
+    class="tw-font-sans tw-antialiased tw-text-gray-900 tw-bg-gray-100{{ $is_dark_mode ? ' theme-dark' : '' }} @if ($pos_layout) hold-transition lockscreen @else hold-transition skin-@if ($is_dark_mode){{ 'black' }}@elseif (!empty(session('business.theme_color'))){{ session('business.theme_color') }}@else{{ 'blue-light' }} @endif sidebar-mini @endif" >
     <div class="tw-flex thetop">
         <script type="text/javascript">
             if (localStorage.getItem("upos_sidebar_collapse") == 'true') {
@@ -55,10 +64,10 @@
         @endif
 
         <!-- Add currency related field-->
-        <input type="hidden" id="__code" value="{{ session('currency')['code'] }}">
-        <input type="hidden" id="__symbol" value="{{ session('currency')['symbol'] }}">
-        <input type="hidden" id="__thousand" value="{{ session('currency')['thousand_separator'] }}">
-        <input type="hidden" id="__decimal" value="{{ session('currency')['decimal_separator'] }}">
+        <input type="hidden" id="__code" value="{{ session('currency.code', '') }}">
+        <input type="hidden" id="__symbol" value="{{ session('currency.symbol', '') }}">
+        <input type="hidden" id="__thousand" value="{{ session('currency.thousand_separator', ',') }}">
+        <input type="hidden" id="__decimal" value="{{ session('currency.decimal_separator', '.') }}">
         <input type="hidden" id="__symbol_placement" value="{{ session('business.currency_symbol_placement') }}">
         <input type="hidden" id="__precision" value="{{ session('business.currency_precision', 2) }}">
         <input type="hidden" id="__quantity_precision" value="{{ session('business.quantity_precision', 2) }}">

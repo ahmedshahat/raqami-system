@@ -31,4 +31,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'babel_whatsapp' => [
+        'url' => env('BABEL_WHATSAPP_URL', 'https://www.babel-cloud.com/notifications/send.php'),
+        'token' => env('BABEL_WHATSAPP_TOKEN'),
+        'instance' => env('BABEL_WHATSAPP_INSTANCE', 'market_ahmed'),
+        'timeout' => env('BABEL_WHATSAPP_TIMEOUT', 10),
+        'verify_ssl' => env('BABEL_WHATSAPP_VERIFY_SSL', true),
+    ],
+
 ];

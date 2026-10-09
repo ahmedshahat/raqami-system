@@ -19,6 +19,15 @@ use Modules\Construction\Http\Controllers\SubcontractorController;
 use Modules\Construction\Http\Controllers\SubcontractCertificateController;
 use Modules\Construction\Http\Controllers\SubcontractPaymentController;
 use Modules\Construction\Http\Controllers\SubcontractRetentionReleaseController;
+use Modules\Construction\Http\Controllers\FinancialReportController;
+use Modules\Construction\Http\Controllers\SubcontractorStatementController;
+use Modules\Construction\Http\Controllers\BoqSubcontractComparisonController;
+use Modules\Construction\Http\Controllers\BoqCostProfitabilityController;
+use Modules\Construction\Http\Controllers\CustomerCertificatesCollectionController;
+use Modules\Construction\Http\Controllers\CustomerRetentionReleaseController;
+use Modules\Construction\Http\Controllers\RetentionGuaranteesReportController;
+use Modules\Construction\Http\Controllers\AccountingSettingsController;
+use Modules\Construction\Http\Controllers\SettingsController;
 
 Route::middleware([
     'web',
@@ -35,6 +44,10 @@ Route::middleware([
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('overview', [DashboardController::class, 'overview'])->name('overview.index');
+    Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::get('settings/accounting', [AccountingSettingsController::class, 'index'])->name('settings.accounting.index');
+    Route::post('settings/accounting/create-accounts', [AccountingSettingsController::class, 'createAccounts'])->name('settings.accounting.create-accounts');
+    Route::put('settings/accounting', [AccountingSettingsController::class, 'update'])->name('settings.accounting.update');
     Route::get('project-items', [BoqController::class, 'workspaceIndex'])->name('project-items.index');
     Route::get('contracts', [ContractController::class, 'index'])->name('contracts.index');
     Route::get('measurements', [MeasurementController::class, 'workspaceIndex'])->name('measurements.index');
@@ -87,12 +100,24 @@ Route::middleware([
     Route::put('subcontractors/{subcontract}/certificates/{certificate}', [SubcontractCertificateController::class, 'update'])->name('subcontractors.certificates.update');
     Route::delete('subcontractors/{subcontract}/certificates/{certificate}', [SubcontractCertificateController::class, 'destroy'])->name('subcontractors.certificates.destroy');
     Route::post('subcontractors/{subcontract}/certificates/{certificate}/approve', [SubcontractCertificateController::class, 'approve'])->name('subcontractors.certificates.approve');
+    Route::patch('subcontractors/{subcontract}/certificates/{certificate}/retention-due-date', [SubcontractCertificateController::class, 'updateRetentionDueDate'])->name('subcontractors.certificates.retention-due-date.update');
     Route::post('subcontractors/{subcontract}/certificates/{certificate}/payments', [SubcontractPaymentController::class, 'store'])->name('subcontractors.certificates.payments.store');
     Route::get('subcontractors/{subcontract}/certificates/{certificate}/payments/{payment}/preview', [SubcontractPaymentController::class, 'preview'])->name('subcontractors.certificates.payments.preview');
     Route::get('subcontractors/{subcontract}/certificates/{certificate}/payments/{payment}/print', [SubcontractPaymentController::class, 'print'])->name('subcontractors.certificates.payments.print');
     Route::post('subcontractors/{subcontract}/certificates/{certificate}/retention-releases', [SubcontractRetentionReleaseController::class, 'store'])->name('subcontractors.certificates.retention-releases.store');
     Route::post('subcontractors/{subcontract}/certificates/{certificate}/retention-releases/{release}/cancel', [SubcontractRetentionReleaseController::class, 'cancel'])->name('subcontractors.certificates.retention-releases.cancel');
-    Route::get('reports', [DashboardController::class, 'reports'])->name('reports.index');
+    Route::get('reports', [FinancialReportController::class, 'index'])->name('reports.index');
+    Route::get('reports/financial-position/print', [FinancialReportController::class, 'print'])->name('reports.financial-position.print');
+    Route::get('reports/subcontractor-statement', [SubcontractorStatementController::class, 'index'])->name('reports.subcontractor-statement.index');
+    Route::get('reports/subcontractor-statement/print', [SubcontractorStatementController::class, 'print'])->name('reports.subcontractor-statement.print');
+    Route::get('reports/boq-subcontract-comparison', [BoqSubcontractComparisonController::class, 'index'])->name('reports.boq-subcontract-comparison.index');
+    Route::get('reports/boq-subcontract-comparison/print', [BoqSubcontractComparisonController::class, 'print'])->name('reports.boq-subcontract-comparison.print');
+    Route::get('reports/boq-cost-profitability', [BoqCostProfitabilityController::class, 'index'])->name('reports.boq-cost-profitability.index');
+    Route::get('reports/boq-cost-profitability/print', [BoqCostProfitabilityController::class, 'print'])->name('reports.boq-cost-profitability.print');
+    Route::get('reports/customer-certificates-collection', [CustomerCertificatesCollectionController::class, 'index'])->name('reports.customer-certificates-collection.index');
+    Route::get('reports/customer-certificates-collection/print', [CustomerCertificatesCollectionController::class, 'print'])->name('reports.customer-certificates-collection.print');
+    Route::get('reports/retention-guarantees', [RetentionGuaranteesReportController::class, 'index'])->name('reports.retention-guarantees.index');
+    Route::get('reports/retention-guarantees/print', [RetentionGuaranteesReportController::class, 'print'])->name('reports.retention-guarantees.print');
     Route::get('print-font/{weight}', [PrintFontController::class, 'show'])->name('print-font');
     Route::get('quotes', [QuoteController::class, 'index'])->name('quotes.index');
     Route::post('quotes', [QuoteController::class, 'store'])->name('quotes.store');
@@ -150,8 +175,11 @@ Route::middleware([
     Route::get('projects/{project}/certificates/{certificate}', [CustomerCertificateController::class, 'show'])->name('projects.certificates.show');
     Route::post('projects/{project}/certificates/{certificate}/approve', [CustomerCertificateController::class, 'approve'])->name('projects.certificates.approve');
     Route::post('projects/{project}/certificates/{certificate}/cancel', [CustomerCertificateController::class, 'cancel'])->name('projects.certificates.cancel');
+    Route::patch('projects/{project}/certificates/{certificate}/retention-due-date', [CustomerCertificateController::class, 'updateRetentionDueDate'])->name('projects.certificates.retention-due-date.update');
     Route::get('projects/{project}/certificates/{certificate}/preview', [CustomerCertificateController::class, 'preview'])->name('projects.certificates.preview');
     Route::get('projects/{project}/certificates/{certificate}/print', [CustomerCertificateController::class, 'print'])->name('projects.certificates.print');
     Route::get('projects/{project}/certificates/{certificate}/pdf', [CustomerCertificateController::class, 'pdf'])->name('projects.certificates.pdf');
     Route::post('projects/{project}/certificates/{certificate}/invoice', [CustomerCertificateController::class, 'createInvoice'])->name('projects.certificates.invoice');
+    Route::post('projects/{project}/certificates/{certificate}/retention-releases', [CustomerRetentionReleaseController::class, 'store'])->name('projects.certificates.retention-releases.store');
+    Route::post('projects/{project}/certificates/{certificate}/retention-releases/{release}/cancel', [CustomerRetentionReleaseController::class, 'cancel'])->name('projects.certificates.retention-releases.cancel');
 });

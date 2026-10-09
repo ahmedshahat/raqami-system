@@ -8,4 +8,4 @@
             : asset('img/saudi-riyal-new.svg'))
         : null;
 @endphp
-<span class="print-money print-money--{{ $money['position'] }}" dir="ltr">@if($money['position'] === 'before')@include('construction::partials.money_symbol', ['money' => $money, 'isSaudiRiyal' => $isSaudiRiyal, 'symbolSource' => $symbolSource])@endif<span>{{ $money['amount'] }}</span>@if($money['position'] === 'after')@include('construction::partials.money_symbol', ['money' => $money, 'isSaudiRiyal' => $isSaudiRiyal, 'symbolSource' => $symbolSource])@endif</span>
+<span class="print-money print-money--{{ $money['position'] }}">@if($money['position'] === 'before')@include('construction::partials.money_symbol', ['money' => $money, 'isSaudiRiyal' => $isSaudiRiyal, 'symbolSource' => $symbolSource])@endif<span>{{ $money['amount'] }}</span>@if($money['position'] === 'after')@include('construction::partials.money_symbol', ['money' => $money, 'isSaudiRiyal' => $isSaudiRiyal, 'symbolSource' => $symbolSource])@endif</span>

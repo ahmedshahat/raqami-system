@@ -1,43 +1,32 @@
-<?php
-
-return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Contact Language Lines
-    |--------------------------------------------------------------------------
-    |
-    | The following language lines are used during Contacts CRUD operations.
-    |
-    */
-
-    'contacts' => 'جهات الاتصال',
-    'name' => 'الاسم',
-    'contact' => 'جهة الاتصال',
-    'manage_your_contact' => 'إدارة :contacts الخاص بك',
-    'all_your_contact' => 'جميع :contacts',
-    'add_contact' => 'إضافة جهة اتصال جديدة',
-    'contact_type' => 'نوع جهة الاتصال',
-    'tax_no' => 'الرقم الضريبي',
-    'pay_term' => 'مدة السداد',
-    'pay_term_period' => 'فترة مدة السداد',
-    'mobile' => 'رقم موبايل',
-    'landline' => 'خط الهاتف الارضي أو موبايل إضافي',
-    'alternate_contact_number' => 'رقم موبايل إضافي',
-    'edit_contact' => 'تعديل جهة الاتصال',
-    'added_success' => 'تمت إضافة جهة الاتصال بنجاح',
-    'updated_success' => 'تم تحديث جهة الاتصال بنجاح',
-    'deleted_success' => 'تم حذف جهة الاتصال بنجاح',
-    'add_new_customer' => 'إضافة عميل جديد',
-    'view_contact' => 'عرض جهة الاتصال',
-    'contact_info' => ':معلومات جهة اتصال',
-    'all_purchases_linked_to_this_contact' => 'جميع عمليات الشراء ذات الصلة بجهة الإتصال هذه',
-    'all_sells_linked_to_this_contact' => 'جميع المبيعات ذات الصلة بجهة الإتصال هذه',
-    'total_purchase_due' => 'إجمالي المشتريات غير المدفوعة',
-    'pay_due_amount' => 'سداد المبلغ المستحق',
-    'total_paid' => 'مجموع المبالغ المدفوعة',
-    'total_purchase_paid' => 'إجمالي مدفوعات المشتريات',
-    'total_sale_paid' => 'إجمالي مدفوعات المبيعات',
-    'total_sale_due' => 'إجمالي المبيعات غير المدفوعة',
-    'customer' => 'العميل',
+<?php 
+ return [ 
+"contacts" => "العملاء والموردين",
+"name" => "الإسم",
+"contact" => "مورد",
+"manage_your_contact" => "إدارة contacts: الخاص بك",
+"all_your_contact" => " كل contacts: الخاص بك",
+"add_contact" => "اضافة جهة اتصال",
+"contact_type" => "نوع جهة الاتصال",
+"tax_no" => "رقم ضريبي",
+"pay_term" => "مدة الاجل",
+"pay_term_period" => "كل",
+"mobile" => "رقم الموبيل",
+"landline" => "رقم التليفون",
+"alternate_contact_number" => "الموبايل البديل",
+"edit_contact" => "تعديل جهة اتصال",
+"added_success" => "تمت الاضافة بنجاح",
+"updated_success" => "تم التحديث بنجاح",
+"deleted_success" => "تم الحذف بنجاح",
+"add_new_customer" => "إضافة عميل جديد",
+"view_contact" => "عرض جهات الاتصال",
+"contact_info" => ":contact معلومات عن",
+"all_purchases_linked_to_this_contact" => "جميع المشتريات المتعلقة بهذا العميل",
+"all_sells_linked_to_this_contact" => "جميع المبيعات المتعلقة بهذا العميل",
+"total_purchase_due" => "مشتريات غير مدفوعة", 
+"pay_due_amount" => "المبلغ المستحق", 
+"total_paid" => "المدفوع ", 
+"total_purchase_paid" => "مجموع مدفوعات الشراء", 
+"total_sale_paid" => "اجمالي مدفوعات المبيعات", 
+"total_sale_due" => "غير مدفوع", 
+"customer" => "العميل", 
 ];

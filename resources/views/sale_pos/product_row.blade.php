@@ -15,9 +15,9 @@
 
 <tr class="product_row" data-row_index="{{$row_count}}" @if(!empty($so_line)) data-so_id="{{$so_line->transaction_id}}" @endif>
 	@if(!empty($is_serial_no))
-		<td class="serial_no" ></td>
+		<td class="serial_no serial-no-col" ></td>
 	@endif
-	<td>
+	<td class="product-col">
 		@if(!empty($so_line))
 			<input type="hidden" 
 			name="products[{{$row_count}}][so_line_id]" 
@@ -38,13 +38,15 @@
 		@else
 			{!! $product_name !!}
 		@endif
+		@if(empty($is_direct_sell))
 		<img src="@if(count($product->media) > 0)
 						{{$product->media->first()->display_url}}
 					@elseif(!empty($product->product_image))
 						{{asset('/uploads/img/' . rawurlencode($product->product_image))}}
 					@else
 						{{asset('/img/default.png')}}
-					@endif" alt="product-img" loading="lazy"style="height:50px;display: inline;margin-left: 3px; border: black;border-radius: 5px; margin-top: 5px; width: 50px;object-fit: cover;">
+					@endif" alt="product-img" loading="lazy" style="height:50px;display:inline;margin-left:3px;border-radius:5px;margin-top:5px;width:50px;object-fit:cover;">
+		@endif
 
 
 		<input type="hidden" class="enable_sr_no" value="{{$product->enable_sr_no}}">
@@ -202,7 +204,7 @@
 	@endif
 	</td>
 
-	<td>
+	<td class="quantity-col">
 		{{-- If edit then transaction sell lines will be present --}}
 		@if(!empty($product->transaction_sell_lines_id))
 			<input type="hidden" name="products[{{$row_count}}][transaction_sell_lines_id]" class="form-control" value="{{$product->transaction_sell_lines_id}}">
@@ -338,7 +340,7 @@
 	</td>
 	@if(!empty($is_direct_sell))
 		@if(!empty($pos_settings['inline_service_staff']))
-			<td>
+			<td class="service-staff-col">
 				<div class="form-group">
 					<div class="input-group">
 						{!! Form::select("products[" . $row_count . "][res_service_staff_id]", $waiters, !empty($product->res_service_staff_id) ? $product->res_service_staff_id : null, ['class' => 'form-control select2 order_line_service_staff', 'placeholder' => __('restaurant.select_service_staff'), 'required' => (!empty($pos_settings['is_service_staff_required']) && $pos_settings['is_service_staff_required'] == 1) ? true : false ]); !!}
@@ -353,7 +355,7 @@
 				$pos_unit_price = $so_line->unit_price_before_discount;
 			}
 		@endphp
-		<td class="@if(!auth()->user()->can('edit_product_price_from_sale_screen')) hide @endif">
+		<td class="unit-price-col @if(!auth()->user()->can('edit_product_price_from_sale_screen')) hide @endif">
 			<input type="text" name="products[{{$row_count}}][unit_price]" class="form-control pos_unit_price input_number mousetrap" value="{{@num_format($pos_unit_price)}}" @if(!empty($pos_settings['enable_msp'])) data-rule-min-value="{{$pos_unit_price}}" data-msg-min-value="{{__('lang_v1.minimum_selling_price_error_msg', ['price' => @num_format($pos_unit_price)])}}" @endif> 
 
 			@if(!empty($last_sell_line))
@@ -361,7 +363,7 @@
 				<small class="text-muted">@lang('lang_v1.prev_unit_price'): @format_currency($last_sell_line->unit_price_before_discount)</small>
 			@endif
 		</td>
-		<td @if(!$edit_discount) class="hide" @endif>
+		<td class="discount-col @if(!$edit_discount) hide @endif">
 			{!! Form::text("products[$row_count][line_discount_amount]", @num_format($discount_amount), ['class' => 'form-control input_number row_discount_amount']); !!}<br>
 			{!! Form::select("products[$row_count][line_discount_type]", ['fixed' => __('lang_v1.fixed'), 'percentage' => __('lang_v1.percentage')], $discount_type , ['class' => 'form-control row_discount_type']); !!}
 			@if(!empty($discount))
@@ -380,7 +382,7 @@
 				</small>
 			@endif
 		</td>
-		<td class="text-center {{$hide_tax}}">
+		<td class="text-center tax-col {{$hide_tax}}">
 			{!! Form::hidden("products[$row_count][item_tax]", @num_format($item_tax), ['class' => 'item_tax']); !!}
 		
 			{!! Form::select("products[$row_count][tax_id]", $tax_dropdown['tax_rates'], $tax_id, ['placeholder' => 'Select', 'class' => 'form-control tax_id'], $tax_dropdown['attributes']); !!}
@@ -388,7 +390,7 @@
 
 	@else
 		@if(!empty($pos_settings['inline_service_staff']))
-			<td>
+			<td class="service-staff-col">
 				<div class="form-group">
 					<div class="input-group">
 						{!! Form::select("products[" . $row_count . "][res_service_staff_id]", $waiters, !empty($product->res_service_staff_id) ? $product->res_service_staff_id : null, ['class' => 'form-control select2 order_line_service_staff', 'placeholder' => __('restaurant.select_service_staff'), 'required' => (!empty($pos_settings['is_service_staff_required']) && $pos_settings['is_service_staff_required'] == 1) ? true : false ]); !!}
@@ -397,15 +399,15 @@
 			</td>
 		@endif
 	@endif
-	<td class="{{$hide_tax}}">
+	<td class="price-inc-tax-col {{$hide_tax}}">
 		<input type="text" style="width: auto" name="products[{{$row_count}}][unit_price_inc_tax]" class="form-control pos_unit_price_inc_tax input_number" value="{{@num_format($unit_price_inc_tax)}}" @if(!$edit_price) readonly @endif @if(!empty($pos_settings['enable_msp'])) data-rule-min-value="{{$unit_price_inc_tax}}" data-msg-min-value="{{__('lang_v1.minimum_selling_price_error_msg', ['price' => @num_format($unit_price_inc_tax)])}}" @endif>
 	</td>
 	@if(!empty($common_settings['enable_product_warranty']) && !empty($is_direct_sell))
-		<td>
+		<td class="warranty-col">
 			{!! Form::select("products[$row_count][warranty_id]", $warranties, $warranty_id, ['placeholder' => __('messages.please_select'), 'class' => 'form-control']); !!}
 		</td>
 	@endif
-	<td class="text-center">
+	<td class="text-center subtotal-col">
 		@php
 			$subtotal_type = !empty($pos_settings['is_pos_subtotal_editable']) ? 'text' : 'hidden';
 
@@ -413,7 +415,7 @@
 		<input style="width: auto" type="{{$subtotal_type}}" class="form-control pos_line_total @if(!empty($pos_settings['is_pos_subtotal_editable'])) input_number @endif" value="{{@num_format($product->quantity_ordered*$unit_price_inc_tax )}}">
 		<span class="display_currency pos_line_total_text @if(!empty($pos_settings['is_pos_subtotal_editable'])) hide @endif" data-currency_symbol="true">{{$product->quantity_ordered*$unit_price_inc_tax}}</span>
 	</td>
-	<td class="text-center v-center">
+	<td class="text-center v-center remove-col">
 		<i class="fa fa-times text-danger pos_remove_row cursor-pointer" aria-hidden="true"></i>
 	</td>
 </tr>

@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Business;
 use App\BusinessLocation;
-use App\Events\SellCreatedOrModified;
 use App\Product;
 use App\ProductVariation;
 use App\TaxRate;
@@ -18,6 +17,7 @@ use Modules\Construction\Entities\ConstructionCustomerCertificate;
 use Modules\Construction\Entities\ConstructionProject;
 use Modules\Construction\Support\PrintPdfFactory;
 use Modules\Construction\Support\AuditTrail;
+use Modules\Construction\Support\ConstructionAccountingPoster;
 
 class CustomerCertificateController extends BaseController
 {
@@ -81,7 +81,7 @@ class CustomerCertificateController extends BaseController
         $contract = $project->primaryContract;
         abort_unless($contract && $contract->status === 'active', 422, __('construction::lang.certificate_requires_active_contract'));
         $approvedBoq = $project->boqVersions()->where('status', 'approved')->findOrFail($contract->boq_version_id);
-        $this->normalizeBusinessDates($request, ['certificate_date', 'period_from', 'period_to']);
+        $this->normalizeBusinessDates($request, ['certificate_date', 'period_from', 'period_to', 'retention_due_date']);
         $this->normalizeLocalizedNumbers($request, [
             'advance_recovery_value', 'other_deductions_value',
         ]);
@@ -89,6 +89,7 @@ class CustomerCertificateController extends BaseController
             'certificate_date' => ['required', 'date'],
             'period_from' => ['nullable', 'date'],
             'period_to' => ['nullable', 'date', 'after_or_equal:period_from'],
+            'retention_due_date' => ['nullable', 'date'],
             'advance_recovery_value' => ['nullable', 'numeric', 'min:0'],
             'other_deductions_value' => ['nullable', 'numeric', 'min:0'],
             'measurement_id' => ['required', 'integer', Rule::exists('construction_measurements', 'id')->where(fn ($query) => $query->where('business_id', $this->businessId())->where('project_id', $project->id)->where('status', 'approved'))],
@@ -134,6 +135,7 @@ class CustomerCertificateController extends BaseController
                 'status' => 'draft',
                 'previous_gross' => $previousGross,
                 'retention_percent' => $contract->retention_percent,
+                'retention_due_date' => $validated['retention_due_date'] ?? null,
                 'advance_recovery_value' => $recovery,
                 'other_deductions_value' => $validated['other_deductions_value'] ?? 0,
                 'tax_rate_id' => $taxRate?->id,
@@ -189,7 +191,11 @@ class CustomerCertificateController extends BaseController
         $this->authorizePermission('construction.certificate.view');
         $project = $this->findProject($project);
         $certificate = $this->findCertificate($project, $certificate);
-        $certificate->load(['items.boqItem', 'boqVersion', 'contract', 'measurement', 'invoice', 'approvedBy:id,surname,first_name,last_name,username']);
+        $certificate->load([
+            'items.boqItem', 'boqVersion', 'contract', 'measurement', 'invoice', 'accountingPosting.mapping',
+            'retentionReleases.accountingPosting.mapping', 'retentionReleases.cancellationAccountingPosting.mapping',
+            'approvedBy:id,surname,first_name,last_name,username',
+        ]);
         $recoveredBefore = $project->customerCertificates()->where('contract_id', $certificate->contract_id)
             ->whereIn('status', self::APPROVED_STATUSES)->where('id', '!=', $certificate->id)
             ->when($certificate->approved_at, fn ($query) => $query->where('approved_at', '<', $certificate->approved_at))
@@ -254,6 +260,22 @@ class CustomerCertificateController extends BaseController
         return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.certificate_cancelled')]);
     }
 
+    public function updateRetentionDueDate(Request $request, int $project, int $certificate)
+    {
+        $this->authorizePermission('construction.certificate.manage');
+        $project = $this->findProject($project);
+        $certificate = $this->findCertificate($project, $certificate);
+        abort_if($certificate->status === 'cancelled', 422, __('construction::lang.cancelled_certificate_retention_date_locked'));
+        $this->normalizeBusinessDates($request, ['retention_due_date']);
+        $validated = $request->validate(['retention_due_date' => ['nullable', 'date']]);
+        $before = $certificate->retention_due_date?->toDateString();
+        $certificate->update(['retention_due_date' => $validated['retention_due_date'] ?? null]);
+        AuditTrail::record('customer_retention_due_date_updated', $certificate, $project->id,
+            ['retention_due_date' => $before], ['retention_due_date' => $certificate->fresh()->retention_due_date?->toDateString()]);
+
+        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.retention_due_date_updated')]);
+    }
+
     public function preview(int $project, int $certificate)
     {
         return view('construction::certificates.print', $this->printData($project, $certificate) + ['autoPrint' => false, 'pdfMode' => false]);
@@ -292,11 +314,13 @@ class CustomerCertificateController extends BaseController
         $certificate = $this->findCertificate($project, $certificate);
         abort_unless(in_array($certificate->status, self::APPROVED_STATUSES, true), 422, __('construction::lang.certificate_not_approved_for_invoice'));
 
-        $invoice = DB::transaction(function () use ($project, $certificate) {
+        [$invoice, $posting] = DB::transaction(function () use ($project, $certificate) {
             $certificate = ConstructionCustomerCertificate::whereKey($certificate->id)->lockForUpdate()->firstOrFail();
             if ($certificate->invoice_transaction_id) {
                 if ($certificate->invoice && $certificate->invoice->status === 'final') {
-                    return $certificate->invoice;
+                    $posting = app(ConstructionAccountingPoster::class)
+                        ->postCustomerCertificateInvoice($certificate->load('invoice'));
+                    return [$certificate->invoice, $posting];
                 }
                 $certificate->update(['invoice_transaction_id' => null]);
             }
@@ -336,13 +360,15 @@ class CustomerCertificateController extends BaseController
             $invoice->payment_status = 'due';
             $invoice->save();
             $certificate->update(['invoice_transaction_id' => $invoice->id]);
-            DB::afterCommit(fn () => SellCreatedOrModified::dispatch($invoice));
-
-            return $invoice;
+            $posting = app(ConstructionAccountingPoster::class)
+                ->postCustomerCertificateInvoice($certificate->fresh(['invoice']));
+            return [$invoice, $posting];
         });
 
         return redirect()->route('construction.projects.certificates.show', [$project->id, $certificate->id])
-            ->with('status', ['success' => 1, 'msg' => __('construction::lang.invoice_created_with_number', ['number' => $invoice->invoice_no])]);
+            ->with('status', ['success' => 1, 'msg' => $posting
+                ? __('construction::lang.invoice_created_and_posted', ['number' => $invoice->invoice_no])
+                : __('construction::lang.invoice_created_with_number', ['number' => $invoice->invoice_no])]);
     }
 
     private function invoiceProductForBoqItem($boqItem): array

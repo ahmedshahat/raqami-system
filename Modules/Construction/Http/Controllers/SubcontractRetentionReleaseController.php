@@ -10,6 +10,7 @@ use Modules\Construction\Entities\ConstructionSubcontract;
 use Modules\Construction\Entities\ConstructionSubcontractCertificate;
 use Modules\Construction\Entities\ConstructionSubcontractRetentionRelease;
 use Modules\Construction\Support\AuditTrail;
+use Modules\Construction\Support\ConstructionAccountingPoster;
 
 class SubcontractRetentionReleaseController extends BaseController
 {
@@ -26,7 +27,7 @@ class SubcontractRetentionReleaseController extends BaseController
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $release = DB::transaction(function () use ($contract, $certificate, $validated) {
+        [$release, $posting] = DB::transaction(function () use ($contract, $certificate, $validated) {
             $certificate = ConstructionSubcontractCertificate::where('business_id', $this->businessId())->lockForUpdate()->findOrFail($certificate->id);
             $remaining = $certificate->retentionRemainingValue();
             if ((float) $validated['retention_amount'] > $remaining + 0.0001) {
@@ -46,11 +47,17 @@ class SubcontractRetentionReleaseController extends BaseController
                 'created_by' => auth()->id(),
             ]);
             AuditTrail::record('subcontract_retention_released', $release, $contract->project_id, [], ['number' => $release->number, 'amount' => (float) $release->amount]);
+            $posting = app(ConstructionAccountingPoster::class)->postSubcontractRetentionRelease($release);
 
-            return $release;
+            return [$release, $posting];
         });
 
-        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.retention_release_recorded', ['number' => $release->number])]);
+        return back()->with('status', [
+            'success' => 1,
+            'msg' => $posting
+                ? __('construction::lang.retention_release_recorded_and_posted', ['number' => $release->number])
+                : __('construction::lang.retention_release_recorded', ['number' => $release->number]),
+        ]);
     }
 
     public function cancel(Request $request, int $subcontract, int $certificate, int $release)
@@ -59,7 +66,7 @@ class SubcontractRetentionReleaseController extends BaseController
         $validated = $request->validate(['cancellation_reason' => ['required', 'string', 'max:1000']]);
         [$contract, $certificate] = $this->findCertificate($subcontract, $certificate);
 
-        DB::transaction(function () use ($contract, $certificate, $release, $validated) {
+        $reversal = DB::transaction(function () use ($contract, $certificate, $release, $validated) {
             $certificate = ConstructionSubcontractCertificate::where('business_id', $this->businessId())->lockForUpdate()->findOrFail($certificate->id);
             $release = $certificate->retentionReleases()->where('business_id', $this->businessId())->lockForUpdate()->findOrFail($release);
             abort_unless($release->isActive(), 422, __('construction::lang.retention_release_already_cancelled'));
@@ -74,9 +81,15 @@ class SubcontractRetentionReleaseController extends BaseController
                 'cancellation_reason' => $validated['cancellation_reason'],
             ]);
             AuditTrail::record('subcontract_retention_release_cancelled', $release, $contract->project_id, ['amount' => (float) $release->amount], ['reason' => $validated['cancellation_reason']]);
+            return app(ConstructionAccountingPoster::class)->reverseSubcontractRetentionRelease($release->fresh());
         });
 
-        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.retention_release_cancelled')]);
+        return back()->with('status', [
+            'success' => 1,
+            'msg' => $reversal
+                ? __('construction::lang.retention_release_cancelled_and_reversed')
+                : __('construction::lang.retention_release_cancelled'),
+        ]);
     }
 
     private function findCertificate(int $subcontract, int $certificate): array

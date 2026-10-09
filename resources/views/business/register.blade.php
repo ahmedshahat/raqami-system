@@ -1,51 +1,124 @@
 @extends('layouts.auth2')
 @section('title', __('lang_v1.register'))
 
-@section('content')
+@section('css')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25.10.6/build/css/intlTelInput.css">
+    <link rel="stylesheet" href="{{ asset('css/register.css?v=' . $asset_v) }}">
+@endsection
 
-    <div class="col-md-8 col-xs-12 col-md-offset-2 tw-mt-6">
-        <div
-            class=" tw-p-2 sm:tw-p-3 tw-mb-4 tw-transition-all tw-duration-200  tw-bg-white tw-shadow-sm tw-rounded-xl tw-ring-1 tw-ring-gray-200">
-            <div class="tw-flex tw-flex-col tw-gap-4 tw-dw-rounded-box tw-dw-p-6 tw-dw-max-w-md">
-                <div class="tw-flex tw-flex-col rounded-2xl tw-dw-p-6 tw-dw-max-w-md text-center">
-                    {{-- <svg xmlns="http://www.w3.org/2000/svg" class="tw-ml-4 tw-mt-4 icon icon-tabler icon-tabler-circle-key-filled" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#2c3e50" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <path d="M12 2c5.523 0 10 4.477 10 10a10 10 0 0 1 -20 0c0 -5.523 4.477 -10 10 -10zm2 5a3 3 0 0 0 -2.98 2.65l-.015 .174l-.005 .176l.005 .176c.019 .319 .087 .624 .197 .908l.09 .209l-3.5 3.5l-.082 .094a1 1 0 0 0 0 1.226l.083 .094l1.5 1.5l.094 .083a1 1 0 0 0 1.226 0l.094 -.083l.083 -.094a1 1 0 0 0 0 -1.226l-.083 -.094l-.792 -.793l.585 -.585l.793 .792l.094 .083a1 1 0 0 0 1.403 -1.403l-.083 -.094l-.792 -.793l.792 -.792a3 3 0 1 0 1.293 -5.708zm0 2a1 1 0 1 1 0 2a1 1 0 0 1 0 -2z" stroke-width="0" fill="currentColor" />
-                    </svg> --}}
-                    {{-- <svg xmlns="http://www.w3.org/2000/svg" class="tw-mr-3 tw-mt-1 icon icon-tabler icon-tabler-lock-up" width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="#2c3e50" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <path d="M12.5 21h-5.5a2 2 0 0 1 -2 -2v-6a2 2 0 0 1 2 -2h10a2 2 0 0 1 1.739 1.01" />
-                        <path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" />
-                        <path d="M8 11v-4a4 4 0 1 1 8 0v4" />
-                        <path d="M19 22v-6" />
-                        <path d="M22 19l-3 -3l-3 3" />
-                    </svg>
-                    <h1 class="tw-dw-text-3xl tw-dw-font-bold"> {{ config('app.name', 'ultimatePOS') }} - @lang('business.register_and_get_started_in_minutes')</h1> --}}
-                    <h1 class="tw-text-lg md:tw-text-xl tw-font-semibold tw-text-[#1e1e1e]">
-                            {{ config('app.name', 'ultimatePOS') }}
-                      </h1>
-                      <h2 class="tw-text-sm tw-font-medium tw-text-gray-500">
-                            @lang('business.register_and_get_started_in_minutes')
-                      </h2>
+@section('content')
+    <div class="register-page" dir="rtl">
+        <div class="register-shell">
+            <section class="register-showcase">
+                <div class="brand-lockup">
+                    <img src="{{ asset('img/logo-small.png') }}" alt="{{ config('app.name') }}">
+                    <div><strong>{{ config('app.name', 'UltimatePOS') }}</strong><span>النظام المحاسبي السحابي في مصر</span></div>
+                </div>
+                <div class="showcase-copy">
+                    <h2>برنامج محاسبة سحابي<br><em>أسهل، أسرع، أدق</em></h2>
+                    <p>أدر أعمالك من أي مكان وفي أي وقت،<br>الفواتير، المخزون، الحسابات وأكثر من ذلك بكثير.</p>
+                </div>
+                <div class="showcase-photo" aria-hidden="true"></div>
+                <div class="showcase-benefits">
+                    <div><i class="fa fa-shield-alt"></i><strong>أمان عالي</strong><span>حماية كاملة لبياناتك</span></div>
+                    <div><i class="fa fa-cloud"></i><strong>تجربة سحابية</strong><span>الوصول من أي مكان</span></div>
+                    <div><i class="fa fa-rocket"></i><strong>تشغيل سريع</strong><span>ابدأ خلال دقائق</span></div>
+                </div>
+            </section>
+
+            <section class="register-card">
+                <div class="register-heading">
+                    <h1>إنشاء حساب جديد</h1>
+                    <p>ابدأ تجربتك المجانية الآن، بدون بطاقة ائتمان</p>
+                    <span></span>
                 </div>
             {!! Form::open([
                 'url' => route('business.postRegister'),
                 'method' => 'post',
-                'id' => 'business_register_form',
+                'id' => 'simple_business_register_form',
                 'files' => true,
             ]) !!}
-            @include('business.partials.register_form', ['is_register' => true])
+            @include('business.partials.register_simple_form')
             {!! Form::hidden('package_id', $package_id) !!}
             {!! Form::close() !!}
-            </div>
+            </section>
         </div>
     </div>
 @stop
 @section('javascript')
+    <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@25.10.6/build/js/intlTelInput.min.js"></script>
     <script type="text/javascript">
         $(document).ready(function() {
+            const mobileInput = document.querySelector('#mobile');
+            const mobileCountry = document.querySelector('#mobile_country');
+
+            if (mobileInput && mobileCountry && window.intlTelInput) {
+                const countries = ['eg', 'sa', 'kw', 'ly', 'ye', 'sy', 'jo', 'om', 'qa', 'bh', 'ae', 'sd', 'dz', 'tn'];
+                const selectedCountry = (mobileCountry.value || 'EG').toLowerCase();
+                const phoneInput = window.intlTelInput(mobileInput, {
+                    initialCountry: countries.includes(selectedCountry) ? selectedCountry : 'eg',
+                    onlyCountries: countries,
+                    countryOrder: countries,
+                    countrySearch: false,
+                    countrySelectorMode: 'DROPDOWN',
+                    separateDialCode: true,
+                    showFlags: true,
+                    dropdownParent: document.body,
+                    countryNameOverrides: {
+                        eg: 'مصر',
+                        sa: 'السعودية',
+                        kw: 'الكويت',
+                        ly: 'ليبيا',
+                        ye: 'اليمن',
+                        sy: 'سوريا',
+                        jo: 'الأردن',
+                        om: 'عُمان',
+                        qa: 'قطر',
+                        bh: 'البحرين',
+                        ae: 'الإمارات',
+                        sd: 'السودان',
+                        dz: 'الجزائر',
+                        tn: 'تونس'
+                    }
+                });
+
+                let previousDialCode = phoneInput.getSelectedCountryData().dialCode || '';
+
+                const removeOldStandaloneDialCode = function() {
+                    const value = mobileInput.value.replace(/[\s()-]/g, '');
+                    if (value === previousDialCode || value === '+' + previousDialCode) {
+                        mobileInput.value = '';
+                    }
+                };
+
+                const syncMobileCountry = function() {
+                    const country = phoneInput.getSelectedCountryData();
+                    if (country && country.iso2) {
+                        mobileCountry.value = country.iso2.toUpperCase();
+                        previousDialCode = country.dialCode || '';
+                    }
+                };
+
+                removeOldStandaloneDialCode();
+                mobileInput.addEventListener('countrychange', function() {
+                    removeOldStandaloneDialCode();
+                    syncMobileCountry();
+                });
+                $('#simple_business_register_form').on('submit', syncMobileCountry);
+                syncMobileCountry();
+            }
+
             $('.change_lang').click(function() {
-                window.location = "{{ route('business.getRegister') }}?lang=" + $(this).attr('value');
+                const packageId = @json($package_id);
+                const params = new URLSearchParams({lang: $(this).attr('value')});
+                if (packageId) params.set('package', packageId);
+                window.location = "{{ route('business.getRegister') }}?" + params.toString();
+            });
+
+            $('.password-toggle').on('click', function() {
+                const input = $($(this).data('target'));
+                input.attr('type', input.attr('type') === 'password' ? 'text' : 'password');
+                $(this).find('i').toggleClass('fa-eye fa-eye-slash');
             });
         })
     </script>

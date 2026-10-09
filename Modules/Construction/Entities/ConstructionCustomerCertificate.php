@@ -23,6 +23,7 @@ class ConstructionCustomerCertificate extends Model
         'current_submitted_gross' => 'decimal:4',
         'current_approved_gross' => 'decimal:4',
         'retention_value' => 'decimal:4',
+        'retention_due_date' => 'date',
         'advance_recovery_value' => 'decimal:4',
         'other_deductions_value' => 'decimal:4',
         'tax_value' => 'decimal:4',
@@ -54,9 +55,36 @@ class ConstructionCustomerCertificate extends Model
         return $this->belongsTo(\App\Transaction::class, 'invoice_transaction_id');
     }
 
+    public function accountingPosting()
+    {
+        return $this->hasOne(ConstructionAccountingPosting::class, 'source_id')
+            ->where('source_type', 'customer_certificate')
+            ->where('event', 'invoiced');
+    }
+
     public function items()
     {
         return $this->hasMany(ConstructionCustomerCertificateItem::class, 'certificate_id');
+    }
+
+    public function retentionReleases()
+    {
+        return $this->hasMany(ConstructionCustomerRetentionRelease::class, 'certificate_id');
+    }
+
+    public function activeRetentionReleases()
+    {
+        return $this->retentionReleases()->where('status', 'recorded');
+    }
+
+    public function releasedRetentionValue(): float
+    {
+        return round((float) $this->activeRetentionReleases()->sum('amount'), 4);
+    }
+
+    public function retentionRemainingValue(): float
+    {
+        return max(0, round((float) $this->retention_value - $this->releasedRetentionValue(), 4));
     }
 
     public function submittedBy()

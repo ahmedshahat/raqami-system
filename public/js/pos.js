@@ -2022,9 +2022,65 @@ function pos_each_row(row_obj) {
     __write_number(row_obj.find('input.item_tax'), unit_price_inc_tax - discounted_unit_price);
 }
 
+    function apply_tier_discount(price_total) {
+        if ($('#tier_discount_enabled').val() != '1') {
+            return;
+        }
+    
+        var rangesElement = document.getElementById('tier_discount_ranges_json');
+    
+        if (!rangesElement) {
+            return;
+        }
+    
+        var ranges = [];
+    
+        try {
+            ranges = JSON.parse(rangesElement.textContent || '[]');
+        } catch (error) {
+            console.error('Invalid tier discount settings:', error);
+            return;
+        }
+    
+        var discountPercentage = 0;
+    
+        for (var i = 0; i < ranges.length; i++) {
+            var fromAmount = parseFloat(
+                String(ranges[i].from || 0).replace(/,/g, '')
+            );
+    
+            var toAmount = parseFloat(
+                String(ranges[i].to || 0).replace(/,/g, '')
+            );
+    
+            var discount = parseFloat(
+                String(ranges[i].discount || 0).replace(/,/g, '')
+            );
+    
+            if (
+                !isNaN(fromAmount) &&
+                !isNaN(toAmount) &&
+                !isNaN(discount) &&
+                price_total >= fromAmount &&
+                price_total <= toAmount
+            ) {
+                discountPercentage = discount;
+                break;
+            }
+        }
+    
+        $('#discount_type').val('percentage');
+    
+        __write_number(
+            $('#discount_amount'),
+            discountPercentage
+        );
+    }
+
 function pos_total_row() {
     var total_quantity = 0;
     var price_total = get_subtotal();
+    apply_tier_discount(price_total);
     $('table#pos_table tbody tr').each(function() {
         total_quantity = total_quantity + __read_number($(this).find('input.pos_quantity'));
     });

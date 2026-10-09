@@ -13,6 +13,9 @@ use Illuminate\Validation\ValidationException;
 use Modules\Construction\Entities\ConstructionSubcontract;
 use Modules\Construction\Entities\ConstructionSubcontractCertificate;
 use Modules\Construction\Entities\ConstructionSubcontractPayment;
+use Modules\Accounting\Entities\AccountingAccount;
+use Modules\Construction\Entities\ConstructionAccountingSetting;
+use Modules\Construction\Support\ConstructionAccountingPoster;
 
 class SubcontractPaymentController extends BaseController
 {
@@ -24,16 +27,27 @@ class SubcontractPaymentController extends BaseController
         $this->normalizeBusinessDates($request, ['payment_date']);
         $this->normalizeLocalizedNumbers($request, ['amount']);
         $methods = array_keys((new Util())->payment_types(null, false, $this->businessId()));
+        $accountingSettings = ConstructionAccountingSetting::where('business_id', $this->businessId())->first();
         $validated = $request->validate([
             'payment_date' => ['required', 'date'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'method' => ['required', Rule::in($methods)],
             'account_id' => ['nullable', 'integer', Rule::exists('accounts', 'id')->where(fn ($query) => $query->where('business_id', $this->businessId())->whereNull('deleted_at')->where('is_closed', 0))],
+            'accounting_account_id' => [
+                Rule::requiredIf((bool) $accountingSettings),
+                'nullable',
+                'integer',
+                Rule::exists('accounting_accounts', 'id')->where(fn ($query) => $query
+                    ->where('business_id', $this->businessId())
+                    ->where('status', 'active')
+                    ->where('account_primary_type', 'asset')
+                    ->where('account_sub_type_id', 3)),
+            ],
             'reference_no' => ['nullable', 'string', 'max:120'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $payment = DB::transaction(function () use ($contract, $certificate, $validated) {
+        [$payment, $posting] = DB::transaction(function () use ($contract, $certificate, $validated) {
             $certificate = ConstructionSubcontractCertificate::where('business_id', $this->businessId())->lockForUpdate()->findOrFail($certificate->id);
             $paid = (float) ConstructionSubcontractPayment::where('certificate_id', $certificate->id)->where('status', 'recorded')->sum('amount');
             $remaining = round(max(0, $certificate->payableValue() - $paid), 4);
@@ -41,12 +55,13 @@ class SubcontractPaymentController extends BaseController
                 throw ValidationException::withMessages(['amount' => __('construction::lang.payment_exceeds_remaining', ['remaining' => (new Util())->num_f($remaining)])]);
             }
 
-            return ConstructionSubcontractPayment::create([
+            $payment = ConstructionSubcontractPayment::create([
                 'business_id' => $this->businessId(),
                 'project_id' => $contract->project_id,
                 'subcontract_id' => $contract->id,
                 'certificate_id' => $certificate->id,
                 'account_id' => $validated['account_id'] ?? null,
+                'accounting_account_id' => $validated['accounting_account_id'] ?? null,
                 'number' => $this->nextNumber(),
                 'payment_date' => $validated['payment_date'],
                 'amount' => $validated['amount'],
@@ -56,9 +71,17 @@ class SubcontractPaymentController extends BaseController
                 'status' => 'recorded',
                 'created_by' => auth()->id(),
             ]);
+            $posting = app(ConstructionAccountingPoster::class)->postSubcontractPayment($payment);
+
+            return [$payment, $posting];
         });
 
-        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.subcontract_payment_recorded', ['number' => $payment->number])]);
+        return back()->with('status', [
+            'success' => 1,
+            'msg' => $posting
+                ? __('construction::lang.subcontract_payment_recorded_and_posted', ['number' => $payment->number])
+                : __('construction::lang.subcontract_payment_recorded', ['number' => $payment->number]),
+        ]);
     }
 
     public function preview(int $subcontract, int $certificate, int $payment)
@@ -77,7 +100,7 @@ class SubcontractPaymentController extends BaseController
         [$contract, $certificate] = $this->findCertificate($subcontract, $certificate);
         $payment = $certificate->payments()->where('business_id', $this->businessId())->findOrFail($payment);
         $contract->load(['project:id,code,name', 'subcontractor:id,name,supplier_business_name,mobile']);
-        $payment->load(['account:id,name', 'createdBy:id,surname,first_name,last_name']);
+        $payment->load(['account:id,name', 'accountingAccount:id,name', 'createdBy:id,surname,first_name,last_name']);
         $paymentTypes = (new Util())->payment_types(null, false, $this->businessId());
 
         return [

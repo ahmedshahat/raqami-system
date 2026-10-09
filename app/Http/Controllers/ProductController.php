@@ -269,7 +269,10 @@ class ProductController extends Controller
                     return $product;
                 })
                 ->editColumn('image', function ($row) {
-                    return '<div style="display: flex;"><img src="'.$row->image_url.'" alt="Product image" class="product-thumbnail-small"></div>';
+                    $image_url = e($row->image_url);
+                    $fallback_image = e(asset('/img/default.png'));
+
+                    return '<div style="display: flex;"><img src="'.$image_url.'" alt="Product image" class="product-thumbnail-small" onerror="this.onerror=null;this.src=\''.$fallback_image.'\';"></div>';
                 })
                 ->editColumn('type', '@lang("lang_v1." . $type)')
                 ->addColumn('mass_delete', function ($row) {

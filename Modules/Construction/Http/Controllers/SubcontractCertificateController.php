@@ -12,6 +12,9 @@ use Illuminate\Validation\ValidationException;
 use Modules\Construction\Entities\ConstructionSubcontract;
 use Modules\Construction\Entities\ConstructionSubcontractCertificate;
 use Modules\Construction\Entities\ConstructionSubcontractCertificateItem;
+use Modules\Accounting\Entities\AccountingAccount;
+use Modules\Construction\Entities\ConstructionAccountingSetting;
+use Modules\Construction\Support\ConstructionAccountingPoster;
 
 class SubcontractCertificateController extends BaseController
 {
@@ -20,11 +23,12 @@ class SubcontractCertificateController extends BaseController
         $this->authorizePermission('construction.subcontract.manage');
         $contract = $this->findContract($subcontract);
         abort_unless($contract->status === 'approved', 422, __('construction::lang.subcontract_certificate_requires_approved_contract'));
-        $this->normalizeBusinessDates($request, ['certificate_date', 'period_from', 'period_to']);
+        $this->normalizeBusinessDates($request, ['certificate_date', 'period_from', 'period_to', 'retention_due_date']);
         $validated = $request->validate([
             'certificate_date' => ['required', 'date'],
             'period_from' => ['nullable', 'date'],
             'period_to' => ['nullable', 'date', 'after_or_equal:period_from'],
+            'retention_due_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
@@ -66,8 +70,20 @@ class SubcontractCertificateController extends BaseController
         $this->loadCertificate($contract, $certificate);
         $paymentTypes = (new Util())->payment_types(null, false, $this->businessId());
         $paymentAccounts = Account::forDropdown($this->businessId(), true, false, false);
+        $accountingSettings = ConstructionAccountingSetting::where('business_id', $this->businessId())->first();
+        $accountingPaymentAccounts = $accountingSettings
+            ? AccountingAccount::where('business_id', $this->businessId())
+                ->where('status', 'active')
+                ->where('account_primary_type', 'asset')
+                ->where('account_sub_type_id', 3)
+                ->orderBy('name')
+                ->pluck('name', 'id')
+            : collect();
 
-        return view('construction::subcontractors.certificates.show', compact('contract', 'certificate', 'paymentTypes', 'paymentAccounts'));
+        return view('construction::subcontractors.certificates.show', compact(
+            'contract', 'certificate', 'paymentTypes', 'paymentAccounts',
+            'accountingSettings', 'accountingPaymentAccounts'
+        ));
     }
 
     public function update(Request $request, int $subcontract, int $certificate)
@@ -75,7 +91,7 @@ class SubcontractCertificateController extends BaseController
         $this->authorizePermission('construction.subcontract.manage');
         [$contract, $certificate] = $this->findCertificate($subcontract, $certificate);
         abort_unless($certificate->isEditable(), 422, __('construction::lang.approved_subcontract_certificate_locked'));
-        $this->normalizeBusinessDates($request, ['certificate_date', 'period_from', 'period_to']);
+        $this->normalizeBusinessDates($request, ['certificate_date', 'period_from', 'period_to', 'retention_due_date']);
         $this->normalizeLocalizedNumbers($request, ['other_deductions']);
         $items = $request->input('items', []);
         foreach ($items as $key => $value) {
@@ -86,6 +102,7 @@ class SubcontractCertificateController extends BaseController
             'certificate_date' => ['required', 'date'],
             'period_from' => ['nullable', 'date'],
             'period_to' => ['nullable', 'date', 'after_or_equal:period_from'],
+            'retention_due_date' => ['nullable', 'date'],
             'other_deductions' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array'],
             'items.*' => ['required', 'numeric', 'min:0'],
@@ -97,6 +114,7 @@ class SubcontractCertificateController extends BaseController
                 'certificate_date' => $validated['certificate_date'],
                 'period_from' => $validated['period_from'] ?? null,
                 'period_to' => $validated['period_to'] ?? null,
+                'retention_due_date' => $validated['retention_due_date'] ?? null,
                 'other_deductions' => $validated['other_deductions'] ?? 0,
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -125,13 +143,25 @@ class SubcontractCertificateController extends BaseController
             ->with('status', ['success' => 1, 'msg' => __('construction::lang.subcontract_certificate_deleted')]);
     }
 
+    public function updateRetentionDueDate(Request $request, int $subcontract, int $certificate)
+    {
+        $this->authorizePermission('construction.subcontract.manage');
+        [$contract, $certificate] = $this->findCertificate($subcontract, $certificate);
+        abort_if($certificate->status === 'cancelled', 422, __('construction::lang.cancelled_certificate_retention_date_locked'));
+        $this->normalizeBusinessDates($request, ['retention_due_date']);
+        $validated = $request->validate(['retention_due_date' => ['nullable', 'date']]);
+        $certificate->update(['retention_due_date' => $validated['retention_due_date'] ?? null]);
+
+        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.retention_due_date_updated')]);
+    }
+
     public function approve(int $subcontract, int $certificate)
     {
         $this->authorizePermission('construction.subcontract.approve');
         [$contract, $certificate] = $this->findCertificate($subcontract, $certificate);
         abort_unless($certificate->isEditable(), 422, __('construction::lang.approved_subcontract_certificate_locked'));
 
-        DB::transaction(function () use ($certificate) {
+        $posting = DB::transaction(function () use ($certificate) {
             $certificate = ConstructionSubcontractCertificate::whereKey($certificate->id)->lockForUpdate()->firstOrFail();
             abort_unless($certificate->isEditable(), 422, __('construction::lang.approved_subcontract_certificate_locked'));
             $this->syncCertificate($certificate, true);
@@ -139,9 +169,15 @@ class SubcontractCertificateController extends BaseController
                 throw ValidationException::withMessages(['certificate' => __('construction::lang.subcontract_certificate_requires_progress')]);
             }
             $certificate->update(['status' => 'approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
+            return app(ConstructionAccountingPoster::class)->postSubcontractCertificateApproval($certificate->fresh());
         });
 
-        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.subcontract_certificate_approved')]);
+        return back()->with('status', [
+            'success' => 1,
+            'msg' => $posting
+                ? __('construction::lang.subcontract_certificate_approved_and_posted')
+                : __('construction::lang.subcontract_certificate_approved'),
+        ]);
     }
 
     public function preview(int $subcontract, int $certificate)
@@ -222,7 +258,7 @@ class SubcontractCertificateController extends BaseController
     private function loadCertificate(ConstructionSubcontract $contract, ConstructionSubcontractCertificate $certificate): void
     {
         $contract->load(['project:id,code,name', 'subcontractor:id,name,supplier_business_name,mobile', 'items']);
-        $certificate->load(['items.subcontractItem', 'payments.account:id,name', 'payments.createdBy:id,surname,first_name,last_name', 'retentionReleases.createdBy:id,surname,first_name,last_name', 'retentionReleases.cancelledBy:id,surname,first_name,last_name', 'createdBy:id,surname,first_name,last_name', 'approvedBy:id,surname,first_name,last_name']);
+        $certificate->load(['items.subcontractItem', 'accountingPosting.mapping', 'payments.account:id,name', 'payments.accountingAccount:id,name', 'payments.accountingPosting.mapping', 'payments.createdBy:id,surname,first_name,last_name', 'retentionReleases.accountingPosting.mapping', 'retentionReleases.cancellationAccountingPosting.mapping', 'retentionReleases.createdBy:id,surname,first_name,last_name', 'retentionReleases.cancelledBy:id,surname,first_name,last_name', 'createdBy:id,surname,first_name,last_name', 'approvedBy:id,surname,first_name,last_name']);
     }
 
     private function printData(int $subcontract, int $certificate): array

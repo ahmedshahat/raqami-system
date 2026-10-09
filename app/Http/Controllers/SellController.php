@@ -219,6 +219,12 @@ class SellController extends Controller
             $only_shipments = request()->only_shipments == 'true' ? true : false;
 
             $datatable = Datatables::of($sells)
+                ->addColumn('transaction_id', function ($row) {
+                    return $row->id;
+                })
+                ->addColumn('print_url', function ($row) {
+                    return route('sell.printInvoice', [$row->id], false);
+                })
                 ->addColumn(
                     'action',
                     function ($row) use ($only_shipments, $is_admin, $sale_type, $is_zatca) {
@@ -317,6 +323,7 @@ class SellController extends Controller
                         if ($row->type == 'sell') {
                             if (auth()->user()->can('print_invoice')) {
                                 $html .= '<li><a href="#" class="print-invoice" data-href="'.route('sell.printInvoice', [$row->id]).'"><i class="fas fa-print" aria-hidden="true"></i> '.__('lang_v1.print_invoice').'</a></li>
+                                    <li><a href="#" class="share-invoice-image" data-href="'.route('sell.printInvoice', [$row->id]).'" data-invoice-no="'.e($row->invoice_no).'"><i class="fab fa-whatsapp" aria-hidden="true"></i> مشاركة صورة الفاتورة</a></li>
                                     <li><a href="#" class="print-invoice" data-href="'.route('sell.printInvoice', [$row->id]).'?package_slip=true"><i class="fas fa-file-alt" aria-hidden="true"></i> '.__('lang_v1.packing_slip').'</a></li>';
 
                                 $html .= '<li><a href="#" class="print-invoice" data-href="'.route('sell.printInvoice', [$row->id]).'?delivery_note=true"><i class="fas fa-file-alt" aria-hidden="true"></i> '.__('lang_v1.delivery_note').'</a></li>';
@@ -552,10 +559,12 @@ class SellController extends Controller
         }
 
         $payment_types = $this->transactionUtil->payment_types(null, true, $business_id);
+        $common_settings = session()->get('business.common_settings', []);
+        $invoice_whatsapp_number = $common_settings['invoice_whatsapp_number'] ?? '';
 
 
         return view('sell.index')
-        ->with(compact('business_locations', 'customers', 'is_woocommerce', 'sales_representative', 'is_cmsn_agent_enabled', 'commission_agents', 'service_staffs', 'is_tables_enabled', 'is_service_staff_enabled', 'is_types_service_enabled', 'shipping_statuses', 'sources', 'payment_types'));
+        ->with(compact('business_locations', 'customers', 'is_woocommerce', 'sales_representative', 'is_cmsn_agent_enabled', 'commission_agents', 'service_staffs', 'is_tables_enabled', 'is_service_staff_enabled', 'is_types_service_enabled', 'shipping_statuses', 'sources', 'payment_types', 'invoice_whatsapp_number'));
     }
 
     /**
