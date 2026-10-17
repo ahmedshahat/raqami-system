@@ -12,6 +12,7 @@ use Modules\Construction\Http\Controllers\BoqSpreadsheetController;
 use Modules\Construction\Http\Controllers\ContractController;
 use Modules\Construction\Http\Controllers\PrintFontController;
 use Modules\Construction\Http\Controllers\QuoteController;
+use Modules\Construction\Http\Controllers\QuoteSpreadsheetController;
 use Modules\Construction\Http\Controllers\ContractAdjustmentController;
 use Modules\Construction\Http\Controllers\MaterialController;
 use Modules\Construction\Http\Controllers\LaborController;
@@ -121,6 +122,10 @@ Route::middleware([
     Route::get('print-font/{weight}', [PrintFontController::class, 'show'])->name('print-font');
     Route::get('quotes', [QuoteController::class, 'index'])->name('quotes.index');
     Route::post('quotes', [QuoteController::class, 'store'])->name('quotes.store');
+    Route::get('quotes/import-template', [QuoteSpreadsheetController::class, 'template'])->name('quotes.import-template');
+    Route::post('quotes/{quote}/items/import-preview', [QuoteSpreadsheetController::class, 'preview'])->name('quotes.items.import.preview');
+    Route::get('quotes/{quote}/items/import-review/{token}', [QuoteSpreadsheetController::class, 'review'])->name('quotes.items.import.review');
+    Route::post('quotes/{quote}/items/import-commit/{token}', [QuoteSpreadsheetController::class, 'commit'])->name('quotes.items.import.commit');
     Route::get('quotes/{quote}', [QuoteController::class, 'show'])->name('quotes.show');
     Route::put('quotes/{quote}', [QuoteController::class, 'update'])->name('quotes.update');
     Route::delete('quotes/{quote}', [QuoteController::class, 'destroy'])->name('quotes.destroy');

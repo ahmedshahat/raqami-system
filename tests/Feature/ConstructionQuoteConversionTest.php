@@ -8,12 +8,83 @@ use App\Currency;
 use App\Unit;
 use App\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Modules\Construction\Entities\ConstructionProject;
 use Modules\Construction\Entities\ConstructionQuote;
 use Tests\TestCase;
 
 class ConstructionQuoteConversionTest extends TestCase
 {
     use DatabaseTransactions;
+
+    public function test_draft_project_from_quote_can_be_deleted_and_the_quote_can_be_converted_again(): void
+    {
+        $business = Business::whereHas('locations')->whereIn('id', Unit::select('business_id'))->firstOrFail();
+        $user = User::findOrFail($business->owner_id);
+        $customer = Contact::where('business_id', $business->id)->whereIn('type', ['customer', 'both'])->firstOrFail();
+        $unit = Unit::where('business_id', $business->id)->firstOrFail();
+        $this->actingAs($user);
+        $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+        $_SERVER['HTTP_USER_AGENT'] = 'PHPUnit';
+
+        $quote = ConstructionQuote::create([
+            'business_id' => $business->id,
+            'number' => 'TEST-RECONVERT-'.uniqid(),
+            'quote_date' => '2026-10-15',
+            'customer_id' => $customer->id,
+            'title' => 'Reconvert quotation',
+            'validity_days' => 30,
+            'status' => 'accepted',
+            'total' => 100,
+            'created_by' => $user->id,
+        ]);
+        $quote->items()->create([
+            'business_id' => $business->id,
+            'code' => 'ITEM-1',
+            'description' => 'Reconvert item',
+            'unit_id' => $unit->id,
+            'unit' => $unit->short_name,
+            'quantity' => 1,
+            'unit_price' => 100,
+            'total' => 100,
+            'sort_order' => 1,
+        ]);
+
+        $this->post(route('construction.quotes.convert', $quote->id), ['project_name' => 'First conversion'])
+            ->assertRedirect();
+        $quote = $quote->fresh();
+        $firstProject = $quote->project()->firstOrFail();
+
+        $projectsHtml = $this->get(route('construction.projects.index'))->assertOk()->getContent();
+        $this->assertStringContainsString(
+            'action="'.route('construction.projects.destroy', $firstProject->id).'"',
+            $projectsHtml
+        );
+
+        $this->delete(route('construction.projects.destroy', $firstProject->id))
+            ->assertRedirect(route('construction.projects.index'))
+            ->assertSessionHas('status', [
+                'success' => 1,
+                'msg' => __('construction::lang.project_deleted_quote_restored'),
+            ]);
+
+        $quote = $quote->fresh();
+        $deletedProject = ConstructionProject::withTrashed()->findOrFail($firstProject->id);
+        $this->assertNull($quote->project_id);
+        $this->assertSame('accepted', $quote->status);
+        $this->assertNull($deletedProject->quote_id);
+        $this->assertNotNull($deletedProject->deleted_at);
+
+        $this->post(route('construction.quotes.convert', $quote->id), ['project_name' => 'Second conversion'])
+            ->assertRedirect();
+
+        $quote = $quote->fresh();
+        $secondProject = $quote->project()->firstOrFail();
+        $baseCode = 'PRJ-Q'.str_pad((string) $quote->id, 4, '0', STR_PAD_LEFT);
+        $this->assertNotSame($firstProject->id, $secondProject->id);
+        $this->assertSame($baseCode.'-2', $secondProject->code);
+        $this->assertSame($quote->id, $secondProject->quote_id);
+        $this->assertSame('draft', $secondProject->status);
+    }
 
     public function test_accepted_quote_converts_once_to_project_and_approved_boq_without_reentering_items(): void
     {

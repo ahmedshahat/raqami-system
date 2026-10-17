@@ -4,12 +4,14 @@
     <link rel="stylesheet" href="{{ asset('modules/construction/css/dashboard.css?v=' . config('construction.module_version')) }}">
     @yield('module_css')
     <link rel="stylesheet" href="{{ asset('modules/construction/css/refinement.css?v=' . config('construction.module_version')) }}">
+    {{-- نظام التصميم المشترك للموديول (متغيرات + مكوّنات rr-*) — انظر CLAUDE.md --}}
+    <link rel="stylesheet" href="{{ asset('modules/construction/css/raqmi.css?v=' . config('construction.module_version')) }}">
     @stack('ct_quick_css')
 @endsection
 
 @section('content')
 <div class="ct-dashboard ct-module-page" dir="rtl">
-    @if(request()->routeIs('construction.overview.*') || request()->routeIs('construction.dashboard'))
+    @if(request()->routeIs('construction.dashboard'))
         @include('construction::partials.module_header')
     @endif
     @include('construction::partials.section_tabs')

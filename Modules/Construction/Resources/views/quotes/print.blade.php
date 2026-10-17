@@ -13,14 +13,14 @@
 @endphp
 <!doctype html><html lang="{{ app()->getLocale() }}" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ $quote->number }}</title><style>
 @if(empty($pdfMode))@page{size:A4 portrait;margin:8mm}@endif
-body{direction:rtl;margin:0;color:#26364d}.accent{height:5px;background:#1769d2;margin-bottom:5mm}.header,.details,.items,.signatures,.footer{width:100%;border-collapse:collapse;direction:rtl}
-.header{border-bottom:1px solid #dce5f0;margin-bottom:5mm}.header td{padding:4px;vertical-align:middle}.logo{width:20mm}.logo img{max-width:18mm;max-height:18mm}.company{color:#123d91}.company-data{text-align:left;color:#66758b}
-.title{text-align:center;margin:5mm 0}.title h1{margin:0;color:#172f55}.title p{margin:2mm 0;color:#1769d2}.title .status{color:#60748e}
+body{direction:rtl;margin:0;color:#18324e}.accent{height:5px;background:#145da0;margin-bottom:5mm}.header,.details,.items,.signatures,.footer{width:100%;border-collapse:collapse;direction:rtl}
+.header{border-bottom:1px solid #dce5ee;margin-bottom:5mm}.header td{padding:4px;vertical-align:middle}.logo{width:20mm}.logo img{max-width:18mm;max-height:18mm}.company{color:#145da0}.company-data{text-align:left;color:#667b91}
+.title{text-align:center;margin:5mm 0}.title h1{margin:0;color:#102f63}.title p{margin:2mm 0;color:#0f8098}.title .status{color:#667b91}
 .details{border:1px solid #dfe7f0;margin-bottom:5mm;table-layout:fixed}.details td{width:50%;padding:8px 10px;border-bottom:1px solid #e8eef5;vertical-align:top}.details .print-label{display:block;color:#7d8da2}.details .print-value{display:block;color:#23436d}
-.items{table-layout:fixed}.items th,.items td{border:1px solid #d7e0eb}.items th{background:#1769d2;color:#fff;text-align:center}.items td{text-align:center}.items .description{text-align:right}.items .code{width:12%}.items .description{width:37%}.items .unit{width:12%}.items .quantity{width:12%}.items .price{width:13%}.items .amount{width:14%}.items tfoot td{background:#eafaf4;color:#087453}
+.items{table-layout:fixed}.items th,.items td{border:1px solid #dce5ee}.items th{background:#145da0;color:#fff;text-align:center}.items td{text-align:center}.items .description{text-align:right}.items .code{width:12%}.items .description{width:37%}.items .unit{width:12%}.items .quantity{width:12%}.items .price{width:13%}.items .amount{width:14%}.items tfoot td{background:#eaf8f2;color:#087453}
 .notes{margin-top:6mm;padding:10px;border:1px solid #dfe7f0;color:#4b6079;white-space:pre-line}.notes h2{margin:0 0 5px;color:#173b70}.signatures{margin-top:8mm}.signatures td{width:50%;padding:9px;text-align:center;vertical-align:top;border:1px solid #e4ebf3}.signatures .line{height:13mm;border-bottom:1px solid #bfcbd9;margin:3mm 8mm}
 .footer{margin-top:5mm;border-top:1px solid #e3eaf2;color:#8a97a8}.footer td:last-child{text-align:left;direction:ltr}
-.toolbar{display:flex;justify-content:center;padding:12px;background:#eef4fc}.toolbar button{padding:9px 18px;border:0;border-radius:9px;background:#1769d2;color:#fff;cursor:pointer}
+.toolbar{display:flex;justify-content:center;padding:12px;background:#f2f8fd}.toolbar button{padding:9px 18px;border:0;border-radius:9px;background:#145da0;color:#fff;cursor:pointer;font-weight:700}
 @media print{.toolbar{display:none}}
 @include('construction::partials.print_typography')
 </style></head><body>

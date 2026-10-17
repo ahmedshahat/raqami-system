@@ -57,7 +57,7 @@ class ConstructionQuoteListActionsTest extends TestCase
 
         $html = $this->get(route('construction.quotes.index'))->assertOk()->getContent();
         $row = function (ConstructionQuote $quote) use ($html): string {
-            $this->assertSame(1, preg_match('/<tr data-quote-id="'.$quote->id.'">(.*?)<\/tr>/s', $html, $matches));
+            $this->assertSame(1, preg_match('/<tr[^>]*\bdata-quote-id="'.$quote->id.'"[^>]*>(.*?)<\/tr>/s', $html, $matches));
 
             return $matches[1];
         };

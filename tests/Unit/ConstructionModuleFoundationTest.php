@@ -14,7 +14,7 @@ class ConstructionModuleFoundationTest extends TestCase
     public function test_module_configuration_and_routes_are_registered(): void
     {
         $this->assertSame('Construction', config('construction.name'));
-        $this->assertSame('0.27.0', config('construction.module_version'));
+        $this->assertSame('0.34.0', config('construction.module_version'));
         $this->assertTrue(Route::has('construction.dashboard'));
         $this->assertTrue(Route::has('construction.install.index'));
         $this->assertTrue(Route::has('construction.install.store'));
@@ -26,6 +26,10 @@ class ConstructionModuleFoundationTest extends TestCase
         $this->assertTrue(Route::has('construction.quotes.index'));
         $this->assertTrue(Route::has('construction.quotes.convert'));
         $this->assertTrue(Route::has('construction.quotes.pdf'));
+        $this->assertTrue(Route::has('construction.quotes.import-template'));
+        $this->assertTrue(Route::has('construction.quotes.items.import.preview'));
+        $this->assertTrue(Route::has('construction.quotes.items.import.review'));
+        $this->assertTrue(Route::has('construction.quotes.items.import.commit'));
         $this->assertTrue(Route::has('construction.projects.store'));
         $this->assertTrue(Route::has('construction.projects.show'));
         $this->assertTrue(Route::has('construction.projects.update'));
@@ -136,14 +140,17 @@ class ConstructionModuleFoundationTest extends TestCase
         $this->assertStringContainsString("route('construction.contracts.index'", $sectionTabs);
         $this->assertStringContainsString("route('construction.ipcs.index'", $sectionTabs);
         $this->assertStringNotContainsString("['materials', 'fa-cubes'", $sectionTabs);
-        $this->assertStringContainsString("request()->routeIs('construction.overview.*')", $layout);
+        // شاشة النظرة العامة ليها هيدر نظام التصميم الخاص بيها، والهيدر القديم للمسار القديم بس
+        $this->assertStringContainsString("@if(request()->routeIs('construction.dashboard'))", $layout);
+        $this->assertStringNotContainsString("request()->routeIs('construction.overview.*')", $layout);
+        $this->assertStringContainsString('css/raqmi.css', $layout);
         $this->assertStringContainsString('Two-line screen headers', $refinementCss);
         $this->assertStringContainsString('Single-title card headers', $refinementCss);
         $this->assertStringContainsString('.ct-aging-panel>header>div>span:first-child', $refinementCss);
         $this->assertStringContainsString('.ct-panel-heading>div>span:first-child', $refinementCss);
         $this->assertStringContainsString('.ct-date-range-filter .select2-container{width:100%!important;max-width:100%!important}', $refinementCss);
 
-        foreach (['Resources/views/layouts/module.blade.php', 'Resources/views/partials/module_header.blade.php', 'Resources/views/partials/section_tabs.blade.php', 'Resources/views/settings/index.blade.php', 'Resources/views/settings/accounting.blade.php', 'Resources/views/projects/partials/form.blade.php', 'Resources/views/projects/partials/consultant_script.blade.php', 'Resources/views/projects/create.blade.php', 'Resources/views/projects/edit.blade.php', 'Resources/views/projects/show.blade.php', 'Resources/views/contracts/partials/form.blade.php', 'Resources/views/contracts/create.blade.php', 'Resources/views/contracts/edit.blade.php', 'Resources/views/contracts/show.blade.php', 'Resources/views/contracts/index.blade.php', 'Resources/views/contracts/print.blade.php', 'Resources/views/boq/index.blade.php', 'Resources/views/boq/workspace.blade.php', 'Resources/views/boq/show.blade.php', 'Resources/views/boq/import_review.blade.php', 'Resources/views/cost_codes/index.blade.php', 'Resources/views/measurements/index.blade.php', 'Resources/views/measurements/workspace.blade.php', 'Resources/views/measurements/show.blade.php', 'Resources/views/certificates/index.blade.php', 'Resources/views/certificates/workspace.blade.php', 'Resources/views/certificates/show.blade.php', 'Resources/views/dashboard/overview.blade.php', 'Resources/views/dashboard/costs.blade.php', 'Resources/views/dashboard/reports.blade.php', 'Resources/views/dashboard/partials/date-range-filter.blade.php', 'Resources/views/dashboard/subcontractor-statement.blade.php', 'Resources/views/dashboard/subcontractor-statement-print.blade.php', 'Resources/views/dashboard/boq-subcontract-comparison.blade.php', 'Resources/views/dashboard/boq-subcontract-comparison-print.blade.php', 'Resources/views/dashboard/boq-cost-profitability.blade.php', 'Resources/views/dashboard/boq-cost-profitability-print.blade.php', 'Resources/views/dashboard/customer-certificates-collection.blade.php', 'Resources/views/dashboard/customer-certificates-collection-print.blade.php', 'Resources/views/dashboard/retention-guarantees.blade.php', 'Resources/views/dashboard/retention-guarantees-print.blade.php'] as $view) {
+        foreach (['Resources/views/layouts/module.blade.php', 'Resources/views/partials/module_header.blade.php', 'Resources/views/partials/section_tabs.blade.php', 'Resources/views/settings/index.blade.php', 'Resources/views/settings/accounting.blade.php', 'Resources/views/projects/partials/form.blade.php', 'Resources/views/projects/partials/consultant_script.blade.php', 'Resources/views/projects/create.blade.php', 'Resources/views/projects/edit.blade.php', 'Resources/views/projects/show.blade.php', 'Resources/views/contracts/partials/form.blade.php', 'Resources/views/contracts/create.blade.php', 'Resources/views/contracts/edit.blade.php', 'Resources/views/contracts/show.blade.php', 'Resources/views/contracts/index.blade.php', 'Resources/views/contracts/print.blade.php', 'Resources/views/quotes/show.blade.php', 'Resources/views/quotes/import_review.blade.php', 'Resources/views/boq/index.blade.php', 'Resources/views/boq/workspace.blade.php', 'Resources/views/boq/show.blade.php', 'Resources/views/boq/import_review.blade.php', 'Resources/views/cost_codes/index.blade.php', 'Resources/views/measurements/index.blade.php', 'Resources/views/measurements/workspace.blade.php', 'Resources/views/measurements/show.blade.php', 'Resources/views/certificates/index.blade.php', 'Resources/views/certificates/workspace.blade.php', 'Resources/views/certificates/show.blade.php', 'Resources/views/dashboard/overview.blade.php', 'Resources/views/dashboard/costs.blade.php', 'Resources/views/dashboard/reports.blade.php', 'Resources/views/dashboard/partials/date-range-filter.blade.php', 'Resources/views/dashboard/subcontractor-statement.blade.php', 'Resources/views/dashboard/subcontractor-statement-print.blade.php', 'Resources/views/dashboard/boq-subcontract-comparison.blade.php', 'Resources/views/dashboard/boq-subcontract-comparison-print.blade.php', 'Resources/views/dashboard/boq-cost-profitability.blade.php', 'Resources/views/dashboard/boq-cost-profitability-print.blade.php', 'Resources/views/dashboard/customer-certificates-collection.blade.php', 'Resources/views/dashboard/customer-certificates-collection-print.blade.php', 'Resources/views/dashboard/retention-guarantees.blade.php', 'Resources/views/dashboard/retention-guarantees-print.blade.php'] as $view) {
             $this->assertNotEmpty(\Illuminate\Support\Facades\Blade::compileString(
                 file_get_contents(module_path('Construction', $view))
             ));

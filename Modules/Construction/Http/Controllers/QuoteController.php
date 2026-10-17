@@ -21,17 +21,32 @@ class QuoteController extends BaseController
     {
         $this->authorizePermission('construction.project.view');
         $search = trim((string) $request->input('q'));
-        $quotes = ConstructionQuote::query()->where('business_id', $this->businessId())
+        $status = (string) $request->input('status');
+        $status = in_array($status, array_merge(ConstructionQuote::STATUSES, ['converted']), true) ? $status : '';
+        $baseQuery = ConstructionQuote::query()->where('business_id', $this->businessId());
+        $quoteSummary = (clone $baseQuery)
+            ->selectRaw('COUNT(*) as all_count')
+            ->selectRaw("COALESCE(SUM(CASE WHEN project_id IS NULL AND status = 'draft' THEN 1 ELSE 0 END), 0) as draft_count")
+            ->selectRaw("COALESCE(SUM(CASE WHEN project_id IS NULL AND status = 'sent' THEN 1 ELSE 0 END), 0) as sent_count")
+            ->selectRaw("COALESCE(SUM(CASE WHEN project_id IS NULL AND status = 'accepted' THEN 1 ELSE 0 END), 0) as accepted_count")
+            ->selectRaw('COALESCE(SUM(CASE WHEN project_id IS NOT NULL THEN 1 ELSE 0 END), 0) as converted_count')
+            ->selectRaw('COALESCE(SUM(total), 0) as total_value')
+            ->first();
+        $quotes = $baseQuery
             ->with(['customer:id,name,supplier_business_name', 'project:id,code,name'])
             ->withCount('items')
             ->when($search !== '', fn ($query) => $query->where(fn ($nested) => $nested
                 ->where('number', 'like', '%'.$search.'%')->orWhere('title', 'like', '%'.$search.'%')
-                ->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', '%'.$search.'%'))))
-            ->latest('id')->paginate(20)->appends($request->only('q'));
+                ->orWhereHas('customer', fn ($customer) => $customer->where(fn ($contact) => $contact
+                    ->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('supplier_business_name', 'like', '%'.$search.'%')))))
+            ->when($status === 'converted', fn ($query) => $query->whereNotNull('project_id'))
+            ->when($status !== '' && $status !== 'converted', fn ($query) => $query->whereNull('project_id')->where('status', $status))
+            ->latest('id')->paginate(20)->appends($request->only('q', 'status'));
         $customers = Contact::where('business_id', $this->businessId())
             ->whereIn('type', ['customer', 'both'])->orderBy('name')->get(['id', 'name', 'supplier_business_name']);
 
-        return view('construction::quotes.index', compact('quotes', 'customers', 'search') + $this->conversionOptions());
+        return view('construction::quotes.index', compact('quotes', 'customers', 'search', 'status', 'quoteSummary') + $this->conversionOptions());
     }
 
     public function store(Request $request)
@@ -248,8 +263,12 @@ class QuoteController extends BaseController
             abort_if($quote->project_id, 422, __('construction::lang.quote_already_converted'));
             $items = $quote->items()->orderBy('sort_order')->orderBy('id')->get();
             abort_if($items->isEmpty(), 422, __('construction::lang.quote_requires_items'));
-            $code = 'PRJ-Q'.str_pad((string) $quote->id, 4, '0', STR_PAD_LEFT);
-            abort_if(ConstructionProject::withTrashed()->where('business_id', $this->businessId())->where('code', $code)->exists(), 422, __('construction::lang.quote_project_code_conflict'));
+            $baseCode = 'PRJ-Q'.str_pad((string) $quote->id, 4, '0', STR_PAD_LEFT);
+            $code = $baseCode;
+            $conversionNumber = 2;
+            while (ConstructionProject::withTrashed()->where('business_id', $this->businessId())->where('code', $code)->exists()) {
+                $code = $baseCode.'-'.$conversionNumber++;
+            }
 
             $project = ConstructionProject::create([
                 'business_id' => $this->businessId(), 'code' => $code,
@@ -348,6 +367,12 @@ class QuoteController extends BaseController
             'title' => ['required', 'string', 'max:190'],
             'validity_days' => ['required', 'integer', 'min:1', 'max:365'],
             'notes' => ['nullable', 'string', 'max:5000'],
+        ], [], [
+            'quote_date' => __('construction::lang.quote_date'),
+            'customer_id' => __('construction::lang.customer'),
+            'title' => __('construction::lang.quote_title'),
+            'validity_days' => __('construction::lang.quote_validity_days'),
+            'notes' => __('construction::lang.quote_notes'),
         ]);
     }
 

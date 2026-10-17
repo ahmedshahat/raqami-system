@@ -1,0 +1,596 @@
+/* ==========================================================================
+   رقمي للمقاولات — ملف التصميم المشترك لموديول المقاولات
+   --------------------------------------------------------------------------
+   الاستخدام:
+   1. الملف محمّل تلقائيًا من layouts/module.blade.php لكل شاشات الموديول.
+   2. لفّ محتوى الشاشة في <main class="content rr-page"> — كل المتغيرات معرّفة
+      على .rr-page، ولن تعمل المكوّنات خارجه. العناصر التي تقع خارج <main>
+      (مثل النوافذ المنبثقة) تأخذ class="rr-scope" لتعمل بنفس النظام.
+   3. الأيقونات: @include('construction::partials.rr_icon', ['name' => '...'])
+      الترقيم:  @include('construction::partials.rr_pager', ['paginator' => $x, 'itemLabel' => '...'])
+   4. الثيم العام يفرض font-family و font-size بـ !important على كل العناصر؛
+      لذلك كل حجم خط هنا مكتوب بـ !important. اتبع نفس النمط في أي قاعدة جديدة.
+   5. لا تكتب ألوانًا أو مسافات مباشرة في الشاشات؛ استخدم المتغيرات أدناه.
+
+   المرجع: تصميم "مركز متابعة المشاريع" و"عروض الأسعار" (نظام تصميم رقمي).
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. المتغيرات (Tokens)
+   ========================================================================== */
+
+.rr-page, .rr-scope {
+    /* ── الخطوط ── */
+    --rr-font: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
+    --rr-fs-xs: 13px;   --rr-lh-xs: 20px;    /* تسميات صغيرة، أكواد، تلميحات */
+    --rr-fs-sm: 14px;   --rr-lh-sm: 22px;    /* جداول، أزرار صغيرة، أوصاف */
+    --rr-fs-md: 15px;   --rr-lh-md: 24px;    /* النص الأساسي، الأزرار، الحقول */
+    --rr-fs-lg: 16px;   --rr-lh-lg: 26px;    /* عناوين الكروت والجداول */
+    --rr-fs-xl: 20px;   --rr-lh-xl: 30px;    /* عناوين الأقسام */
+    --rr-fs-2xl: 24px;  --rr-lh-2xl: 32px;   /* عنوان الصفحة، أرقام المؤشرات */
+    --rr-fw-regular: 400; --rr-fw-medium: 500; --rr-fw-semibold: 600; --rr-fw-bold: 700;
+
+    /* ── الألوان: الأسطح والنص ── */
+    --rr-page-bg: #F3F4F8;
+    --rr-surface: #FFFFFF;
+    --rr-surface-sunken: #EDEFF4;      /* رؤوس الجداول، مسارات التقدّم */
+    --rr-surface-hover: #F1F3F8;
+    --rr-surface-selected: #E8E6FA;
+    --rr-border: #DADFE8;
+    --rr-border-control: #778093;      /* حدود الحقول والأزرار الثانوية */
+    --rr-ink: #11141B;
+    --rr-ink-muted: #454E60;
+    --rr-ink-subtle: #586174;
+
+    /* ── الألوان: الهوية ── */
+    --rr-brand: #22177A;
+    --rr-brand-hover: #2C1F96;
+    --rr-brand-pressed: #180F5C;
+    --rr-on-brand: #FFFFFF;
+    --rr-brand-tint: #ECEAFB;
+    --rr-brand-tint-ink: #22177A;
+    --rr-link: #3425B8;
+    --rr-focus: #4B3FE0;
+
+    /* ── الألوان: الحالات (لون / خلفية / حد) ── */
+    --rr-success: #0A6252; --rr-success-tint: #E0F3EF; --rr-success-line: #8CCABD;
+    --rr-warning: #7C4A00; --rr-warning-tint: #FFF1D3; --rr-warning-line: #E3B75F;
+    --rr-danger: #AE231B;  --rr-danger-tint: #FDE8E6;  --rr-danger-line: #EDA29B;
+    --rr-danger-solid: #B9261D; --rr-danger-solid-hover: #9C1F17;
+    --rr-info: #0A5A82;    --rr-info-tint: #E1F0F8;    --rr-info-line: #8DC1DD;
+    --rr-neutral-tint: #EAEDF2; --rr-neutral-line: #C5CBD6;
+
+    /* ── المسافات ── */
+    --rr-space-1: 4px;  --rr-space-2: 8px;   --rr-space-3: 12px; --rr-space-4: 16px;
+    --rr-space-5: 20px; --rr-space-6: 24px;  --rr-space-8: 32px; --rr-space-10: 40px;
+
+    /* ── المقاسات ── */
+    --rr-control-sm: 32px; --rr-control-md: 40px; --rr-control-lg: 48px;
+    --rr-row: 52px;            /* ارتفاع صف الجدول */
+    --rr-row-head: 40px;       /* ارتفاع رأس الجدول */
+    --rr-page-max: 1280px;
+
+    /* ── الزوايا والظلال ── */
+    --rr-radius-sm: 4px; --rr-radius-md: 6px; --rr-radius-lg: 8px; --rr-radius-xl: 12px; --rr-radius-full: 999px;
+    --rr-shadow-card: 0 1px 2px rgba(17,20,27,0.06);
+    --rr-shadow-popover: 0 8px 24px rgba(17,20,27,0.12), 0 2px 6px rgba(17,20,27,0.08);
+    --rr-shadow-modal: 0 24px 64px rgba(17,20,27,0.24);
+    --rr-modal-md: 640px;
+    --rr-z-menu: 1060;
+}
+
+[data-theme="dark"] .rr-page, [data-theme="dark"] .rr-scope {
+    --rr-page-bg: #0D1016; --rr-surface: #151922; --rr-surface-sunken: #1C212B;
+    --rr-surface-hover: #212734; --rr-surface-selected: #2A2652;
+    --rr-border: #2B3240; --rr-border-control: #7E879A;
+    --rr-ink: #EDEFF4; --rr-ink-muted: #B1B8C6; --rr-ink-subtle: #9AA3B4;
+    --rr-brand: #B9B3FF; --rr-brand-hover: #CCC8FF; --rr-brand-pressed: #A59EFA; --rr-on-brand: #15103F;
+    --rr-brand-tint: #27234F; --rr-brand-tint-ink: #D5D2FF; --rr-link: #B0AAFF; --rr-focus: #B0AAFF;
+    --rr-success: #58D6BC; --rr-success-tint: #10302B; --rr-success-line: #2A7A6B;
+    --rr-warning: #F1BE5E; --rr-warning-tint: #352810; --rr-warning-line: #8B6423;
+    --rr-danger: #FF9B93;  --rr-danger-tint: #3A1815;  --rr-danger-line: #93413A;
+    --rr-danger-solid: #F26A5F; --rr-danger-solid-hover: #F78880;
+    --rr-info: #76C6F0;    --rr-info-tint: #0F2A38;    --rr-info-line: #2D6C8D;
+    --rr-neutral-tint: #232937; --rr-neutral-line: #3C4455;
+    --rr-shadow-card: 0 1px 2px rgba(0,0,0,0.4);
+    --rr-shadow-popover: 0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
+    --rr-shadow-modal: 0 24px 64px rgba(0,0,0,0.6);
+}
+
+
+/* ==========================================================================
+   2. الأساس (Base)
+   ========================================================================== */
+
+.rr-page {
+    max-width: var(--rr-page-max);
+    margin: 0 auto;
+    padding: 0 0 var(--rr-space-10) !important;
+    display: flex;
+    flex-direction: column;
+    gap: var(--rr-space-5);
+    color: var(--rr-ink);
+    font-family: var(--rr-font);
+    font-size: var(--rr-fs-md) !important;
+    line-height: var(--rr-lh-md);
+}
+/* عناصر خارج <main> (النوافذ المنبثقة مثلًا) تأخذ نفس المتغيرات والمكوّنات بإضافة rr-scope */
+.rr-scope { color: var(--rr-ink); font-family: var(--rr-font); font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); }
+:is(.rr-page, .rr-scope) *, :is(.rr-page, .rr-scope) *::before, :is(.rr-page, .rr-scope) *::after { box-sizing: border-box; }
+/* نعيد حجم الخط للوراثة داخل الشاشة بأقل أولوية ممكنة (انظر الملاحظة 4 أعلاه) */
+:is(.rr-page, .rr-scope) :where(h1, h2, h3, h4, h5, h6, p, span, a, div, button, td, th, li, label) { font-size: inherit !important; }
+:is(.rr-page, .rr-scope) :where(h1, h2, h3, h4, h5, h6, p) { margin: 0; font-family: inherit; }
+:is(.rr-page, .rr-scope) a { text-decoration: none; }
+:is(.rr-page, .rr-scope) ul, :is(.rr-page, .rr-scope) ol { list-style: none; margin: 0; padding: 0; }
+
+
+/* ==========================================================================
+   3. أدوات مساعدة (Utilities)
+   ========================================================================== */
+
+.rr-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* الأرقام تُعزل دائمًا كنص LTR بأرقام متساوية العرض */
+.rr-num { direction: ltr; unicode-bidi: isolate; display: inline-block; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rr-code { direction: ltr; unicode-bidi: isolate; display: inline-block; font-variant-numeric: tabular-nums; letter-spacing: .01em; color: var(--rr-ink-muted); font-weight: var(--rr-fw-medium); font-size: var(--rr-fs-xs) !important; white-space: nowrap; }
+.rr-icon { display: inline-block; flex: none; vertical-align: middle; }
+[dir="rtl"] .rr-icon--flip { transform: scaleX(-1); }
+.rr-eyebrow { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-semibold); color: var(--rr-brand-tint-ink); }
+.rr-muted { color: var(--rr-ink-muted); }
+
+
+/* ==========================================================================
+   4. التخطيط (Layout)
+   ========================================================================== */
+
+/* رأس الصفحة: شعار + عناوين + أزرار */
+.rr-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--rr-space-4); padding-top: var(--rr-space-6); }
+.rr-head__logo { width: 56px; height: 56px; flex: none; padding: var(--rr-space-2); object-fit: contain; background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); }
+.rr-head__titles { flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: var(--rr-space-1); }
+:is(.rr-page, .rr-scope) .rr-head__title { font-size: var(--rr-fs-2xl) !important; line-height: 36px; font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-head__sub { font-size: var(--rr-fs-lg) !important; line-height: var(--rr-lh-lg); color: var(--rr-ink-muted); }
+.rr-head__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-4); margin-top: var(--rr-space-2); font-size: var(--rr-fs-sm) !important; line-height: 20px; color: var(--rr-ink-muted); }
+.rr-head__meta-item { display: inline-flex; align-items: center; gap: 6px; }
+.rr-head__actions { display: flex; flex-wrap: wrap; gap: var(--rr-space-2); align-items: center; padding-top: var(--rr-space-1); }
+
+/* مسار التنقل */
+.rr-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-1); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-crumbs a { color: var(--rr-link); }
+:is(.rr-page, .rr-scope) .rr-crumbs a:hover { text-decoration: underline; }
+.rr-crumbs li + li::before { content: "/"; margin-inline-end: var(--rr-space-1); color: var(--rr-ink-subtle); }
+
+/* عمودان: رئيسي + جانبي (يتكدسان تلقائيًا في الشاشات الضيقة) */
+.rr-cols { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--rr-space-5); }
+.rr-cols__main { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: var(--rr-space-5); }
+.rr-cols__side { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: var(--rr-space-5); }
+
+/* قسم بعنوان + وصف */
+.rr-section { display: flex; flex-direction: column; gap: var(--rr-space-3); }
+:is(.rr-page, .rr-scope) .rr-section-title { font-size: var(--rr-fs-xl) !important; line-height: var(--rr-lh-xl); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-section-desc { font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink-muted); }
+
+
+/* ==========================================================================
+   5. الأزرار (Button)
+   <a|button class="rr-btn rr-btn--primary|secondary|ghost|danger [rr-btn--sm|lg] [rr-btn--icon]">
+   ========================================================================== */
+
+:is(.rr-page, .rr-scope) .rr-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--rr-space-2); height: var(--rr-control-md); padding-inline: var(--rr-space-4); border-radius: var(--rr-radius-md); border: 1px solid transparent; font-family: inherit; font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); font-weight: var(--rr-fw-semibold); cursor: pointer; white-space: nowrap; text-decoration: none; transition: background-color .12s, border-color .12s, color .12s; }
+:is(.rr-page, .rr-scope) .rr-btn:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: 2px; }
+:is(.rr-page, .rr-scope) .rr-btn--sm { height: var(--rr-control-sm); padding-inline: var(--rr-space-3); font-size: var(--rr-fs-sm) !important; line-height: 20px; }
+:is(.rr-page, .rr-scope) .rr-btn--lg { height: var(--rr-control-lg); padding-inline: var(--rr-space-6); }
+:is(.rr-page, .rr-scope) .rr-btn--icon { padding: 0; width: var(--rr-control-md); }
+:is(.rr-page, .rr-scope) .rr-btn--icon.rr-btn--sm { width: var(--rr-control-sm); }
+:is(.rr-page, .rr-scope) .rr-btn[disabled], :is(.rr-page, .rr-scope) .rr-btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; pointer-events: none; }
+
+:is(.rr-page, .rr-scope) .rr-btn--primary, :is(.rr-page, .rr-scope) .rr-btn--primary:focus { background: var(--rr-brand); color: var(--rr-on-brand); }
+:is(.rr-page, .rr-scope) .rr-btn--primary:hover { background: var(--rr-brand-hover); color: var(--rr-on-brand); }
+:is(.rr-page, .rr-scope) .rr-btn--primary:active { background: var(--rr-brand-pressed); }
+
+:is(.rr-page, .rr-scope) .rr-btn--secondary, :is(.rr-page, .rr-scope) .rr-btn--secondary:focus { background: var(--rr-surface); color: var(--rr-ink); border-color: var(--rr-border-control); }
+:is(.rr-page, .rr-scope) .rr-btn--secondary:hover { background: var(--rr-surface-hover); border-color: var(--rr-ink-muted); color: var(--rr-ink); }
+:is(.rr-page, .rr-scope) .rr-btn--secondary:active { background: var(--rr-surface-sunken); }
+
+:is(.rr-page, .rr-scope) .rr-btn--ghost, :is(.rr-page, .rr-scope) .rr-btn--ghost:focus { background: transparent; color: var(--rr-link); }
+:is(.rr-page, .rr-scope) .rr-btn--ghost:hover, :is(.rr-page, .rr-scope) .rr-btn--ghost[aria-expanded="true"] { background: var(--rr-surface-selected); color: var(--rr-link); }
+
+:is(.rr-page, .rr-scope) .rr-btn--danger, :is(.rr-page, .rr-scope) .rr-btn--danger:focus { background: var(--rr-danger-solid); color: #FFFFFF; }
+:is(.rr-page, .rr-scope) .rr-btn--danger:hover { background: var(--rr-danger-solid-hover); color: #FFFFFF; }
+
+
+/* ==========================================================================
+   6. الشارات والمبالغ (Badge / Money)
+   ========================================================================== */
+
+/* <span class="rr-badge rr-badge--success"><span class="rr-badge__dot"></span>نص</span>
+   الألوان: success | warning | danger | info | brand | (بدون = محايد) — أو أيقونة بدل النقطة */
+.rr-badge { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding-inline: var(--rr-space-2); border-radius: var(--rr-radius-sm); border: 1px solid var(--rr-neutral-line); background: var(--rr-neutral-tint); color: var(--rr-ink-muted); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-semibold); white-space: nowrap; }
+.rr-badge__dot { width: 8px; height: 8px; border-radius: var(--rr-radius-full); background: currentColor; flex: none; }
+.rr-badge--success { background: var(--rr-success-tint); border-color: var(--rr-success-line); color: var(--rr-success); }
+.rr-badge--warning { background: var(--rr-warning-tint); border-color: var(--rr-warning-line); color: var(--rr-warning); }
+.rr-badge--danger { background: var(--rr-danger-tint); border-color: var(--rr-danger-line); color: var(--rr-danger); }
+.rr-badge--info { background: var(--rr-info-tint); border-color: var(--rr-info-line); color: var(--rr-info); }
+.rr-badge--brand { background: var(--rr-brand-tint); border-color: var(--rr-border); color: var(--rr-brand-tint-ink); }
+.rr-badge--lg { height: 28px; padding-inline: var(--rr-space-3); font-size: var(--rr-fs-sm) !important; }
+
+/* <span class="rr-money rr-money--lg">@include('construction::partials.money', [...])</span>
+   أضف rr-money--zero للقيمة صفر */
+.rr-money { display: inline-flex; align-items: baseline; gap: 6px; color: var(--rr-ink); white-space: nowrap; }
+.rr-money--zero { color: var(--rr-ink-subtle); }
+.rr-money--sm { font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); font-weight: var(--rr-fw-medium); }
+.rr-money--lg { font-size: var(--rr-fs-2xl) !important; line-height: var(--rr-lh-2xl); font-weight: var(--rr-fw-bold); }
+.rr-money .print-money-symbol { font-size: .72em !important; font-weight: var(--rr-fw-medium); color: var(--rr-ink-muted); }
+.rr-money .sar-currency-icon { width: auto; height: .62em; opacity: .75; }
+[data-theme="dark"] .rr-money .sar-currency-icon { filter: invert(1); }
+
+
+/* ==========================================================================
+   7. الكروت (Card / Next step)
+   ========================================================================== */
+
+.rr-card { background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); box-shadow: var(--rr-shadow-card); min-width: 0; }
+.rr-card__head { display: flex; align-items: center; gap: var(--rr-space-3); padding: var(--rr-space-4) var(--rr-space-5); border-bottom: 1px solid var(--rr-border); }
+.rr-card__titles { flex: 1; min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-card__title { font-size: var(--rr-fs-lg) !important; line-height: var(--rr-lh-lg); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-card__desc { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+.rr-card__body { padding: var(--rr-space-5); }
+
+/* كارت "الخطوة التالية": أيقونة + نص + زرار */
+.rr-next { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-4); }
+.rr-next__icon { width: 44px; height: 44px; flex: none; border-radius: var(--rr-radius-md); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); display: inline-flex; align-items: center; justify-content: center; }
+.rr-next__copy { flex: 1 1 360px; min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-next__title { font-size: var(--rr-fs-lg) !important; line-height: var(--rr-lh-lg); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-next__text { font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink-muted); }
+
+
+/* ==========================================================================
+   8. المؤشرات (StatGroup / Stat)
+   <div class="rr-statgroup-wrap"><div class="rr-statgroup rr-statgroup--4" style="--rr-stats: 4">
+       <div|a class="rr-stat">…</div></div></div>
+   ========================================================================== */
+
+.rr-statgroup-wrap { container-type: inline-size; }
+.rr-statgroup { display: grid; grid-template-columns: repeat(var(--rr-stats, 4), minmax(0, 1fr)); gap: 1px; background: var(--rr-border); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); box-shadow: var(--rr-shadow-card); overflow: hidden; }
+.rr-stat { display: flex; flex-direction: column; gap: var(--rr-space-1); padding: var(--rr-space-4) var(--rr-space-5); min-width: 0; background: var(--rr-surface); }
+.rr-stat__label { display: flex; align-items: center; gap: var(--rr-space-2); font-size: var(--rr-fs-sm) !important; line-height: 20px; font-weight: var(--rr-fw-medium); color: var(--rr-ink-muted); }
+.rr-stat__value { color: var(--rr-ink); font-size: var(--rr-fs-2xl) !important; line-height: var(--rr-lh-2xl); font-weight: var(--rr-fw-bold); font-variant-numeric: tabular-nums; }
+.rr-stat__caption { font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); font-weight: var(--rr-fw-semibold); }
+.rr-stat__sub { margin-top: var(--rr-space-1); display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--rr-space-1) var(--rr-space-2); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); }
+.rr-stat__hint { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+
+/* مؤشر قابل للضغط (رابط تصفية) — aria-current="true" للمؤشر النشط */
+:is(.rr-page, .rr-scope) a.rr-stat { color: inherit; transition: background-color .12s; }
+:is(.rr-page, .rr-scope) a.rr-stat:hover { background: var(--rr-surface-hover); }
+:is(.rr-page, .rr-scope) a.rr-stat:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: -2px; }
+:is(.rr-page, .rr-scope) a.rr-stat[aria-current="true"] { background: var(--rr-surface-selected); box-shadow: inset 0 -3px 0 var(--rr-brand); }
+
+/* التجاوب حسب عدد المؤشرات */
+@container (max-width: 900px) {
+    .rr-statgroup--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .rr-statgroup--5 > :first-child { grid-column: 1 / -1; }
+}
+@container (max-width: 720px) { .rr-statgroup--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 520px) { .rr-statgroup--3 { grid-template-columns: minmax(0, 1fr); } }
+@container (max-width: 420px) { .rr-statgroup--4, .rr-statgroup--5 { grid-template-columns: minmax(0, 1fr); } }
+
+
+/* ==========================================================================
+   9. الجداول (Table)
+   <section class="rr-table-wrap"><div class="rr-table-head">…</div>
+     <div class="rr-table-scroll"><table class="rr-table">…</table></div> [rr_pager] </section>
+   ========================================================================== */
+
+.rr-table-wrap { background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); overflow: hidden; box-shadow: var(--rr-shadow-card); }
+.rr-table-head { display: flex; align-items: center; gap: var(--rr-space-3); padding: var(--rr-space-3) var(--rr-space-4); border-bottom: 1px solid var(--rr-border); }
+:is(.rr-page, .rr-scope) .rr-table-head__title { flex: 1; min-width: 0; font-size: var(--rr-fs-lg) !important; line-height: var(--rr-lh-lg); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-table-scroll { overflow-x: auto; }
+.rr-table { width: 100%; min-width: 680px; border-collapse: separate; border-spacing: 0; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink); }
+.rr-table--wide { min-width: 1040px; }
+.rr-th { height: var(--rr-row-head); padding: 0 var(--rr-space-4); background: var(--rr-surface-sunken); border-bottom: 1px solid var(--rr-border); color: var(--rr-ink-muted); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-semibold); text-align: start; white-space: nowrap; }
+.rr-th--num { text-align: right; }
+.rr-th__in { display: inline-flex; align-items: center; gap: var(--rr-space-1); }
+.rr-th__unit { font-weight: var(--rr-fw-regular); }
+.rr-td { height: var(--rr-row); padding: 0 var(--rr-space-4); border-bottom: 1px solid var(--rr-border); vertical-align: middle; text-align: start; }
+.rr-td--wrap { padding-block: var(--rr-space-3); }
+.rr-td--num { text-align: right; font-weight: var(--rr-fw-medium); white-space: nowrap; }
+.rr-td--muted { color: var(--rr-ink-muted); }
+.rr-td--actions { width: 1%; white-space: nowrap; text-align: end; }
+.rr-td__sub { color: var(--rr-ink-muted); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); }
+.rr-tr:last-child .rr-td { border-bottom: 0; }
+.rr-tr:hover .rr-td { background: var(--rr-surface-hover); }
+.rr-row-actions { display: inline-flex; align-items: center; gap: var(--rr-space-1); }
+
+/* رابط لكود مستند داخل جدول: <a class="rr-code-link"><span class="rr-code">QTN-0001</span></a> */
+:is(.rr-page, .rr-scope) .rr-code-link { color: var(--rr-link); }
+:is(.rr-page, .rr-scope) .rr-code-link:hover { color: var(--rr-link); text-decoration: underline; }
+:is(.rr-page, .rr-scope) .rr-code-link:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: 2px; border-radius: var(--rr-radius-sm); }
+:is(.rr-page, .rr-scope) .rr-code-link .rr-code { color: inherit; }
+
+/* خلية كيان: علامة بحرف + اسم + كود */
+.rr-entity { display: flex; align-items: center; gap: var(--rr-space-3); }
+.rr-entity__mark { width: 36px; height: 36px; flex: none; border-radius: var(--rr-radius-md); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); display: inline-flex; align-items: center; justify-content: center; font-weight: var(--rr-fw-bold); }
+.rr-entity__name { font-weight: var(--rr-fw-semibold); }
+
+/* حالة فارغة */
+.rr-empty { display: flex; flex-direction: column; align-items: center; gap: var(--rr-space-2); text-align: center; padding: var(--rr-space-8) var(--rr-space-6); }
+.rr-empty__icon { width: 48px; height: 48px; border-radius: var(--rr-radius-full); background: var(--rr-surface-sunken); color: var(--rr-ink-muted); display: inline-flex; align-items: center; justify-content: center; }
+:is(.rr-page, .rr-scope) .rr-empty__title { font-size: var(--rr-fs-lg) !important; line-height: var(--rr-lh-lg); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-empty__text { max-width: 420px; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink-muted); }
+
+/* الترقيم: @include('construction::partials.rr_pager') */
+.rr-pager { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-3); padding: var(--rr-space-3) var(--rr-space-4); border-top: 1px solid var(--rr-border); font-size: var(--rr-fs-sm) !important; color: var(--rr-ink-muted); background: var(--rr-surface); }
+.rr-pager__sum { flex: 1; }
+.rr-pager__pages { display: inline-flex; align-items: center; gap: var(--rr-space-1); }
+:is(.rr-page, .rr-scope) .rr-pager__page { min-width: var(--rr-control-sm); height: var(--rr-control-sm); padding-inline: var(--rr-space-2); display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-md); border: 1px solid transparent; background: transparent; color: var(--rr-ink); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); font-variant-numeric: tabular-nums; }
+:is(.rr-page, .rr-scope) a.rr-pager__page:hover { background: var(--rr-surface-hover); color: var(--rr-ink); }
+:is(.rr-page, .rr-scope) a.rr-pager__page:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: 2px; }
+:is(.rr-page, .rr-scope) .rr-pager__page[aria-current="page"] { background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); font-weight: var(--rr-fw-bold); }
+:is(.rr-page, .rr-scope) .rr-pager__page[aria-disabled="true"] { color: var(--rr-ink-subtle); opacity: .5; }
+
+
+/* ==========================================================================
+   10. الحقول والتصفية (Field / Control / FilterBar)
+   <div class="rr-field"><label class="rr-field__label" for="x">…</label>
+     <div class="rr-control">[<span class="rr-control__lead">icon</span>]
+       <input class="rr-control__input" id="x"></div></div>
+   ========================================================================== */
+
+.rr-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; }
+:is(.rr-page, .rr-scope) .rr-field__label { display: flex; align-items: baseline; gap: var(--rr-space-1); margin: 0; font-size: var(--rr-fs-sm) !important; line-height: 20px; font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-field__req { color: var(--rr-danger); font-weight: var(--rr-fw-bold); }
+.rr-field__hint { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+.rr-field__error { display: flex; align-items: flex-start; gap: 6px; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-medium); color: var(--rr-danger); }
+
+.rr-control { position: relative; display: flex; align-items: center; min-width: 0; height: var(--rr-control-md); background: var(--rr-surface); border: 1px solid var(--rr-border-control); border-radius: var(--rr-radius-md); color: var(--rr-ink); overflow: hidden; transition: border-color .12s; }
+.rr-control:hover { border-color: var(--rr-ink-muted); }
+.rr-control:focus-within { border-color: var(--rr-focus); outline: 1px solid var(--rr-focus); overflow: visible; }
+.rr-control--invalid, .rr-control--invalid:focus-within { border-color: var(--rr-danger); outline-color: var(--rr-danger); }
+.rr-control--area { height: auto; align-items: stretch; }
+.rr-control__lead { display: inline-flex; align-items: center; padding-inline-start: var(--rr-space-3); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-control__input { flex: 1; min-width: 0; height: 100%; margin: 0; border: 0; outline: 0; box-shadow: none; background: transparent; color: inherit; font: inherit; font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); padding-inline: var(--rr-space-3); }
+:is(.rr-page, .rr-scope) textarea.rr-control__input { min-height: 96px; padding: var(--rr-space-3); resize: vertical; }
+.rr-control__lead + .rr-control__input { padding-inline-start: var(--rr-space-2); }
+.rr-control__input::placeholder { color: var(--rr-ink-subtle); }
+.rr-control__input::-webkit-search-cancel-button { cursor: pointer; }
+:is(.rr-page, .rr-scope) .rr-control__input--num { direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+/* Select: <select class="rr-control__input rr-control__select"> + <span class="rr-control__chev">chevron-down</span> */
+:is(.rr-page, .rr-scope) .rr-control__select { appearance: none; -webkit-appearance: none; padding-inline-end: 36px; cursor: pointer; }
+.rr-control__chev { position: absolute; inset-inline-end: var(--rr-space-3); top: 50%; margin-top: -8px; pointer-events: none; color: var(--rr-ink-muted); }
+
+/* شريط التصفية: <form class="rr-filter"><div class="rr-filter__fields">حقول</div><div class="rr-filter__actions">أزرار</div></form> */
+.rr-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--rr-space-3); padding: var(--rr-space-4); background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); }
+.rr-filter__fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--rr-space-3); flex: 1 1 auto; min-width: 0; }
+.rr-filter__fields > * { flex: 1 1 200px; max-width: 360px; }
+.rr-filter__fields > .rr-filter__grow { flex: 2 1 280px; max-width: 520px; }
+.rr-filter__actions { display: flex; gap: var(--rr-space-2); }
+
+
+/* ==========================================================================
+   11. القائمة المنسدلة (Menu)
+   زرار: <button class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon" aria-haspopup="true">more</button>
+   القائمة: <div class="rr-menu" role="menu"><a class="rr-menu__item" role="menuitem">…</a>
+            <div class="rr-menu__sep"></div><button class="rr-menu__item rr-menu__item--danger">…</button></div>
+   القائمة مخفية افتراضيًا (position: fixed)، وسكريبت الشاشة يظهرها ويحدد مكانها.
+   ========================================================================== */
+
+:is(.rr-page, .rr-scope) .rr-menu { display: none; position: fixed; z-index: var(--rr-z-menu); min-width: 200px; padding: var(--rr-space-1); background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); box-shadow: var(--rr-shadow-popover); }
+:is(.rr-page, .rr-scope) .rr-menu__item { display: flex; align-items: center; gap: var(--rr-space-2); width: 100%; min-height: 36px; padding: 0 var(--rr-space-3); border: 0; border-radius: var(--rr-radius-md); background: transparent; color: var(--rr-ink); font-family: inherit; font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); text-align: start; cursor: pointer; white-space: nowrap; }
+:is(.rr-page, .rr-scope) .rr-menu__item:hover, :is(.rr-page, .rr-scope) .rr-menu__item:focus-visible { background: var(--rr-surface-hover); color: var(--rr-ink); outline: none; }
+:is(.rr-page, .rr-scope) .rr-menu__item--danger { border-top: 0; color: var(--rr-danger); }
+:is(.rr-page, .rr-scope) .rr-menu__item--danger:hover { background: var(--rr-danger-tint); color: var(--rr-danger); }
+:is(.rr-page, .rr-scope) .rr-menu__sep { height: 1px; margin: var(--rr-space-1) 0; background: var(--rr-border); }
+
+
+/* ==========================================================================
+   12. مكوّنات اللوحات (Stepper / Nav list / Progress)
+   ========================================================================== */
+
+/* مراحل: <div class="rr-steps-scroll"><ol class="rr-steps"><li class="rr-step">… */
+.rr-steps-scroll { overflow-x: auto; }
+:is(.rr-page, .rr-scope) .rr-steps { display: flex; min-width: 760px; }
+.rr-step { position: relative; flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: var(--rr-space-2); text-align: center; padding-inline: var(--rr-space-2); min-width: 0; }
+.rr-step:not(:last-child)::after { content: ""; position: absolute; top: 15px; inset-inline-start: calc(50% + 24px); inset-inline-end: calc(-50% + 24px); height: 2px; background: var(--rr-border-control); opacity: .45; }
+.rr-step--done:not(:last-child)::after { background: var(--rr-brand); opacity: 1; }
+.rr-step__dot { width: 32px; height: 32px; border-radius: var(--rr-radius-full); display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--rr-border-control); background: var(--rr-surface); color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-bold); font-variant-numeric: tabular-nums; }
+.rr-step--done .rr-step__dot { background: var(--rr-brand); border-color: var(--rr-brand); color: var(--rr-on-brand); }
+.rr-step--current .rr-step__dot { border-color: var(--rr-brand); color: var(--rr-brand); box-shadow: 0 0 0 4px var(--rr-brand-tint); }
+.rr-step__label { font-size: var(--rr-fs-sm) !important; line-height: 20px; font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-step__note { font-size: var(--rr-fs-xs) !important; line-height: 18px; color: var(--rr-ink-muted); }
+
+/* قائمة روابط داخل كارت: <ul><li><a class="rr-nav-row">… */
+.rr-nav-row { display: flex; align-items: center; gap: var(--rr-space-3); min-height: 56px; padding: 0 var(--rr-space-5); color: var(--rr-ink); border-bottom: 1px solid var(--rr-border); }
+:is(.rr-page, .rr-scope) .rr-nav-row:hover, :is(.rr-page, .rr-scope) .rr-nav-row:focus { background: var(--rr-surface-hover); color: var(--rr-ink); }
+.rr-nav-row:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: -2px; }
+.rr-nav-row__icon { width: 36px; height: 36px; border-radius: var(--rr-radius-md); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.rr-nav-row__label { flex: 1; font-weight: var(--rr-fw-semibold); font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); }
+.rr-nav-row__chev { color: var(--rr-ink-muted); display: inline-flex; }
+li:last-child > .rr-nav-row { border-bottom: 0; }
+
+/* صف توزيع بنسبة: شارة + عدد + نسبة + شريط تقدّم */
+.rr-dist-row { padding: 14px var(--rr-space-5); border-bottom: 1px solid var(--rr-border); display: flex; flex-direction: column; gap: 10px; }
+li:last-child > .rr-dist-row { border-bottom: 0; }
+.rr-dist-row__line { display: flex; align-items: center; gap: var(--rr-space-3); }
+.rr-dist-row__count { margin-inline-start: auto; font-weight: var(--rr-fw-bold); }
+.rr-dist-row__pct { min-width: 44px; text-align: end; color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; }
+.rr-progress { height: 8px; border-radius: var(--rr-radius-full); background: var(--rr-surface-sunken); overflow: hidden; }
+.rr-progress__fill { height: 100%; border-radius: var(--rr-radius-full); background: var(--rr-brand); }
+.rr-progress__fill--success { background: var(--rr-success); }
+.rr-progress__fill--warning { background: var(--rr-warning); }
+.rr-progress__fill--danger { background: var(--rr-danger); }
+.rr-progress__fill--info { background: var(--rr-info); }
+.rr-progress__fill--neutral { background: var(--rr-ink-subtle); }
+
+
+/* ==========================================================================
+   13. التنبيهات (Alert)
+   <div class="rr-alert rr-alert--danger" role="alert">نص</div>
+   الألوان: info (افتراضي) | success | warning | danger — rr-alert:empty يختفي تلقائيًا
+   ========================================================================== */
+
+.rr-alert { display: flex; align-items: flex-start; gap: var(--rr-space-3); margin: 0; padding: var(--rr-space-3) var(--rr-space-4); border-radius: var(--rr-radius-md); border: 1px solid var(--rr-info-line); background: var(--rr-info-tint); color: var(--rr-ink); font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); white-space: pre-line; }
+.rr-alert:empty { display: none; }
+.rr-alert--success { background: var(--rr-success-tint); border-color: var(--rr-success-line); }
+.rr-alert--warning { background: var(--rr-warning-tint); border-color: var(--rr-warning-line); }
+.rr-alert--danger { background: var(--rr-danger-tint); border-color: var(--rr-danger-line); color: var(--rr-danger); font-weight: var(--rr-fw-medium); }
+
+
+/* ==========================================================================
+   14. شبكة الفورم (Form grid)
+   <div class="rr-form-grid"><div class="rr-field">…</div><div class="rr-field rr-field--full">…</div></div>
+   عمودان، ويتحولان لعمود واحد في المساحات الضيقة
+   ========================================================================== */
+
+.rr-form-wrap { container-type: inline-size; }
+.rr-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rr-space-5) var(--rr-space-4); align-items: start; }
+.rr-field--full { grid-column: 1 / -1; }
+@container (max-width: 480px) { .rr-form-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* لاحقة/سابقة داخل الحقل: <span class="rr-control__affix">يوم</span> */
+.rr-control__affix { display: inline-flex; align-self: stretch; align-items: center; padding-inline: var(--rr-space-3); background: var(--rr-surface-sunken); color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; white-space: nowrap; border-inline-start: 1px solid var(--rr-border); }
+.rr-field__opt { font-size: var(--rr-fs-xs) !important; font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-control__input[type="date"] { direction: rtl; font-variant-numeric: tabular-nums; }
+:is(.rr-page, .rr-scope) .rr-control__input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; }
+
+
+/* ==========================================================================
+   15. النافذة المنبثقة (Modal) — فوق آلية Bootstrap 3 الحالية
+   <div class="modal fade rr-scope" tabindex="-1" role="dialog" aria-labelledby="t">
+     <div class="modal-dialog rr-modal-dialog"><div class="modal-content rr-modal">
+       <header class="rr-modal__head"><div class="rr-modal__titles"><h2 class="rr-modal__title" id="t">…</h2>
+         <p class="rr-modal__desc">…</p></div><button class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon" data-dismiss="modal">x</button></header>
+       <div class="rr-modal__body">…</div>
+       <footer class="rr-modal__foot">أزرار</footer>
+   </div></div></div>
+   ========================================================================== */
+
+:is(.rr-page, .rr-scope) .rr-modal-dialog { width: calc(100% - 24px); max-width: var(--rr-modal-md); margin: 48px auto; }
+:is(.rr-page, .rr-scope) .rr-modal { display: flex; flex-direction: column; max-height: calc(100vh - 96px); background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-xl); box-shadow: var(--rr-shadow-modal); color: var(--rr-ink); overflow: hidden; }
+.rr-modal__head { display: flex; align-items: flex-start; gap: var(--rr-space-3); padding: var(--rr-space-5) var(--rr-space-5) var(--rr-space-4); border-bottom: 1px solid var(--rr-border); }
+.rr-modal__titles { flex: 1; min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-modal__title { font-size: var(--rr-fs-xl) !important; line-height: var(--rr-lh-xl); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-modal__desc { margin-top: 2px !important; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink-muted); }
+/* لو فيه <form> ملفوف حوالين الرأس والجسم والفوتر، لازم يكمّل نفس الترتيب عشان الجسم بس هو اللي يعمل scroll والفوتر يفضل ظاهر */
+.rr-modal > form { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; margin: 0; }
+.rr-modal__head, .rr-modal__foot { flex: none; }
+.rr-modal__body { display: flex; flex-direction: column; gap: var(--rr-space-4); flex: 1 1 auto; min-height: 0; padding: var(--rr-space-5); overflow-y: auto; }
+.rr-modal__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-2); padding: var(--rr-space-4) var(--rr-space-5); border-top: 1px solid var(--rr-border); background: var(--rr-surface-sunken); }
+.rr-modal__note { margin-inline-start: auto; display: inline-flex; align-items: center; gap: var(--rr-space-2); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+/* نسخة مضغوطة لنوافذ الفورم القصيرة: مسافات أقل عشان الفورم يظهر كامل من غير scroll */
+:is(.rr-page, .rr-scope) .rr-modal-dialog--compact { margin: 24px auto; }
+:is(.rr-page, .rr-scope) .rr-modal-dialog--sm { max-width: 480px; }
+:is(.rr-page, .rr-scope) .rr-modal-dialog--lg { max-width: 880px; }
+.rr-modal-dialog--compact .rr-modal { max-height: calc(100vh - 48px); }
+.rr-modal-dialog--compact .rr-modal__head { padding: var(--rr-space-4) var(--rr-space-5) var(--rr-space-3); }
+.rr-modal-dialog--compact .rr-modal__body { gap: var(--rr-space-3); padding: var(--rr-space-4) var(--rr-space-5); }
+.rr-modal-dialog--compact .rr-form-grid { row-gap: var(--rr-space-4); }
+.rr-modal-dialog--compact .rr-modal__foot { padding: var(--rr-space-3) var(--rr-space-5); }
+.rr-modal-dialog--compact .rr-field__hint { margin-top: -2px; }
+:is(.rr-page, .rr-scope) textarea.rr-control__input--short { min-height: 64px; }
+
+@media (max-width: 767px) {
+    :is(.rr-page, .rr-scope) .rr-modal-dialog { margin: 12px auto; }
+    :is(.rr-page, .rr-scope) .rr-modal { max-height: calc(100vh - 24px); }
+    .rr-modal__note { margin-inline-start: 0; flex-basis: 100%; }
+}
+
+
+/* ==========================================================================
+   16. قائمة بيانات (Definition list)
+   <dl class="rr-deflist"><div class="rr-deflist__item"><dt>الاسم</dt><dd>القيمة</dd></div></dl>
+   ========================================================================== */
+
+.rr-deflist { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0; }
+.rr-deflist__item { display: flex; align-items: baseline; justify-content: space-between; gap: var(--rr-space-4); min-width: 0; padding: var(--rr-space-3) var(--rr-space-5); border-bottom: 1px solid var(--rr-border); }
+.rr-deflist__item:last-child { border-bottom: 0; }
+:is(.rr-page, .rr-scope) .rr-deflist dt { flex: none; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-deflist dd { margin: 0; min-width: 0; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); text-align: end; overflow-wrap: anywhere; }
+/* نص طويل تحت قائمة البيانات (ملاحظات) */
+.rr-prose { padding: var(--rr-space-4) var(--rr-space-5); font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink); white-space: pre-line; }
+
+
+/* ==========================================================================
+   17. إضافات الجداول: صف الإجمالي + حقول داخل الجدول + أزرار الأيقونات
+   ========================================================================== */
+
+/* <tfoot class="rr-tfoot"><tr><td class="rr-td">…</td></tr></tfoot> */
+.rr-tfoot .rr-td { height: var(--rr-row); background: var(--rr-surface-sunken); border-top: 1px solid var(--rr-border-control); border-bottom: 0; font-weight: var(--rr-fw-bold); }
+.rr-table-wrap .rr-tbody .rr-tr:last-child .rr-td { border-bottom: 0; }
+
+/* حقل صغير داخل خلية جدول: <div class="rr-control rr-control--sm"><input class="rr-control__input"></div> */
+.rr-control--sm { height: var(--rr-control-sm); }
+:is(.rr-page, .rr-scope) .rr-control--sm .rr-control__input { font-size: var(--rr-fs-sm) !important; padding-inline: var(--rr-space-2); }
+.rr-td--input { padding-block: var(--rr-space-2); padding-inline: var(--rr-space-1); }
+.rr-td--input:first-child { padding-inline-start: var(--rr-space-4); }
+
+/* زرار أيقونة للخطر: rr-btn rr-btn--danger-ghost rr-btn--sm rr-btn--icon */
+:is(.rr-page, .rr-scope) .rr-btn--danger-ghost, :is(.rr-page, .rr-scope) .rr-btn--danger-ghost:focus { background: transparent; color: var(--rr-danger); }
+:is(.rr-page, .rr-scope) .rr-btn--danger-ghost:hover { background: var(--rr-danger-tint); color: var(--rr-danger); }
+.rr-inline-form { display: inline; margin: 0; }
+
+/* شريط أدوات تحت جدول إدخال: أزرار على الطرفين */
+.rr-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-2); padding: var(--rr-space-3) var(--rr-space-4); border-top: 1px solid var(--rr-border); background: var(--rr-surface); }
+.rr-toolbar__end { margin-inline-start: auto; display: flex; gap: var(--rr-space-2); }
+
+
+/* ==========================================================================
+   18. لوحة إجراء ملوّنة + فاصل بنص + خطوات مختصرة
+   ========================================================================== */
+
+/* <div class="rr-callout rr-callout--success"><span class="rr-callout__icon">icon</span>
+     <div class="rr-callout__copy"><strong>…</strong><p>…</p></div><div class="rr-callout__actions">…</div></div> */
+.rr-callout { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-3) var(--rr-space-4); padding: var(--rr-space-4); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); background: var(--rr-surface-sunken); }
+.rr-callout--success { background: var(--rr-success-tint); border-color: var(--rr-success-line); }
+.rr-callout--info { background: var(--rr-info-tint); border-color: var(--rr-info-line); }
+.rr-callout__icon { width: 40px; height: 40px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-md); background: var(--rr-surface); color: var(--rr-brand-tint-ink); }
+.rr-callout--success .rr-callout__icon { color: var(--rr-success); }
+.rr-callout--info .rr-callout__icon { color: var(--rr-info); }
+.rr-callout__copy { flex: 1 1 280px; min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-callout__copy strong { display: block; font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+:is(.rr-page, .rr-scope) .rr-callout__copy p { font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink-muted); }
+.rr-callout__actions { display: flex; flex-wrap: wrap; gap: var(--rr-space-2); }
+
+/* <div class="rr-divider"><span>أو</span></div> */
+.rr-divider { display: flex; align-items: center; gap: var(--rr-space-3); color: var(--rr-ink-muted); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-semibold); }
+.rr-divider::before, .rr-divider::after { content: ""; flex: 1; height: 1px; background: var(--rr-border); }
+
+/* خطوات مختصرة في سطر: <ol class="rr-mini-steps"><li><b>1</b>نص</li>…</ol> */
+:is(.rr-page, .rr-scope) .rr-mini-steps { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-2); margin: 0; padding: 0; list-style: none; }
+.rr-mini-steps li { display: inline-flex; align-items: center; gap: var(--rr-space-2); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); color: var(--rr-ink); }
+.rr-mini-steps li + li::before { content: ""; width: 16px; height: 1px; background: var(--rr-border-control); margin-inline-end: var(--rr-space-1); }
+.rr-mini-steps b { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-full); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); font-size: var(--rr-fs-xs) !important; font-weight: var(--rr-fw-bold); }
+
+/* حقل ملف */
+:is(.rr-page, .rr-scope) .rr-control__input[type="file"] { padding-block: 7px; cursor: pointer; }
+
+
+/* ==========================================================================
+   19. حالات الصفوف والقيم + عرض الأعمدة
+   ========================================================================== */
+
+/* قيمة مؤشر ملوّنة: rr-stat__value--success | --danger */
+.rr-stat__value--success { color: var(--rr-success); }
+.rr-stat__value--danger { color: var(--rr-danger); }
+/* لوحة خطر */
+.rr-callout--danger { background: var(--rr-danger-tint); border-color: var(--rr-danger-line); }
+.rr-callout--danger .rr-callout__icon { color: var(--rr-danger); }
+/* صف فيه خطأ: <tr class="rr-tr rr-tr--danger"> */
+.rr-tr--danger .rr-td { background: var(--rr-danger-tint); }
+.rr-tr--danger:hover .rr-td { background: var(--rr-danger-tint); }
+/* قائمة أخطاء داخل خلية */
+:is(.rr-page, .rr-scope) .rr-error-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.rr-error-list li { display: flex; gap: 6px; color: var(--rr-danger); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-medium); }
+.rr-error-list li::before { content: "•"; flex: none; }
+
+/* مفتاح تشغيل بسيط: <label class="rr-toggle"><input type="checkbox" class="rr-toggle__input"><span>نص</span></label> */
+:is(.rr-page, .rr-scope) .rr-toggle { display: inline-flex; align-items: center; gap: var(--rr-space-2); margin: 0; font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); color: var(--rr-ink); cursor: pointer; }
+.rr-toggle__input { width: 16px; height: 16px; margin: 0; accent-color: var(--rr-brand); cursor: pointer; }
+
+/* عرض الأعمدة (للخلايا أو رؤوس الأعمدة) — بدل style داخل الشاشة */
+.rr-col--index { width: 56px; }
+.rr-col--code { width: 120px; }
+.rr-col--qty { width: 110px; }
+.rr-col--price { width: 130px; }
+.rr-col--unit { min-width: 140px; }
+.rr-col--notes { min-width: 160px; }
+.rr-col--text { min-width: 240px; }
+.rr-col--title { min-width: 280px; }
