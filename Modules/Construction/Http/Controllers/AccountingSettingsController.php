@@ -106,13 +106,16 @@ class AccountingSettingsController extends BaseController
             'customer_advance_account_id' => $this->definition('دفعات مقدمة من العملاء', ['دفعات مقدمة من العملاء'], 'liability', 8, 60),
             'customer_deduction_account_id' => $this->definition('خصومات واستقطاعات لدى العملاء', ['خصومات واستقطاعات لدى العملاء'], 'asset', 1, 16),
             'sales_tax_payable_account_id' => $this->definition('ضريبة قيمة مضافة مستحقة', ['ضريبة قيمة مضافة مستحقة', 'Sales and service tax payable'], 'liability', 8, 60),
+            'input_tax_account_id' => $this->definition('ضريبة قيمة مضافة مدخلات', ['ضريبة قيمة مضافة مدخلات', 'Input VAT'], 'asset', 1, 16),
             'inventory_account_id' => $this->definition('المخزون', ['المخزون', 'مخزون البضاعة'], 'asset', 2, 21),
             'material_cost_account_id' => $this->definition('تكلفة مواد المشاريع', ['تكلفة مواد المشاريع', 'مواد خام - تكلفة مبيعات'], 'expenses', 13, 114),
             'labor_cost_account_id' => $this->definition('تكلفة عمالة المشاريع', ['تكلفة عمالة المشاريع', 'أجور مباشرة - تكلفة مبيعات'], 'expenses', 13, 114),
+            'labor_payable_account_id' => $this->definition('أجور عمالة مستحقة', ['أجور عمالة مستحقة', 'أجور مستحقة الدفع'], 'liability', 6, 58),
             'subcontract_cost_account_id' => $this->definition('تكلفة مقاولي الباطن', ['تكلفة مقاولي الباطن', 'مقاولو الباطن - تكلفة مبيعات'], 'expenses', 13, 114),
             'subcontract_payable_account_id' => $this->definition('مستحقات مقاولي الباطن', ['مستحقات مقاولي الباطن'], 'liability', 6, 58),
             'subcontract_retention_account_id' => $this->definition('محتجزات ضمان مقاولي الباطن', ['محتجزات ضمان مقاولي الباطن'], 'liability', 8, 60),
             'subcontract_deduction_account_id' => $this->definition('خصومات واستقطاعات مقاولي الباطن', ['خصومات واستقطاعات مقاولي الباطن'], 'income', 12, 111),
+            'subcontract_advance_account_id' => $this->definition('سلف مقاولي الباطن', ['سلف مقاولي الباطن', 'دفعات مقدمة لمقاولي الباطن'], 'asset', 1, 16),
             'cash_account_id' => $this->definition('الصندوق والنقدية', ['الصندوق والنقدية'], 'asset', 3, 31),
         ];
     }

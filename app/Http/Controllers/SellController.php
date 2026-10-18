@@ -267,7 +267,7 @@ class SellController extends Controller
                         if (auth()->user()->can('sell.view') || auth()->user()->can('direct_sell.view') || auth()->user()->can('view_own_sell_only')) {
                             $html .= '<li><a href="#" data-href="'.action([\App\Http\Controllers\SellController::class, 'show'], [$row->id]).'" class="btn-modal" data-container=".view_modal"><i class="fas fa-eye" aria-hidden="true"></i> '.__('messages.view').'</a></li>';
                         }
-                        if (! $only_shipments) {
+                        if (! $only_shipments && $row->source !== 'construction_certificate') {
                             if ($row->is_direct_sale == 0) {
                                 if (auth()->user()->can('sell.update')) {
                                     $html .= '<li><a target="_blank" href="'.action([\App\Http\Controllers\SellPosController::class, 'edit'], [$row->id]).'"><i class="fas fa-edit"></i> '.__('messages.edit').'</a></li>';
@@ -404,6 +404,43 @@ class SellController extends Controller
                         return (string) view('sell.partials.payment_status', ['payment_status' => $payment_status, 'id' => $row->id]);
                     }
                 )
+                ->editColumn('additional_notes', function ($row) {
+                    if (empty($row->additional_notes)) {
+                        return '';
+                    }
+
+                    $has_woo_note_marker = preg_match(
+                        '/^(?:📝\s*)?(?:توجد ملاحظة|Has a note)\s*:/iu',
+                        trim((string) $row->additional_notes)
+                    );
+
+                    if (! empty($row->woocommerce_order_id) || $has_woo_note_marker) {
+                        return '<span class="label bg-blue no-print"><i class="fas fa-comment-alt"></i> '
+                            .__('woocommerce::lang.sales_table_has_customer_note')
+                            .'</span>';
+                    }
+
+                    return e($row->additional_notes);
+                })
+                ->editColumn('staff_note', function ($row) {
+                    if (empty($row->staff_note)) {
+                        return '';
+                    }
+
+                    $staff_note = trim((string) $row->staff_note);
+                    $is_vodafone_paid_marker = preg_match(
+                        '/(?:مدفوع\s+فودافون\s+كاش|Paid\s+via\s+Vodafone\s+Cash)/iu',
+                        $staff_note
+                    ) || preg_match('/^✅\s*(?:مدفوع|Paid)$/iu', $staff_note);
+
+                    if ($is_vodafone_paid_marker) {
+                        return '<span class="label bg-green no-print"><i class="fas fa-check-circle"></i> '
+                            .__('woocommerce::lang.sales_table_paid_badge')
+                            .'</span>';
+                    }
+
+                    return e($row->staff_note);
+                })
                 ->editColumn(
                     'types_of_service_name',
                     '<span class="service-type-label" data-orig-value="{{$types_of_service_name}}" data-status-name="{{$types_of_service_name}}">{{$types_of_service_name}}</span>'
@@ -526,7 +563,7 @@ class SellController extends Controller
                         }
                     }, ]);
 
-            $rawColumns = ['final_total', 'action', 'total_paid', 'total_remaining', 'payment_status', 'invoice_no', 'discount_amount', 'tax_amount', 'total_before_tax', 'shipping_status', 'types_of_service_name', 'payment_methods', 'return_due', 'conatct_name', 'status', 'zatca_status'];
+            $rawColumns = ['final_total', 'action', 'total_paid', 'total_remaining', 'payment_status', 'invoice_no', 'discount_amount', 'tax_amount', 'total_before_tax', 'shipping_status', 'types_of_service_name', 'payment_methods', 'return_due', 'conatct_name', 'status', 'zatca_status', 'additional_notes', 'staff_note'];
 
             return $datatable->rawColumns($rawColumns)
                       ->skipTotalRecords()
@@ -851,6 +888,15 @@ class SellController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
+        $business_id = request()->session()->get('user.business_id');
+        $protected_transaction = Transaction::where('business_id', $business_id)->findOrFail($id);
+        if ($protected_transaction->source === 'construction_certificate') {
+            return redirect()->action([self::class, 'index'])->with('status', [
+                'success' => 0,
+                'msg' => __('construction::lang.construction_invoice_locked'),
+            ]);
+        }
+
         //Check if the transaction can be edited or not.
         $edit_days = request()->session()->get('business.transaction_edit_days');
         if (! $this->transactionUtil->canBeEdited($id, $edit_days)) {
@@ -864,8 +910,6 @@ class SellController extends Controller
             return back()->with('status', ['success' => 0,
                 'msg' => __('lang_v1.return_exist')]);
         }
-
-        $business_id = request()->session()->get('user.business_id');
 
         $moduleUtil = new ModuleUtil();
 

@@ -12,13 +12,13 @@ class BoqSubcontractComparisonController extends BaseController
 {
     public function index(Request $request, BoqSubcontractComparisonReport $reportBuilder)
     {
-        $this->authorizePermission('construction.access');
+        $this->authorizePermission('construction.reports.view');
         return view('construction::dashboard.boq-subcontract-comparison', $this->reportData($request, $reportBuilder));
     }
 
     public function print(Request $request, BoqSubcontractComparisonReport $reportBuilder)
     {
-        $this->authorizePermission('construction.access');
+        $this->authorizePermission('construction.reports.view');
         $data = $this->reportData($request, $reportBuilder, true);
         $data['business'] = Business::findOrFail($this->businessId());
         $data['businessLocation'] = BusinessLocation::where('business_id', $this->businessId())->active()->orderBy('id')->first();

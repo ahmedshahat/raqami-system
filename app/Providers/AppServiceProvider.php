@@ -32,6 +32,13 @@ class AppServiceProvider extends ServiceProvider
         ini_set('memory_limit', '-1');
         set_time_limit(0);
 
+        //Pending cheques of a deleted sell / purchase are cancelled (they never created a payment).
+        \App\Transaction::deleted(function ($transaction) {
+            \App\Cheque::where('transaction_id', $transaction->id)
+                ->where('status', \App\Cheque::STATUS_PENDING)
+                ->update(['status' => \App\Cheque::STATUS_CANCELLED, 'status_changed_on' => now(), 'status_note' => 'transaction deleted']);
+        });
+
         if (config('app.debug')) {
             error_reporting(E_ALL & ~E_USER_DEPRECATED);
         } else {

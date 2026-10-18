@@ -16,6 +16,14 @@
             </div>
         </div>
         <div class="ct-document-actions">
+            @if($certificate->status === 'approved' && ! $certificate->activePayments()->exists() && ! $certificate->activeRetentionReleases()->exists())
+                @can('construction.cancel')<button type="button" class="btn btn-danger" data-toggle="modal" data-target="#cancel-subcontract-certificate"><i class="fa fa-ban"></i> @lang('construction::lang.cancel_posted_certificate')</button>@endcan
+            @endif
+            @can('construction.cancel')
+                @foreach($certificate->payments->where('status', 'recorded') as $payment)
+                    <button type="button" class="btn btn-danger js-cancel-subcontract-payment" data-toggle="modal" data-target="#cancel-subcontract-payment" data-action="{{ route('construction.subcontractors.certificates.payments.cancel',[$contract->id,$certificate->id,$payment->id]) }}"><i class="fa fa-ban"></i> @lang('construction::lang.cancel_posted_payment') {{ $payment->number }}</button>
+                @endforeach
+            @endcan
             <a href="{{ route('construction.subcontractors.certificates.preview', [$contract->id, $certificate->id]) }}" target="_blank" class="btn btn-default"><i class="fa fa-eye"></i> @lang('construction::lang.print_preview')</a>
             <a href="{{ route('construction.subcontractors.certificates.print', [$contract->id, $certificate->id]) }}" target="_blank" class="btn btn-primary"><i class="fa fa-print"></i> @lang('construction::lang.print')</a>
         </div>
@@ -35,7 +43,7 @@
                 <strong>@lang('construction::lang.accounting_entry_created')</strong>
                 <small>@lang('construction::lang.accounting_entry_reference', ['reference' => $certificate->accountingPosting->mapping->ref_no])</small>
             </div>
-            @can('accounting.view_journal')
+            @can('construction.accounting.view')
                 <button type="button"
                     class="btn btn-default btn-modal"
                     data-href="{{ route('journal-entry.show', $certificate->accountingPosting->accounting_mapping_id) }}"
@@ -44,6 +52,10 @@
                 </button>
             @endcan
         </div>
+    @endif
+
+    @if($certificate->cancellationAccountingPosting?->mapping)
+        <div class="ct-accounting-posting-banner"><span><i class="fa fa-undo"></i></span><div><strong>@lang('construction::lang.reversal_entry_created')</strong><small>{{ $certificate->cancellation_reason }}</small></div>@can('construction.accounting.view')<button type="button" class="btn btn-default btn-modal" data-href="{{ route('journal-entry.show', $certificate->cancellationAccountingPosting->accounting_mapping_id) }}" data-container=".view_modal"><i class="fa fa-external-link-alt"></i> @lang('construction::lang.view_reversal_accounting_entry')</button>@endcan</div>
     @endif
 
     @if($certificate->status === 'approved')
@@ -78,6 +90,8 @@
                 <div class="form-group"><label>@lang('construction::lang.period_to')</label><input name="period_to" value="{{ old('period_to', $certificate->period_to ? @format_date($certificate->period_to) : '') }}" class="form-control ct-date-picker" readonly></div>
                 <div class="form-group"><label>@lang('construction::lang.retention_due_date')</label><input name="retention_due_date" value="{{ old('retention_due_date', $certificate->retention_due_date ? @format_date($certificate->retention_due_date) : '') }}" class="form-control ct-date-picker" readonly></div>
                 <div class="form-group"><label>@lang('construction::lang.other_deductions')</label><input name="other_deductions" value="{{ old('other_deductions', @num_format($certificate->other_deductions)) }}" class="form-control input_number ct-subcert-deduction @error('other_deductions') is-invalid @enderror">@error('other_deductions')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label>@lang('construction::lang.input_vat_percent')</label><input name="tax_percent" value="{{ old('tax_percent', @num_format($certificate->tax_percent)) }}" class="form-control input_number ct-subcert-tax-percent @error('tax_percent') is-invalid @enderror">@error('tax_percent')<small class="text-danger">{{ $message }}</small>@enderror</div>
+                <div class="form-group"><label>@lang('construction::lang.advance_recovery')</label><input name="advance_recovery_value" value="{{ old('advance_recovery_value', @num_format($certificate->advance_recovery_value)) }}" class="form-control input_number ct-subcert-advance @error('advance_recovery_value') is-invalid @enderror"><small>@lang('construction::lang.advance_available'): @include('construction::partials.money',['value'=>$availableAdvance])</small>@error('advance_recovery_value')<small class="text-danger">{{ $message }}</small>@enderror</div>
             </div>
         </div>
 
@@ -105,8 +119,10 @@
         <div class="ct-material-panel ct-subcert-notes"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="4">{{ old('notes', $certificate->notes) }}</textarea></div>
             <div class="ct-subcert-totals" data-retention="{{ (float)$certificate->retention_percent }}">
                 <div><span>@lang('construction::lang.gross_certificate')</span><strong class="ct-subcert-gross">@include('construction::partials.money',['value'=>$certificate->gross_value])</strong></div>
+                <div><span>@lang('construction::lang.input_vat')</span><strong class="ct-subcert-tax">@include('construction::partials.money',['value'=>$certificate->tax_value])</strong></div>
                 <div><span>@lang('construction::lang.retention_value') ({{ @num_format($certificate->retention_percent) }}%)</span><strong class="ct-subcert-retention">@include('construction::partials.money',['value'=>$certificate->retention_value])</strong></div>
                 <div><span>@lang('construction::lang.other_deductions')</span><strong class="ct-subcert-other">@include('construction::partials.money',['value'=>$certificate->other_deductions])</strong></div>
+                <div><span>@lang('construction::lang.advance_recovery')</span><strong class="ct-subcert-advance-value">@include('construction::partials.money',['value'=>$certificate->advance_recovery_value])</strong></div>
                 <div class="is-net"><span>@lang('construction::lang.net_certificate_due')</span><strong class="ct-subcert-net">@include('construction::partials.money',['value'=>$certificate->net_value])</strong></div>
             </div>
         </div>
@@ -117,7 +133,7 @@
         <div class="ct-material-panel">
             <div class="table-responsive"><table class="table ct-material-table"><thead><tr><th>#</th><th>@lang('construction::lang.work_description')</th><th>@lang('construction::lang.contract_quantity')</th><th>@lang('construction::lang.previous_quantity')</th><th>@lang('construction::lang.current_quantity')</th><th>@lang('construction::lang.cumulative_quantity')</th><th>@lang('construction::lang.current_value')</th></tr></thead><tbody>@foreach($certificate->items as $line)<tr><td>{{ $loop->iteration }}</td><td><strong>{{ $line->description }}</strong></td><td>{{ @num_format($line->contract_quantity) }}</td><td>{{ @num_format($line->previous_quantity) }}</td><td>{{ @num_format($line->current_quantity) }}</td><td>{{ @num_format($line->cumulativeQuantity()) }}</td><td><strong>@include('construction::partials.money',['value'=>$line->current_value])</strong></td></tr>@endforeach</tbody></table></div>
         </div>
-        <div class="ct-subcert-totals is-readonly"><div><span>@lang('construction::lang.gross_certificate')</span><strong>@include('construction::partials.money',['value'=>$certificate->gross_value])</strong></div><div><span>@lang('construction::lang.retention_value')</span><strong>@include('construction::partials.money',['value'=>$certificate->retention_value])</strong></div><div><span>@lang('construction::lang.other_deductions')</span><strong>@include('construction::partials.money',['value'=>$certificate->other_deductions])</strong></div><div class="is-net"><span>@lang('construction::lang.net_certificate_due')</span><strong>@include('construction::partials.money',['value'=>$certificate->net_value])</strong></div></div>
+        <div class="ct-subcert-totals is-readonly"><div><span>@lang('construction::lang.gross_certificate')</span><strong>@include('construction::partials.money',['value'=>$certificate->gross_value])</strong></div><div><span>@lang('construction::lang.input_vat')</span><strong>@include('construction::partials.money',['value'=>$certificate->tax_value])</strong></div><div><span>@lang('construction::lang.retention_value')</span><strong>@include('construction::partials.money',['value'=>$certificate->retention_value])</strong></div><div><span>@lang('construction::lang.other_deductions')</span><strong>@include('construction::partials.money',['value'=>$certificate->other_deductions])</strong></div><div><span>@lang('construction::lang.advance_recovery')</span><strong>@include('construction::partials.money',['value'=>$certificate->advance_recovery_value])</strong></div><div class="is-net"><span>@lang('construction::lang.net_certificate_due')</span><strong>@include('construction::partials.money',['value'=>$certificate->net_value])</strong></div></div>
     @endif
 
     @if($certificate->isEditable())
@@ -132,7 +148,7 @@
 
     @if($certificate->status === 'approved')
     <div class="ct-material-panel ct-subcert-retention-panel">
-        <div class="ct-panel-heading"><div><span>@lang('construction::lang.retention_management')</span><h2>@lang('construction::lang.retention_releases')</h2><p>@lang('construction::lang.retention_release_hint')</p></div>@if($retentionRemainingValue > 0.0001)@can('construction.subcontract.manage')<button class="btn ct-primary-action" data-toggle="modal" data-target="#record-retention-release"><i class="fa fa-unlock-alt"></i> @lang('construction::lang.release_retention')</button>@endcan @endif</div>
+        <div class="ct-panel-heading"><div><span>@lang('construction::lang.retention_management')</span><h2>@lang('construction::lang.retention_releases')</h2><p>@lang('construction::lang.retention_release_hint')</p></div>@if($retentionRemainingValue > 0.0001)@can('construction.payment.record')<button class="btn ct-primary-action" data-toggle="modal" data-target="#record-retention-release"><i class="fa fa-unlock-alt"></i> @lang('construction::lang.release_retention')</button>@endcan @endif</div>
         <div class="ct-retention-summary">
             <div><small>@lang('construction::lang.original_retention')</small><strong>@include('construction::partials.money',['value'=>$certificate->retention_value])</strong></div>
             <div><small>@lang('construction::lang.released_retention')</small><strong>@include('construction::partials.money',['value'=>$releasedRetentionValue])</strong></div>
@@ -148,17 +164,17 @@
                     <td>{{ $release->status === 'cancelled' ? $release->cancellation_reason : ($release->notes ?: '—') }}</td>
                     <td>
                         @if($release->accountingPosting?->mapping)
-                            @can('accounting.view_journal')
+                            @can('construction.accounting.view')
                                 <button type="button" class="btn btn-xs btn-success btn-modal" data-href="{{ route('journal-entry.show',$release->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_release_accounting_entry')"><i class="fa fa-book"></i></button>
                             @endcan
                         @endif
                         @if($release->cancellationAccountingPosting?->mapping)
-                            @can('accounting.view_journal')
+                            @can('construction.accounting.view')
                                 <button type="button" class="btn btn-xs btn-default btn-modal" data-href="{{ route('journal-entry.show',$release->cancellationAccountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_reversal_accounting_entry')"><i class="fa fa-undo"></i></button>
                             @endcan
                         @endif
                         @if($release->isActive())
-                            @can('construction.subcontract.manage')
+                            @can('construction.cancel')
                                 <button type="button" class="btn btn-xs btn-danger js-cancel-retention-release" data-toggle="modal" data-target="#cancel-retention-release" data-action="{{ route('construction.subcontractors.certificates.retention-releases.cancel',[$contract->id,$certificate->id,$release->id]) }}"><i class="fa fa-ban"></i> @lang('construction::lang.cancel_release')</button>
                             @endcan
                         @endif
@@ -169,27 +185,35 @@
             @endforelse
         </tbody></table></div>
     </div>
-    @can('construction.subcontract.manage')
+    @can('construction.payment.record')
     <div class="modal fade" id="record-retention-release"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="{{ route('construction.subcontractors.certificates.retention-releases.store',[$contract->id,$certificate->id]) }}">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4><i class="fa fa-unlock-alt"></i> @lang('construction::lang.release_retention')</h4></div><div class="modal-body"><div class="ct-payment-balance"><small>@lang('construction::lang.remaining_retention')</small><strong>@include('construction::partials.money',['value'=>$retentionRemainingValue])</strong></div><div class="row"><div class="col-md-6 form-group"><label>@lang('construction::lang.release_date') *</label><input name="release_date" value="{{ old('release_date', @format_date(now())) }}" class="form-control ct-date-picker" readonly required></div><div class="col-md-6 form-group"><label>@lang('construction::lang.release_amount') *</label><input name="retention_amount" value="{{ old('retention_amount', @num_format($retentionRemainingValue)) }}" class="form-control input_number" required>@error('retention_amount')<small class="text-danger">{{ $message }}</small>@enderror</div><div class="col-md-12 form-group"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea></div></div><div class="ct-context-banner"><i class="fa fa-info-circle"></i><span>@lang('construction::lang.retention_release_no_cost_notice')</span></div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn ct-primary-action"><i class="fa fa-save"></i> @lang('construction::lang.confirm_release')</button></div></form></div></div></div>
+    @endcan
+    @can('construction.cancel')
     <div class="modal fade" id="cancel-retention-release"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4><i class="fa fa-ban"></i> @lang('construction::lang.cancel_release')</h4></div><div class="modal-body"><div class="form-group"><label>@lang('construction::lang.cancellation_reason') *</label><textarea name="cancellation_reason" class="form-control" rows="4" required>{{ old('cancellation_reason') }}</textarea>@error('cancellation_reason')<small class="text-danger">{{ $message }}</small>@enderror</div><div class="alert alert-warning">@lang('construction::lang.retention_release_cancel_notice')</div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn btn-danger"><i class="fa fa-ban"></i> @lang('construction::lang.confirm_cancellation')</button></div></form></div></div></div>
     @endcan
 
     <div class="ct-material-panel ct-subcert-payments-panel">
-        <div class="ct-panel-heading"><div><span>@lang('construction::lang.subcontract_payments')</span><h2>@lang('construction::lang.subcontract_payments')</h2><p>@lang('construction::lang.payment_stage_accounting_notice')</p></div>@if($remainingValue > 0.0001)@can('construction.subcontract.manage')<button class="btn ct-primary-action" data-toggle="modal" data-target="#record-subcontract-payment"><i class="fa fa-money-bill-wave"></i> @lang('construction::lang.record_payment')</button>@endcan @endif</div>
+        <div class="ct-panel-heading"><div><span>@lang('construction::lang.subcontract_payments')</span><h2>@lang('construction::lang.subcontract_payments')</h2><p>@lang('construction::lang.payment_stage_accounting_notice')</p></div>@if($remainingValue > 0.0001)@can('construction.payment.record')<button class="btn ct-primary-action" data-toggle="modal" data-target="#record-subcontract-payment"><i class="fa fa-money-bill-wave"></i> @lang('construction::lang.record_payment')</button>@endcan @endif</div>
         <div class="table-responsive"><table class="table ct-material-table"><thead><tr><th>@lang('construction::lang.payment_number')</th><th>@lang('construction::lang.payment_date')</th><th>@lang('construction::lang.payment_amount')</th><th>@lang('construction::lang.payment_method')</th><th>@lang('construction::lang.payment_account')</th><th>@lang('construction::lang.payment_reference')</th><th>@lang('construction::lang.operations')</th></tr></thead><tbody>
-            @forelse($certificate->payments as $payment)<tr><td><strong dir="ltr">{{ $payment->number }}</strong></td><td>{{ @format_date($payment->payment_date) }}</td><td><strong>@include('construction::partials.money',['value'=>$payment->amount])</strong></td><td>{{ $paymentTypes[$payment->method] ?? $payment->method }}</td><td>{{ $payment->accountingAccount?->name ?: ($payment->account?->name ?: '—') }}</td><td>{{ $payment->reference_no ?: '—' }}</td><td><a href="{{ route('construction.subcontractors.certificates.payments.preview',[$contract->id,$certificate->id,$payment->id]) }}" target="_blank" class="btn btn-xs btn-default"><i class="fa fa-eye"></i></a> <a href="{{ route('construction.subcontractors.certificates.payments.print',[$contract->id,$certificate->id,$payment->id]) }}" target="_blank" class="btn btn-xs btn-primary"><i class="fa fa-print"></i></a> @if($payment->accountingPosting?->mapping)@can('accounting.view_journal')<button type="button" class="btn btn-xs btn-success btn-modal" data-href="{{ route('journal-entry.show',$payment->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_accounting_entry')"><i class="fa fa-book"></i></button>@endcan @endif</td></tr>@empty<tr><td colspan="7"><div class="ct-empty-state is-compact"><span><i class="fa fa-money-check-alt"></i></span><strong>@lang('construction::lang.no_subcontract_payments')</strong></div></td></tr>@endforelse
+            @forelse($certificate->payments as $payment)<tr><td><strong dir="ltr">{{ $payment->number }}</strong></td><td>{{ @format_date($payment->payment_date) }}</td><td><strong>@include('construction::partials.money',['value'=>$payment->amount])</strong></td><td>{{ $paymentTypes[$payment->method] ?? $payment->method }}</td><td>{{ $payment->accountingAccount?->name ?: ($payment->account?->name ?: '—') }}</td><td>{{ $payment->reference_no ?: '—' }}</td><td><a href="{{ route('construction.subcontractors.certificates.payments.preview',[$contract->id,$certificate->id,$payment->id]) }}" target="_blank" class="btn btn-xs btn-default"><i class="fa fa-eye"></i></a> <a href="{{ route('construction.subcontractors.certificates.payments.print',[$contract->id,$certificate->id,$payment->id]) }}" target="_blank" class="btn btn-xs btn-primary"><i class="fa fa-print"></i></a> @if($payment->accountingPosting?->mapping)@can('construction.accounting.view')<button type="button" class="btn btn-xs btn-success btn-modal" data-href="{{ route('journal-entry.show',$payment->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_accounting_entry')"><i class="fa fa-book"></i></button>@endcan @endif</td></tr>@empty<tr><td colspan="7"><div class="ct-empty-state is-compact"><span><i class="fa fa-money-check-alt"></i></span><strong>@lang('construction::lang.no_subcontract_payments')</strong></div></td></tr>@endforelse
         </tbody></table></div>
     </div>
-    @can('construction.subcontract.manage')
+    @can('construction.payment.record')
     <div class="modal fade" id="record-subcontract-payment"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="{{ route('construction.subcontractors.certificates.payments.store',[$contract->id,$certificate->id]) }}">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4><i class="fa fa-money-bill-wave"></i> @lang('construction::lang.new_payment')</h4></div><div class="modal-body"><div class="ct-payment-balance"><small>@lang('construction::lang.remaining_amount')</small><strong>@include('construction::partials.money',['value'=>$remainingValue])</strong></div><div class="row"><div class="col-md-6 form-group"><label>@lang('construction::lang.payment_date') *</label><input name="payment_date" value="{{ old('payment_date', @format_date(now())) }}" class="form-control ct-date-picker" readonly required></div><div class="col-md-6 form-group"><label>@lang('construction::lang.payment_amount') *</label><input name="amount" value="{{ old('amount', @num_format($remainingValue)) }}" class="form-control input_number" required>@error('amount')<small class="text-danger">{{ $message }}</small>@enderror</div><div class="col-md-6 form-group"><label>@lang('construction::lang.payment_method') *</label><select name="method" class="form-control" required>@foreach($paymentTypes as $key=>$label)<option value="{{ $key }}" @selected(old('method','cash')===$key)>{{ $label }}</option>@endforeach</select></div><div class="col-md-6 form-group"><label>@lang('construction::lang.payment_account'){{ $accountingSettings ? ' *' : '' }}</label>@if($accountingSettings)<select name="accounting_account_id" class="form-control select2" required><option value="">@lang('construction::lang.select_cash_bank_account')</option>@foreach($accountingPaymentAccounts as $id=>$name)<option value="{{ $id }}" @selected((string)old('accounting_account_id',$accountingSettings->cash_account_id)===(string)$id)>{{ $name }}</option>@endforeach</select>@error('accounting_account_id')<small class="text-danger">{{ $message }}</small>@enderror@else<select name="account_id" class="form-control select2"><option value="">@lang('lang_v1.none')</option>@foreach($paymentAccounts as $id=>$name)@if($id!=='')<option value="{{ $id }}" @selected((string)old('account_id')===(string)$id)>{{ $name }}</option>@endif @endforeach</select>@endif</div><div class="col-md-12 form-group"><label>@lang('construction::lang.payment_reference')</label><input name="reference_no" value="{{ old('reference_no') }}" class="form-control" maxlength="120"></div><div class="col-md-12 form-group"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea></div></div><div class="ct-context-banner"><i class="fa fa-info-circle"></i><span>@lang('construction::lang.payment_stage_accounting_notice')</span></div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn ct-primary-action"><i class="fa fa-save"></i> @lang('construction::lang.record_payment')</button></div></form></div></div></div>
     @endcan
     @endif
 </section>
+
+<div class="modal fade" id="cancel-subcontract-payment"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4>@lang('construction::lang.cancel_posted_payment')</h4></div><div class="modal-body"><div class="form-group"><label>@lang('construction::lang.cancellation_reason') *</label><textarea name="cancellation_reason" class="form-control" rows="4" required minlength="5"></textarea></div><div class="form-group"><label>@lang('construction::lang.manager_password') *</label><input type="password" name="current_password" class="form-control" required></div><div class="alert alert-warning">@lang('construction::lang.cancellation_creates_reversal_notice')</div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn btn-danger">@lang('construction::lang.confirm_cancellation')</button></div></form></div></div></div>
+<div class="modal fade" id="cancel-subcontract-certificate"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="{{ route('construction.subcontractors.certificates.cancel',[$contract->id,$certificate->id]) }}">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4>@lang('construction::lang.cancel_posted_certificate')</h4></div><div class="modal-body"><div class="form-group"><label>@lang('construction::lang.cancellation_reason') *</label><textarea name="cancellation_reason" class="form-control" rows="4" required minlength="5"></textarea></div><div class="form-group"><label>@lang('construction::lang.manager_password') *</label><input type="password" name="current_password" class="form-control" required></div><div class="alert alert-warning">@lang('construction::lang.cancellation_creates_reversal_notice')</div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn btn-danger">@lang('construction::lang.confirm_cancellation')</button></div></form></div></div></div>
 @endsection
 
 @push('ct_quick_js')
 <script>
 $(function () {
+    $('.js-cancel-subcontract-payment').on('click', function () {
+        $('#cancel-subcontract-payment form').attr('action', $(this).data('action'));
+    });
     $('.js-cancel-retention-release').on('click', function () {
         $('#cancel-retention-release form').attr('action', $(this).data('action'));
     });
@@ -214,12 +238,16 @@ $(function () {
         });
         var retention = gross * (parseFloat($('.ct-subcert-totals').data('retention')) || 0) / 100;
         var other = numberValue($('.ct-subcert-deduction'));
+        var tax = gross * numberValue($('.ct-subcert-tax-percent')) / 100;
+        var advance = numberValue($('.ct-subcert-advance'));
         $('.ct-subcert-gross').text(money(gross));
         $('.ct-subcert-retention').text(money(retention));
         $('.ct-subcert-other').text(money(other));
-        $('.ct-subcert-net').text(money(Math.max(0, gross - retention - other)));
+        $('.ct-subcert-tax').text(money(tax));
+        $('.ct-subcert-advance-value').text(money(advance));
+        $('.ct-subcert-net').text(money(Math.max(0, gross + tax - retention - other - advance)));
     }
-    $(document).on('input change', '.ct-subcert-qty,.ct-subcert-deduction', recalculateCertificate);
+    $(document).on('input change', '.ct-subcert-qty,.ct-subcert-deduction,.ct-subcert-tax-percent,.ct-subcert-advance', recalculateCertificate);
     $('#subcontract-certificate-form').on('submit', function (event) {
         recalculateCertificate();
         if ($('.ct-subcert-table tbody tr.has-limit-error').length) {

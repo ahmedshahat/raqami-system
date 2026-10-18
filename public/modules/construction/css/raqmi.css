@@ -594,3 +594,85 @@ li:last-child > .rr-dist-row { border-bottom: 0; }
 .rr-col--notes { min-width: 160px; }
 .rr-col--text { min-width: 240px; }
 .rr-col--title { min-width: 280px; }
+
+
+/* ==========================================================================
+   20. إدخال صفوف متكررة بدون scroll عرضي (Repeater)
+   كل صف كارت على سطرين، والخانات بتلف لوحدها في المساحات الضيقة:
+   <div class="rr-entry">
+     <div class="rr-entry-row">
+       <span class="rr-entry-row__num" aria-hidden="true"></span>
+       <div class="rr-entry-row__fields">
+         <div class="rr-entry-field rr-entry-field--code"><label class="rr-entry-field__label">…</label><div class="rr-control rr-control--sm">…</div></div>
+         … <span class="rr-entry-row__break"></span> …
+       </div>
+       <button class="rr-btn rr-btn--danger-ghost rr-btn--sm rr-btn--icon">x</button>
+     </div>
+   </div>
+   ========================================================================== */
+
+.rr-entry { display: flex; flex-direction: column; gap: var(--rr-space-3); padding: var(--rr-space-4) var(--rr-space-5); counter-reset: rr-entry; container-type: inline-size; }
+.rr-entry-row { display: flex; align-items: flex-start; gap: var(--rr-space-3); padding: var(--rr-space-3); background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); counter-increment: rr-entry; }
+.rr-entry-row:focus-within { border-color: var(--rr-focus); box-shadow: 0 0 0 1px var(--rr-focus); }
+.rr-entry-row__num { flex: none; width: 28px; height: 28px; margin-top: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-full); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); font-size: var(--rr-fs-xs) !important; font-weight: var(--rr-fw-bold); font-variant-numeric: tabular-nums; }
+.rr-entry-row__num::before { content: counter(rr-entry); }
+.rr-entry-row__fields { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--rr-space-2) var(--rr-space-3); }
+.rr-entry-row__break { flex-basis: 100%; height: 0; }
+.rr-entry-row > .rr-btn { flex: none; margin-top: 22px; }
+
+.rr-entry-field { display: flex; flex-direction: column; gap: var(--rr-space-1); min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-entry-field__label { margin: 0; font-size: var(--rr-fs-xs) !important; line-height: 18px; font-weight: var(--rr-fw-semibold); color: var(--rr-ink-muted); }
+.rr-entry-field--code { flex: 0 1 130px; }
+.rr-entry-field--grow { flex: 3 1 240px; }
+.rr-entry-field--unit { flex: 1 1 150px; }
+.rr-entry-field--num { flex: 1 1 100px; max-width: 160px; }
+.rr-entry-field--note { flex: 3 1 140px; }
+.rr-entry-field--total { flex: 1 1 110px; max-width: 170px; }
+/* الإجمالي قيمة محسوبة، مش حقل */
+.rr-entry-field__value { display: flex; align-items: center; justify-content: flex-end; height: var(--rr-control-sm); padding-inline: var(--rr-space-2); border-radius: var(--rr-radius-md); background: var(--rr-surface-sunken); font-weight: var(--rr-fw-bold); }
+
+@container (max-width: 520px) {
+    .rr-entry-row__num { display: none; }
+    .rr-entry-field--code, .rr-entry-field--num, .rr-entry-field--total { flex-basis: calc(50% - var(--rr-space-3)); }
+}
+
+
+/* ==========================================================================
+   21. رأس جدول فيه أدوات (بحث + فلتر) + رابط كيان
+   <div class="rr-table-head rr-table-head--toolbar">
+     <div class="rr-table-head__titles"><h2 class="rr-table-head__title">…</h2><p class="rr-table-head__sub">…</p></div>
+     <form class="rr-table-tools">…حقول rr-control--sm وأزرار rr-btn--sm…</form>
+   </div>
+   ========================================================================== */
+
+.rr-table-head--toolbar { flex-wrap: wrap; align-items: center; row-gap: var(--rr-space-3); }
+.rr-table-head__titles { flex: 1 1 260px; min-width: 0; }
+.rr-table-head__sub { margin: 0; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+.rr-table-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--rr-space-2); min-width: 0; margin: 0; }
+.rr-table-tools__search { flex: 0 1 320px; min-width: 200px; }
+.rr-table-tools__select { flex: 0 0 170px; }
+
+/* اسم كيان كرابط داخل جدول: <a class="rr-entity rr-entity--link">…<span class="rr-entity__copy">…</span></a> */
+.rr-entity__copy { display: flex; flex-direction: column; min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-entity--link { color: var(--rr-ink); }
+:is(.rr-page, .rr-scope) .rr-entity--link:hover .rr-entity__name { color: var(--rr-link); text-decoration: underline; }
+:is(.rr-page, .rr-scope) .rr-entity--link:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: 2px; border-radius: var(--rr-radius-sm); }
+
+.rr-table--projects { min-width: 880px; }
+
+
+/* ==========================================================================
+   22. التابات (Tabs) — تنقل بين أقسام الموديول
+   <nav class="rr-scope rr-tabs" aria-label="…">
+     <a class="rr-tab" href="…" aria-current="page">icon نص</a> …
+   </nav>
+   nav.rr-tabs أقوى من تنسيقات ct-section-tabs القديمة في refinement.css فبيلغيها.
+   ========================================================================== */
+
+nav.rr-tabs { display: flex; align-items: stretch; gap: var(--rr-space-1); max-width: var(--rr-page-max); margin: 0 auto; padding: 0; overflow-x: auto; border: 0; border-bottom: 1px solid var(--rr-border); border-radius: 0; background: transparent; box-shadow: none; scrollbar-width: thin; }
+nav.rr-tabs .rr-tab { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: var(--rr-space-2); height: 44px; min-height: 0; padding: 0 var(--rr-space-4); border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--rr-ink-muted); font-size: var(--rr-fs-md) !important; font-weight: var(--rr-fw-medium); white-space: nowrap; text-decoration: none; transition: color .12s, background-color .12s; }
+nav.rr-tabs .rr-tab:hover, nav.rr-tabs .rr-tab:focus { color: var(--rr-ink); background: var(--rr-surface-hover); text-decoration: none; box-shadow: none; }
+nav.rr-tabs .rr-tab:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: -2px; }
+nav.rr-tabs .rr-tab[aria-current="page"] { color: var(--rr-brand); font-weight: var(--rr-fw-semibold); background: transparent; box-shadow: none; }
+nav.rr-tabs .rr-tab[aria-current="page"]::after { content: ""; position: absolute; inset-inline: var(--rr-space-3); bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--rr-brand); }
+@media (max-width: 767px) { nav.rr-tabs { margin-inline: 0; } }

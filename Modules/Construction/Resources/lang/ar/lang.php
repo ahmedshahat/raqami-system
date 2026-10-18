@@ -1748,4 +1748,9 @@ return [
     'import_file_rows' => 'صفوف الملف',
     'import_show_errors_only' => 'إظهار الصفوف التي بها أخطاء فقط',
     'import_row_check' => 'نتيجة الفحص',
+    'of_portfolio' => 'من المحفظة',
+    'project_more_actions' => 'مزيد من إجراءات المشروع',
+    'no_matching_projects' => 'لا توجد مشاريع مطابقة',
+    'no_matching_projects_hint' => 'غيّر كلمات البحث أو اختر حالة أخرى لعرض المشاريع.',
+    'project_unit' => 'مشروع',
 ];

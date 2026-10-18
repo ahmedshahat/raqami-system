@@ -407,6 +407,457 @@ body.theme-dark .ct-quote-menu button:hover {
     background: var(--dark-surface-hover) !important;
 }
 
+body.theme-dark .ct-portfolio-page {
+    --ct-list-ink: var(--dark-text);
+    --ct-list-muted: var(--dark-text-muted);
+    --ct-list-line: var(--dark-border);
+    --ct-list-soft: var(--dark-surface-raised);
+    color: var(--dark-text) !important;
+}
+
+body.theme-dark .ct-list-hero,
+body.theme-dark .ct-portfolio-stat,
+body.theme-dark .ct-contract-metrics article,
+body.theme-dark .ct-list-panel,
+body.theme-dark .ct-project-form-shell,
+body.theme-dark .ct-project-form-main,
+body.theme-dark .ct-project-form-section,
+body.theme-dark .ct-project-form-footer,
+body.theme-dark .ct-quick-modal .modal-content,
+body.theme-dark .ct-row-action,
+body.theme-dark .ct-contract-menu-toggle {
+    background: var(--dark-surface) !important;
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .18) !important;
+}
+
+body.theme-dark .ct-list-panel__header,
+body.theme-dark .ct-list-filters,
+body.theme-dark .ct-entity-table th,
+body.theme-dark .ct-project-form-section > header,
+body.theme-dark .ct-quick-modal .modal-header,
+body.theme-dark .ct-quick-modal .modal-footer,
+body.theme-dark .ct-result-count,
+body.theme-dark .ct-percentage-value {
+    background: var(--dark-surface-raised) !important;
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-entity-table td,
+body.theme-dark .ct-list-panel__header,
+body.theme-dark .ct-list-filters,
+body.theme-dark .ct-project-form-section > header {
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-entity-table tbody tr:hover,
+body.theme-dark .ct-row-action:hover,
+body.theme-dark .ct-row-action:focus,
+body.theme-dark .ct-portfolio-stat.is-active {
+    background: var(--dark-surface-hover) !important;
+}
+
+body.theme-dark .ct-list-hero h1,
+body.theme-dark .ct-list-panel__header h2,
+body.theme-dark .ct-portfolio-stat__copy strong,
+body.theme-dark .ct-contract-metrics strong,
+body.theme-dark .ct-entity-title strong,
+body.theme-dark .ct-cell-primary,
+body.theme-dark .ct-money-value,
+body.theme-dark .ct-project-form-section h2,
+body.theme-dark .ct-list-empty h3 {
+    color: var(--dark-text) !important;
+}
+
+body.theme-dark .ct-list-hero p,
+body.theme-dark .ct-list-panel__header p,
+body.theme-dark .ct-portfolio-stat__copy small,
+body.theme-dark .ct-portfolio-stat__copy em,
+body.theme-dark .ct-contract-metrics small,
+body.theme-dark .ct-contract-metrics em,
+body.theme-dark .ct-entity-table td,
+body.theme-dark .ct-entity-title small,
+body.theme-dark .ct-project-form-section header p,
+body.theme-dark .ct-project-fields small,
+body.theme-dark .ct-project-form-footer > span,
+body.theme-dark .ct-list-empty p {
+    color: var(--dark-text-muted) !important;
+}
+
+body.theme-dark .ct-list-filters .form-control,
+body.theme-dark .ct-project-fields .form-control,
+body.theme-dark .ct-project-fields .select2-selection,
+body.theme-dark .ct-quick-modal .form-control {
+    background: var(--dark-surface-raised) !important;
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+}
+
+@media (max-width: 767px) {
+    body.theme-dark .ct-responsive-table,
+    body.theme-dark .ct-entity-table tr {
+        background: var(--dark-surface) !important;
+        border-color: var(--dark-border) !important;
+    }
+}
+
+body.theme-dark .ct-portfolio-page .ct-list-hero {
+    background: radial-gradient(circle at 12% 130%, rgba(45, 212, 191, .24), transparent 34%), linear-gradient(132deg, #091a33 0%, #123f70 58%, #0c5868 100%) !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-list-hero--contracts {
+    background: radial-gradient(circle at 12% 130%, rgba(167, 139, 250, .22), transparent 35%), linear-gradient(132deg, #111b37 0%, #303b78 58%, #0d5265 100%) !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-list-hero h1 {
+    color: #fff !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-list-hero p {
+    color: rgba(255, 255, 255, .78) !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-list-hero .ct-list-btn--primary {
+    color: #124e89 !important;
+    background: #fff !important;
+    border-color: #fff !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-list-hero .ct-list-btn--secondary {
+    color: #fff !important;
+    background: rgba(255, 255, 255, .1) !important;
+    border-color: rgba(255, 255, 255, .34) !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-list-hero .ct-list-btn--secondary:hover,
+body.theme-dark .ct-portfolio-page .ct-list-hero .ct-list-btn--secondary:focus-visible {
+    background: rgba(255, 255, 255, .18) !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-portfolio-stat.is-active,
+body.theme-dark .ct-portfolio-page .ct-contract-metrics article:first-child {
+    background: linear-gradient(140deg, #15345c, #155b8e) !important;
+    color: #fff !important;
+    border-color: #3678a9 !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-portfolio-stat.is-active .ct-portfolio-stat__copy small,
+body.theme-dark .ct-portfolio-page .ct-portfolio-stat.is-active .ct-portfolio-stat__copy strong,
+body.theme-dark .ct-portfolio-page .ct-portfolio-stat.is-active .ct-portfolio-stat__tag,
+body.theme-dark .ct-portfolio-page .ct-contract-metrics article:first-child small,
+body.theme-dark .ct-portfolio-page .ct-contract-metrics article:first-child strong {
+    color: #fff !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-portfolio-stat.is-active .ct-portfolio-stat__copy em {
+    color: rgba(255, 255, 255, .72) !important;
+}
+
+body.theme-dark .ct-portfolio-page .ct-list-filters,
+body.theme-dark .ct-portfolio-page .ct-list-panel__header {
+    background: linear-gradient(105deg, var(--dark-surface-raised), var(--dark-surface)) !important;
+}
+
+/* Construction project and contract sub-screens. */
+body.theme-dark .ct-project-workspace .ct-project-hero {
+    background: radial-gradient(circle at 10% 125%, rgba(45,212,191,.22), transparent 31%), linear-gradient(132deg, #091a33 0%, #123f70 58%, #0c5868 100%) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}
+
+body.theme-dark .ct-project-workspace .ct-project-hero h1,
+body.theme-dark .ct-project-workspace .ct-project-hero__facts dd,
+body.theme-dark .ct-project-workspace .ct-project-hero a,
+body.theme-dark .ct-project-workspace .ct-project-code,
+body.theme-dark .ct-project-workspace .ct-project-state {
+    color: #fff !important;
+}
+
+body.theme-dark .ct-project-workspace .ct-project-code,
+body.theme-dark .ct-project-workspace .ct-project-state,
+body.theme-dark .ct-project-workspace .ct-project-hero__facts > div,
+body.theme-dark .ct-project-workspace .ct-project-hero__actions .ct-project-button--quiet {
+    background: rgba(255,255,255,.1) !important;
+    border-color: rgba(255,255,255,.22) !important;
+}
+
+body.theme-dark .ct-project-workspace .ct-project-hero__facts dt {
+    color: rgba(255,255,255,.68) !important;
+}
+
+body.theme-dark .ct-project-workspace .ct-project-hero__actions .ct-project-button--primary,
+body.theme-dark .ct-project-workspace .ct-project-next .ct-project-button {
+    background: #fff !important;
+    color: #124e89 !important;
+}
+
+body.theme-dark .ct-project-workspace .ct-project-next,
+body.theme-dark .ct-project-workspace .ct-project-stat:first-child {
+    background: linear-gradient(135deg, #132b50, #155b8e 72%, #0d6875) !important;
+    color: #fff !important;
+    border-color: #286f98 !important;
+}
+
+body.theme-dark .ct-project-workspace .ct-project-next h2,
+body.theme-dark .ct-project-workspace .ct-project-stat:first-child strong,
+body.theme-dark .ct-project-workspace .ct-project-stat:first-child .ct-project-stat__icon {
+    color: #fff !important;
+}
+
+body.theme-dark .ct-project-workspace .ct-project-next p,
+body.theme-dark .ct-project-workspace .ct-project-next .ct-project-kicker,
+body.theme-dark .ct-project-workspace .ct-project-stat:first-child span:not(.ct-project-stat__icon) {
+    color: rgba(255,255,255,.72) !important;
+}
+
+body.theme-dark .ct-contract-form-page .ct-contract-editor__intro,
+body.theme-dark .ct-contract-details .ct-contract-detail-head {
+    background: radial-gradient(circle at 12% 125%, rgba(167,139,250,.22), transparent 34%), linear-gradient(132deg, #111b37 0%, #303b78 58%, #0d5265 100%) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}
+
+body.theme-dark .ct-contract-form-page .ct-contract-editor__intro h2,
+body.theme-dark .ct-contract-form-page .ct-contract-editor__intro span,
+body.theme-dark .ct-contract-details .ct-contract-detail-head h2,
+body.theme-dark .ct-contract-details .ct-contract-detail-head__copy > span,
+body.theme-dark .ct-contract-details .ct-contract-detail-head .ct-contract-status {
+    color: #fff !important;
+}
+
+body.theme-dark .ct-contract-form-page .ct-contract-editor__intro p,
+body.theme-dark .ct-contract-details .ct-contract-detail-head p {
+    color: rgba(255,255,255,.74) !important;
+}
+
+body.theme-dark .ct-contract-form-page .ct-contract-editor__intro .ct-contract-button,
+body.theme-dark .ct-contract-details .ct-contract-detail-head .ct-contract-status {
+    background: rgba(255,255,255,.1) !important;
+    border-color: rgba(255,255,255,.25) !important;
+}
+
+body.theme-dark .ct-contract-card,
+body.theme-dark .ct-contract-summary-card,
+body.theme-dark .ct-contract-detail-actions,
+body.theme-dark .ct-contract-alert,
+body.theme-dark .ct-contract-editor__footer {
+    background: var(--dark-surface) !important;
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+    box-shadow: 0 9px 26px rgba(0,0,0,.2) !important;
+}
+
+body.theme-dark .ct-contract-card > header,
+body.theme-dark .ct-contract-summary-card > header {
+    background: linear-gradient(90deg, var(--dark-surface-raised), var(--dark-surface)) !important;
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-contract-card h3,
+body.theme-dark .ct-contract-summary-card h3,
+body.theme-dark .ct-contract-fields strong,
+body.theme-dark .ct-contract-terms {
+    color: var(--dark-text) !important;
+}
+
+body.theme-dark .ct-contract-card p,
+body.theme-dark .ct-contract-grid label,
+body.theme-dark .ct-contract-grid small,
+body.theme-dark .ct-contract-fields small {
+    color: var(--dark-text-muted) !important;
+}
+
+body.theme-dark .ct-contract-grid .form-control,
+body.theme-dark .ct-contract-notes .form-control,
+body.theme-dark .ct-contract-value input {
+    background: var(--dark-surface-raised) !important;
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-contract-fields > div {
+    border-color: var(--dark-border) !important;
+}
+
+/* Construction BOQ and project items. */
+body.theme-dark .ct-boq-landing-hero,
+body.theme-dark .ct-boq-portfolio-hero,
+body.theme-dark .ct-boq-page .ct-boq-head {
+    background: radial-gradient(circle at 12% 130%, rgba(45,212,191,.22), transparent 34%), linear-gradient(132deg,#091a33 0%,#123f70 58%,#0c5868 100%) !important;
+    color: #fff !important;
+}
+
+body.theme-dark .ct-boq-import-hero {
+    background: radial-gradient(circle at 12% 130%,rgba(167,139,250,.22),transparent 34%),linear-gradient(132deg,#111b37 0%,#303b78 58%,#0d5265 100%) !important;
+    color: #fff !important;
+}
+
+body.theme-dark .ct-boq-landing-hero h1,
+body.theme-dark .ct-boq-portfolio-hero h2,
+body.theme-dark .ct-boq-import-hero h1,
+body.theme-dark .ct-boq-page .ct-boq-head h2 {
+    color: #fff !important;
+}
+
+body.theme-dark .ct-boq-landing-hero p,
+body.theme-dark .ct-boq-portfolio-hero p,
+body.theme-dark .ct-boq-import-hero p,
+body.theme-dark .ct-boq-page .ct-boq-head p {
+    color: rgba(255,255,255,.76) !important;
+}
+
+body.theme-dark .ct-boq-version-metrics article,
+body.theme-dark .ct-boq-import-metrics article,
+body.theme-dark .ct-boq-portfolio-page .ct-project-card,
+body.theme-dark .ct-boq-versions-panel,
+body.theme-dark .ct-boq-create-card,
+body.theme-dark .ct-boq-version-card,
+body.theme-dark .ct-boq-import-panel,
+body.theme-dark .ct-boq-page .ct-boq-actions,
+body.theme-dark .ct-boq-page .ct-boq-table-wrap,
+body.theme-dark .ct-boq-page .ct-boq-panel,
+body.theme-dark .ct-boq-page .ct-boq-tools,
+body.theme-dark .ct-boq-page .ct-boq-entry-wrap {
+    background: var(--dark-surface) !important;
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+    box-shadow: 0 9px 26px rgba(0,0,0,.2) !important;
+}
+
+body.theme-dark .ct-boq-portfolio-page .ct-project-card__meta {
+    background: var(--dark-surface-raised) !important;
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-boq-portfolio-page .ct-project-card h3,
+body.theme-dark .ct-boq-portfolio-page .ct-project-card b {
+    color: var(--dark-text) !important;
+}
+
+body.theme-dark .ct-boq-portfolio-page .ct-project-card p,
+body.theme-dark .ct-boq-portfolio-page .ct-project-card small,
+body.theme-dark .ct-boq-portfolio-page .ct-project-card__head {
+    color: var(--dark-text-muted) !important;
+}
+
+body.theme-dark .ct-boq-version-metrics article.is-primary,
+body.theme-dark .ct-boq-portfolio-page .ct-project-card:first-child {
+    background: linear-gradient(140deg,#15345c,#155b8e) !important;
+    color: #fff !important;
+    border-color: #3678a9 !important;
+}
+
+body.theme-dark .ct-boq-versions-panel > header,
+body.theme-dark .ct-boq-create-card > header,
+body.theme-dark .ct-boq-import-panel > header,
+body.theme-dark .ct-boq-page .ct-boq-panel__head,
+body.theme-dark .ct-boq-page .ct-boq-tools summary,
+body.theme-dark .ct-boq-page .ct-boq-table th,
+body.theme-dark .ct-boq-page .ct-boq-entry-table th,
+body.theme-dark .ct-boq-import-table thead th {
+    background: var(--dark-surface-raised) !important;
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-boq-versions-panel h2,
+body.theme-dark .ct-boq-create-card h2,
+body.theme-dark .ct-boq-import-panel h2,
+body.theme-dark .ct-boq-version-card h3,
+body.theme-dark .ct-boq-version-card dd,
+body.theme-dark .ct-boq-version-metrics strong,
+body.theme-dark .ct-boq-import-metrics strong,
+body.theme-dark .ct-boq-page .ct-boq-table td b,
+body.theme-dark .ct-boq-page .ct-boq-tools summary b {
+    color: var(--dark-text) !important;
+}
+
+body.theme-dark .ct-boq-versions-panel p,
+body.theme-dark .ct-boq-create-card p,
+body.theme-dark .ct-boq-import-panel p,
+body.theme-dark .ct-boq-version-card dt,
+body.theme-dark .ct-boq-version-metrics small,
+body.theme-dark .ct-boq-import-metrics small,
+body.theme-dark .ct-boq-page .ct-boq-tools summary small {
+    color: var(--dark-text-muted) !important;
+}
+
+body.theme-dark .ct-boq-version-metrics article.is-primary small,
+body.theme-dark .ct-boq-version-metrics article.is-primary strong,
+body.theme-dark .ct-boq-portfolio-page .ct-project-card:first-child h3,
+body.theme-dark .ct-boq-portfolio-page .ct-project-card:first-child p,
+body.theme-dark .ct-boq-portfolio-page .ct-project-card:first-child small,
+body.theme-dark .ct-boq-portfolio-page .ct-project-card:first-child b {
+    color: #fff !important;
+}
+
+body.theme-dark .ct-boq-create-card .form-control,
+body.theme-dark .ct-boq-page .form-control,
+body.theme-dark .ct-boq-import-form .form-control {
+    background: var(--dark-surface-raised) !important;
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-boq-page .ct-boq-table td,
+body.theme-dark .ct-boq-page .ct-boq-entry-table td,
+body.theme-dark .ct-boq-import-table td {
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-boq-page .ct-boq-table tbody tr:hover,
+body.theme-dark .ct-boq-version-card:hover {
+    background: var(--dark-surface-hover) !important;
+}
+
+body.theme-dark .ct-boq-page .ct-boq-section-row td {
+    background: #152d47 !important;
+    color: #8bc8f4 !important;
+}
+
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card,
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card:first-child {
+    background: var(--dark-surface) !important;
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border) !important;
+    border-right-color: #4b90c5 !important;
+}
+
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card:first-child h3,
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card:first-child p,
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card:first-child small,
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card:first-child b,
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card:first-child .ct-project-card__head > span:last-child {
+    color: inherit !important;
+}
+
+body.theme-dark .ct-boq-project-card__identity .ct-project-card__head > span:last-child,
+body.theme-dark .ct-boq-project-card__action .ct-project-card__meta,
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card:first-child .ct-project-card__meta {
+    background: var(--dark-surface-raised) !important;
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-boq-project-card__action {
+    border-color: var(--dark-border) !important;
+}
+
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card .ct-boq-project-card__action > a {
+    background: #153452 !important;
+    color: #b9def8 !important;
+    border-color: #285879 !important;
+}
+
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card .ct-boq-project-card__action > a:hover,
+body.theme-dark .ct-boq-portfolio-page .ct-boq-project-card .ct-boq-project-card__action > a:focus {
+    background: #1769b4 !important;
+    border-color: #1769b4 !important;
+    color: #fff !important;
+}
+
 /* Stocktaking has its own late inline stylesheet. */
 body.theme-dark .stocktaking-theme,
 body.theme-dark .stocktake-workspace {

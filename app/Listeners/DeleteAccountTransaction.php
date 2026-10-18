@@ -41,8 +41,11 @@ class DeleteAccountTransaction
             return true;
         }
 
-        AccountTransaction::where('account_id', $event->transactionPayment->account_id)
-                        ->where('transaction_payment_id', $event->transactionPayment->id)
+        // The payment id is the stable link to its account transaction. The
+        // payment's account_id can be changed or cleared before the delete
+        // event is dispatched, which used to leave an orphan amount in the
+        // account ledger after its sale invoice had been deleted.
+        AccountTransaction::where('transaction_payment_id', $event->transactionPayment->id)
                         ->delete();
     }
 }

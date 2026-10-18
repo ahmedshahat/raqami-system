@@ -6,6 +6,7 @@ use App\Contact;
 use App\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Modules\Accounting\Entities\AccountingAccount;
 use Modules\Accounting\Entities\AccountingAccountsTransaction;
 use Modules\Construction\Entities\ConstructionAccountingPosting;
@@ -15,6 +16,7 @@ use Modules\Construction\Entities\ConstructionSubcontract;
 use Modules\Construction\Entities\ConstructionSubcontractCertificate;
 use Modules\Construction\Entities\ConstructionSubcontractPayment;
 use Modules\Construction\Entities\ConstructionSubcontractRetentionRelease;
+use Modules\Construction\Entities\ConstructionSubcontractAdvance;
 use Modules\Construction\Support\ConstructionAccountingPoster;
 use Tests\TestCase;
 
@@ -45,6 +47,8 @@ class ConstructionSubcontractWorkflowTest extends TestCase
         $payableAccount = $account('Test subcontract payable', 'liability');
         $retentionAccount = $account('Test subcontract retention', 'liability');
         $deductionAccount = $account('Test subcontract deductions', 'income');
+        $inputTaxAccount = $account('Test input VAT', 'asset');
+        $advanceAccount = $account('Test subcontract advances', 'asset');
         $cashAccount = AccountingAccount::create([
             'business_id' => $business->id,
             'name' => 'Test cash '.uniqid(),
@@ -61,6 +65,8 @@ class ConstructionSubcontractWorkflowTest extends TestCase
                 'subcontract_payable_account_id' => $payableAccount->id,
                 'subcontract_retention_account_id' => $retentionAccount->id,
                 'subcontract_deduction_account_id' => $deductionAccount->id,
+                'input_tax_account_id' => $inputTaxAccount->id,
+                'subcontract_advance_account_id' => $advanceAccount->id,
                 'cash_account_id' => $cashAccount->id,
                 'created_by' => $user->id,
                 'updated_by' => $user->id,
@@ -114,6 +120,21 @@ class ConstructionSubcontractWorkflowTest extends TestCase
             'description' => 'Locked attempt', 'calculation_type' => 'unit', 'quantity' => 1, 'unit_rate' => 1,
         ])->assertStatus(422);
         $this->delete(route('construction.subcontractors.destroy', $contract->id))->assertStatus(422);
+
+        $this->post(route('construction.subcontractors.advances.store', $contract->id), [
+            'advance_date' => now()->toDateString(), 'amount' => 1000, 'method' => 'cash',
+            'accounting_account_id' => $cashAccount->id, 'reference_no' => 'ADV-TEST',
+        ])->assertRedirect();
+        $advance = ConstructionSubcontractAdvance::where('subcontract_id', $contract->id)->firstOrFail();
+        $advancePosting = ConstructionAccountingPosting::where('source_type', 'subcontract_advance')
+            ->where('source_id', $advance->id)->where('event', 'recorded')->firstOrFail();
+        $advanceLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $advancePosting->accounting_mapping_id)
+            ->get()->keyBy('map_type');
+        $this->assertEquals(1000, (float) $advanceLines['construction_subcontract_advance']->amount);
+        $this->assertSame('debit', $advanceLines['construction_subcontract_advance']->type);
+        $this->assertEquals(1000, (float) $advanceLines['construction_subcontract_advance_cash']->amount);
+        $this->assertSame('credit', $advanceLines['construction_subcontract_advance_cash']->type);
+        $this->assertEquals(1000, $contract->advanceRemaining());
 
         $this->post(route('construction.subcontractors.certificates.store', $contract->id), [
             'certificate_date' => now()->toDateString(),
@@ -312,5 +333,47 @@ class ConstructionSubcontractWorkflowTest extends TestCase
             'items' => [$secondItem->id => 8],
         ])->assertRedirect()->assertSessionHasErrors('items.'.$secondItem->id);
         $this->assertEquals(0, (float) $secondItem->fresh()->current_quantity);
+
+        $this->put(route('construction.subcontractors.certificates.update', [$contract->id, $second->id]), [
+            'certificate_date' => now()->addDay()->toDateString(),
+            'tax_percent' => 15, 'advance_recovery_value' => 500, 'other_deductions' => 0,
+            'items' => [$secondItem->id => 1],
+        ])->assertRedirect();
+        $second->refresh();
+        $this->assertEquals(700, (float) $second->gross_value);
+        $this->assertEquals(105, (float) $second->tax_value);
+        $this->assertEquals(35, (float) $second->retention_value);
+        $this->assertEquals(500, (float) $second->advance_recovery_value);
+        $this->assertEquals(270, (float) $second->net_value);
+        $this->post(route('construction.subcontractors.certificates.approve', [$contract->id, $second->id]))->assertRedirect();
+        $secondPosting = ConstructionAccountingPosting::where('source_type', 'subcontract_certificate')
+            ->where('source_id', $second->id)->where('event', 'approval')->firstOrFail();
+        $secondLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $secondPosting->accounting_mapping_id)
+            ->get()->keyBy('map_type');
+        $this->assertEquals(105, (float) $secondLines['construction_subcontract_input_tax']->amount);
+        $this->assertSame('debit', $secondLines['construction_subcontract_input_tax']->type);
+        $this->assertEquals(500, (float) $secondLines['construction_subcontract_advance_recovery']->amount);
+        $this->assertSame('credit', $secondLines['construction_subcontract_advance_recovery']->type);
+        $this->assertEquals(805, (float) $secondLines->where('type', 'debit')->sum('amount'));
+        $this->assertEquals(805, (float) $secondLines->where('type', 'credit')->sum('amount'));
+        $this->assertEquals(500, $contract->advanceRemaining());
+
+        $user->update(['password' => Hash::make('Test-pass-123')]);
+        $this->post(route('construction.subcontractors.advances.store', $contract->id), [
+            'advance_date' => now()->toDateString(), 'amount' => 100, 'method' => 'cash',
+            'accounting_account_id' => $cashAccount->id,
+        ])->assertRedirect();
+        $cancelledAdvance = ConstructionSubcontractAdvance::where('subcontract_id', $contract->id)->latest('id')->firstOrFail();
+        $this->post(route('construction.subcontractors.advances.cancel', [$contract->id, $cancelledAdvance->id]), [
+            'current_password' => 'Test-pass-123', 'cancellation_reason' => 'Duplicate advance entry',
+        ])->assertRedirect();
+        $this->assertSame('cancelled', $cancelledAdvance->fresh()->status);
+        $this->assertDatabaseHas('construction_accounting_postings', [
+            'source_type' => 'subcontract_advance', 'source_id' => $cancelledAdvance->id, 'event' => 'cancelled',
+        ]);
+        $this->post(route('construction.subcontractors.advances.cancel', [$contract->id, $advance->id]), [
+            'current_password' => 'Test-pass-123', 'cancellation_reason' => 'Cannot cancel recovered advance',
+        ])->assertRedirect()->assertSessionHasErrors('cancellation_reason');
+        $this->assertSame('recorded', $advance->fresh()->status);
     }
 }

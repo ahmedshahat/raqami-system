@@ -17,6 +17,7 @@ use App\Utils\TransactionUtil;
 use DB;
 use Excel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Yajra\DataTables\Facades\DataTables;
@@ -476,6 +477,9 @@ class ExpenseController extends Controller
         $expense = Transaction::where('business_id', $business_id)
                                 ->where('id', $id)
                                 ->first();
+        if ($expense && $this->isConstructionExpenseLocked($expense->id)) {
+            abort(422, __('construction::lang.posted_project_expense_locked'));
+        }
 
         $users = User::forDropdown($business_id, true, true);
 
@@ -519,6 +523,10 @@ class ExpenseController extends Controller
         }
 
         $business_id = $request->session()->get('user.business_id');
+        $existingExpense = Transaction::where('business_id', $business_id)->findOrFail($id);
+        if ($this->isConstructionExpenseLocked($existingExpense->id)) {
+            abort(422, __('construction::lang.posted_project_expense_locked'));
+        }
         $this->validateConstructionLink($request, $business_id);
 
         try {
@@ -673,6 +681,29 @@ class ExpenseController extends Controller
             || auth()->user()->can('construction.boq.view');
     }
 
+    private function isConstructionExpenseLocked(int $transactionId): bool
+    {
+        // Keep the base Expenses module independent when Construction is absent.
+        if (! $this->moduleUtil->isModuleInstalled('Construction')
+            || ! Schema::hasTable('construction_expense_cancellations')) {
+            return false;
+        }
+
+        if (Schema::hasTable('accounting_accounts_transactions')
+            && DB::table('accounting_accounts_transactions')->where('transaction_id', $transactionId)
+            ->whereNotNull('construction_project_id')->exists()) {
+            return true;
+        }
+
+        return DB::table('construction_expense_cancellations')
+            ->where(function ($query) use ($transactionId) {
+                $query->where('expense_transaction_id', $transactionId);
+                if (Schema::hasColumn('construction_expense_cancellations', 'refund_transaction_id')) {
+                    $query->orWhere('refund_transaction_id', $transactionId);
+                }
+            })->exists();
+    }
+
     /**
      * Remove the specified resource from storage.
      *
@@ -696,6 +727,10 @@ class ExpenseController extends Controller
                     })
                     ->where('id', $id)
                     ->first();
+
+                if ($expense && $this->isConstructionExpenseLocked($expense->id)) {
+                    return ['success' => false, 'msg' => __('construction::lang.posted_project_expense_locked')];
+                }
 
                 //Delete Cash register transactions
                 $expense->cash_register_payments()->delete();

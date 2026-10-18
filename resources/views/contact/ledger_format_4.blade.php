@@ -83,6 +83,7 @@
     @if(!empty($for_pdf))
     <br>
     @endif
+    @include('contact.partials.ledger_pending_cheques')
     <p class="text-center" style="text-align: center;"><strong>@lang('lang_v1.ledger_table_heading', ['start_date' => $ledger_details['start_date'], 'end_date' => $ledger_details['end_date']])</strong></p>
     <div class="table-responsive">
         <table class="table @if(!empty($for_pdf)) table-pdf td-border @endif" id="ledger_table">

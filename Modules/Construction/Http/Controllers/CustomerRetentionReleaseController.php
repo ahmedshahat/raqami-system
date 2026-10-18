@@ -16,7 +16,7 @@ class CustomerRetentionReleaseController extends BaseController
 {
     public function store(Request $request, int $project, int $certificate)
     {
-        $this->authorizePermission('construction.certificate.manage');
+        $this->authorizePermission('construction.payment.record');
         [$project, $certificate] = $this->findCertificate($project, $certificate);
         abort_unless($certificate->invoice_transaction_id && $certificate->accountingPosting, 422, __('construction::lang.customer_retention_release_requires_invoice'));
         $this->normalizeBusinessDates($request, ['release_date']);
@@ -65,7 +65,7 @@ class CustomerRetentionReleaseController extends BaseController
 
     public function cancel(Request $request, int $project, int $certificate, int $release)
     {
-        $this->authorizePermission('construction.certificate.manage');
+        $this->authorizePermission('construction.cancel');
         $validated = $request->validate(['cancellation_reason' => ['required', 'string', 'max:1000']]);
         [$project, $certificate] = $this->findCertificate($project, $certificate);
 

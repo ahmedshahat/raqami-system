@@ -8,6 +8,8 @@ use App\BusinessLocation;
 use App\CashDenomination;
 use App\Contact;
 use App\Currency;
+use App\Events\OpeningBalanceCreatedOrModified;
+use App\Events\SellCreatedOrModified;
 use App\Events\TransactionPaymentAdded;
 use App\Events\TransactionPaymentDeleted;
 use App\Events\TransactionPaymentUpdated;
@@ -730,6 +732,27 @@ class TransactionUtil extends Util
                 if ($payment['method'] == 'advance' && $payment_amount > $contact_balance) {
                     throw new AdvanceBalanceNotAvailable(__('lang_v1.required_advance_balance_not_available'));
                 }
+                //Cheques on sells / purchases go to the cheques register, not to payments, until collected.
+                $cheque_type = \App\Cheque::typeForTransaction($transaction->type);
+                if ($payment_amount > 0 && $payment['method'] == 'cheque' && ! empty($cheque_type) && empty($payment['is_return'])) {
+                    if (! empty($payment['paid_on'])) {
+                        $cheque_received_on = $uf_data ? $this->uf_date($payment['paid_on'], true) : $payment['paid_on'];
+                    } else {
+                        $cheque_received_on = \Carbon::now()->toDateTimeString();
+                    }
+                    \App\Cheque::register($transaction->business_id, $cheque_type, $transaction->contact_id, $transaction, [
+                        'amount' => $payment_amount,
+                        'cheque_number' => $payment['cheque_number'] ?? null,
+                        'cheque_bank_name' => $payment['cheque_bank_name'] ?? null,
+                        'cheque_due_date' => $payment['cheque_due_date'] ?? null,
+                        'paid_on' => $cheque_received_on,
+                        'account_id' => $payment['account_id'] ?? null,
+                        'note' => $payment['note'] ?? null,
+                    ], $user_id);
+
+                    continue;
+                }
+
                 //If amount is 0 then skip.
                 if ($payment_amount != 0) {
                     $prefix_type = 'sell_payment';
@@ -4276,7 +4299,10 @@ class TransactionUtil extends Util
         //Generate reference number
         $ob_data['ref_no'] = $this->generateReferenceNumber('opening_balance', $ob_ref_count, $business_id);
         //Create opening balance transaction
-        Transaction::create($ob_data);
+        $transaction = Transaction::create($ob_data);
+        event(new OpeningBalanceCreatedOrModified($transaction));
+
+        return $transaction;
     }
 
     /**
@@ -5001,6 +5027,11 @@ class TransactionUtil extends Util
                     event(new TransactionPaymentDeleted($payment));
                 }
             }
+
+            // Dispatch deletion from the central sale deletion path so every
+            // caller (POS, direct sales and import rollback) removes the
+            // related accounting-module entries.
+            SellCreatedOrModified::dispatch($transaction, true);
         }
 
         $output = [
@@ -5182,6 +5213,7 @@ class TransactionUtil extends Util
                 )
                 ->select(
                     'transactions.id',
+                    'transactions.source',
                     'transactions.transaction_date',
                     'transactions.type',
                     'transactions.is_direct_sale',

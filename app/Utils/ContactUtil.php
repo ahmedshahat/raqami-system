@@ -3,6 +3,7 @@
 namespace App\Utils;
 
 use App\Contact;
+use App\Events\OpeningBalanceCreatedOrModified;
 use App\Transaction;
 use DB;
 
@@ -193,6 +194,7 @@ class ContactUtil extends Util
                 $ob_transaction->save();
                 //Update opening balance payment status
                 $transactionUtil->updatePaymentStatus($ob_transaction->id, $ob_transaction->final_total);
+                event(new OpeningBalanceCreatedOrModified($ob_transaction->fresh()));
             } else {
                 //Add opening balance
                 if (! empty($opening_balance)) {

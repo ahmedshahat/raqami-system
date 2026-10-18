@@ -6,9 +6,11 @@ use App\Account;
 use App\User;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Accounting\Entities\AccountingAccount;
+use Modules\Construction\Support\ProtectsPostedConstructionDocument;
 
 class ConstructionSubcontractPayment extends Model
 {
+    use ProtectsPostedConstructionDocument;
     protected $table = 'construction_subcontract_payments';
     protected $guarded = ['id'];
     protected $casts = ['payment_date' => 'date', 'amount' => 'decimal:4', 'cancelled_at' => 'datetime'];
@@ -23,6 +25,12 @@ class ConstructionSubcontractPayment extends Model
             ->where('source_type', 'subcontract_payment')
             ->where('event', 'recorded');
     }
+    public function cancellationAccountingPosting()
+    {
+        return $this->hasOne(ConstructionAccountingPosting::class, 'source_id')
+            ->where('source_type', 'subcontract_payment')->where('event', 'cancelled');
+    }
     public function createdBy() { return $this->belongsTo(User::class, 'created_by'); }
     public function isActive(): bool { return $this->status === 'recorded'; }
+    protected function constructionAccountingSourceType(): string { return 'subcontract_payment'; }
 }

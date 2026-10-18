@@ -825,6 +825,16 @@ class SellPosController extends Controller
             return $this->moduleUtil->expiredResponse();
         }
 
+        $protected_transaction = Transaction::where('business_id', $business_id)
+            ->where('type', 'sell')
+            ->findOrFail($id);
+        if ($protected_transaction->source === 'construction_certificate' && ! request()->routeIs('edit-pos-payment')) {
+            return redirect()->action([SellController::class, 'index'])->with('status', [
+                'success' => 0,
+                'msg' => __('construction::lang.construction_invoice_locked'),
+            ]);
+        }
+
         //Check if the transaction can be edited or not.
         $edit_days = request()->session()->get('business.transaction_edit_days');
         if (!$this->transactionUtil->canBeEdited($id, $edit_days)) {
@@ -1135,6 +1145,15 @@ class SellPosController extends Controller
         if (!auth()->user()->can('sell.update') && !auth()->user()->can('direct_sell.access') &&
             !auth()->user()->can('so.update') && !auth()->user()->can('edit_pos_payment')) {
             abort(403, 'Unauthorized action.');
+        }
+
+        $business_id = $request->session()->get('user.business_id');
+        $protected_transaction = Transaction::where('business_id', $business_id)->findOrFail($id);
+        if ($protected_transaction->source === 'construction_certificate' && $request->has('products')) {
+            return redirect()->action([SellController::class, 'index'])->with('status', [
+                'success' => 0,
+                'msg' => __('construction::lang.construction_invoice_locked'),
+            ]);
         }
 
         try {
@@ -1596,6 +1615,14 @@ class SellPosController extends Controller
                 DB::beginTransaction();
 
                 $transaction = Transaction::where('business_id', $business_id)->findOrFail($id);
+                if ($transaction->source === 'construction_certificate') {
+                    DB::rollBack();
+
+                    return [
+                        'success' => false,
+                        'msg' => __('construction::lang.construction_invoice_locked'),
+                    ];
+                }
                 $output = $this->transactionUtil->deleteSale($business_id, $id);
                 SellCreatedOrModified::dispatch($transaction, true);
 

@@ -13,13 +13,13 @@ class RetentionGuaranteesReportController extends BaseController
 {
     public function index(Request $request, RetentionGuaranteesReport $reportBuilder)
     {
-        $this->authorizePermission('construction.access');
+        $this->authorizePermission('construction.reports.view');
         return view('construction::dashboard.retention-guarantees', $this->reportData($request, $reportBuilder));
     }
 
     public function print(Request $request, RetentionGuaranteesReport $reportBuilder)
     {
-        $this->authorizePermission('construction.access');
+        $this->authorizePermission('construction.reports.view');
         $data = $this->reportData($request, $reportBuilder);
         $data['business'] = Business::findOrFail($this->businessId());
         $data['businessLocation'] = BusinessLocation::where('business_id', $this->businessId())->active()->orderBy('id')->first();

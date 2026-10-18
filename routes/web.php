@@ -339,6 +339,11 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('/payments/add_payment/{transaction_id}', [TransactionPaymentController::class, 'addPayment']);
     Route::get('/payments/pay-contact-due/{contact_id}', [TransactionPaymentController::class, 'getPayContactDue']);
     Route::post('/payments/pay-contact-due', [TransactionPaymentController::class, 'postPayContactDue']);
+
+    Route::get('/cheques', [\App\Http\Controllers\ChequeController::class, 'index']);
+    Route::get('/cheques/data/{type}', [\App\Http\Controllers\ChequeController::class, 'data'])->where('type', 'receivable|payable');
+    Route::get('/cheques/{id}/{action}', [\App\Http\Controllers\ChequeController::class, 'actionForm'])->where(['id' => '[0-9]+', 'action' => 'collect|bounce|cancel']);
+    Route::post('/cheques/{id}/{action}', [\App\Http\Controllers\ChequeController::class, 'performAction'])->where(['id' => '[0-9]+', 'action' => 'collect|bounce|cancel']);
     Route::resource('payments', TransactionPaymentController::class);
 
     //Printers...

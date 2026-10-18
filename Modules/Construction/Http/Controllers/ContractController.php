@@ -19,6 +19,11 @@ class ContractController extends BaseController
         $this->authorizePermission('construction.contract.view');
 
         $businessId = $this->businessId();
+        $search = trim((string) $request->input('q'));
+        $status = (string) $request->input('status');
+        if (! in_array($status, ['draft', 'active'], true)) {
+            $status = '';
+        }
         $contractSummary = ConstructionContract::query()
             ->where('business_id', $businessId)
             ->selectRaw('COUNT(*) as contracts_count')
@@ -32,10 +37,22 @@ class ContractController extends BaseController
         $contracts = ConstructionContract::query()
             ->where('business_id', $businessId)
             ->with('project:id,business_id,code,name,status')
+            ->when($search !== '', function ($query) use ($search) {
+                $like = '%'.$search.'%';
+                $query->where(function ($nested) use ($like) {
+                    $nested->where('contract_number', 'like', $like)
+                        ->orWhere('title', 'like', $like)
+                        ->orWhereHas('project', fn ($project) => $project
+                            ->where('name', 'like', $like)
+                            ->orWhere('code', 'like', $like));
+                });
+            })
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->latest('id')
-            ->paginate(20);
+            ->paginate(20)
+            ->appends($request->only(['q', 'status']));
 
-        return view('construction::contracts.index', compact('contractSummary', 'contracts'));
+        return view('construction::contracts.index', compact('contractSummary', 'contracts', 'search', 'status'));
     }
 
     public function create(int $project)

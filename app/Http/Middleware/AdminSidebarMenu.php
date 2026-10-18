@@ -386,6 +386,14 @@ class AdminSidebarMenu
                             );
                         }
 
+                        if (auth()->user()->can('sell.payments')) {
+                            $sub->url(
+                                action([\App\Http\Controllers\ChequeController::class, 'index']).'?tab=receivable',
+                                __('cheque.cheques_register'),
+                                ['icon' => '', 'active' => request()->segment(1) == 'cheques']
+                            );
+                        }
+
                         if ($is_admin || auth()->user()->hasAnyPermission(['access_shipping', 'access_own_shipping', 'access_commission_agent_shipping'])) {
                             $sub->url(
                                 action([\App\Http\Controllers\SellController::class, 'shipments']),
@@ -689,6 +697,13 @@ class AdminSidebarMenu
                                 action([\App\Http\Controllers\ReportController::class, 'sellPaymentReport']),
                                 __('lang_v1.sell_payment_report'),
                                 ['icon' => '', 'active' => request()->segment(2) == 'sell-payment-report']
+                            );
+                        }
+                        if (auth()->user()->can('sell.payments') || auth()->user()->can('purchase.payments')) {
+                            $sub->url(
+                                action([\App\Http\Controllers\ChequeController::class, 'index']),
+                                __('cheque.cheques_report'),
+                                ['icon' => '', 'active' => request()->segment(1) == 'cheques']
                             );
                         }
                         if (in_array('expenses', $enabled_modules) && auth()->user()->can('expense_report.view')) {

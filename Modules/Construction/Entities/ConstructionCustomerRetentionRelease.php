@@ -4,9 +4,11 @@ namespace Modules\Construction\Entities;
 
 use App\User;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Construction\Support\ProtectsPostedConstructionDocument;
 
 class ConstructionCustomerRetentionRelease extends Model
 {
+    use ProtectsPostedConstructionDocument;
     protected $table = 'construction_customer_retention_releases';
     protected $guarded = ['id'];
     protected $casts = ['release_date' => 'date', 'amount' => 'decimal:4', 'cancelled_at' => 'datetime'];
@@ -26,4 +28,5 @@ class ConstructionCustomerRetentionRelease extends Model
             ->where('source_type', 'customer_retention_release')->where('event', 'cancelled');
     }
     public function isActive(): bool { return $this->status === 'recorded'; }
+    protected function constructionAccountingSourceType(): string { return 'customer_retention_release'; }
 }

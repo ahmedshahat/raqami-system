@@ -4,9 +4,11 @@ namespace Modules\Construction\Entities;
 
 use App\User;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Construction\Support\ProtectsPostedConstructionDocument;
 
 class ConstructionCustomerCertificate extends Model
 {
+    use ProtectsPostedConstructionDocument;
     public const STATUSES = ['draft', 'submitted', 'partially_approved', 'approved', 'posted', 'paid', 'cancelled'];
 
     protected $table = 'construction_customer_certificates';
@@ -55,11 +57,23 @@ class ConstructionCustomerCertificate extends Model
         return $this->belongsTo(\App\Transaction::class, 'invoice_transaction_id');
     }
 
+    public function creditNote()
+    {
+        return $this->belongsTo(\App\Transaction::class, 'credit_note_transaction_id');
+    }
+
     public function accountingPosting()
     {
         return $this->hasOne(ConstructionAccountingPosting::class, 'source_id')
             ->where('source_type', 'customer_certificate')
             ->where('event', 'invoiced');
+    }
+
+    public function cancellationAccountingPosting()
+    {
+        return $this->hasOne(ConstructionAccountingPosting::class, 'source_id')
+            ->where('source_type', 'customer_certificate')
+            ->where('event', 'cancelled');
     }
 
     public function items()
@@ -101,6 +115,7 @@ class ConstructionCustomerCertificate extends Model
     {
         return $this->status === 'draft';
     }
+    protected function constructionAccountingSourceType(): string { return 'customer_certificate'; }
 
     public function recalculate(bool $useApproved = false): void
     {

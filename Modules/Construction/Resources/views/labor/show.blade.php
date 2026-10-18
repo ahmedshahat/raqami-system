@@ -24,6 +24,20 @@
             </div>
         </div>
         <div class="ct-document-actions">
+            @if($sheet->accountingPosting?->mapping)
+            @can('construction.accounting.view')
+                    <button type="button" class="btn btn-success btn-modal" data-href="{{ route('journal-entry.show', $sheet->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal">
+                        <i class="fa fa-book"></i> @lang('construction::lang.view_accounting_entry')
+                    </button>
+                @endcan
+            @endif
+            @if($sheet->cancellationAccountingPosting?->mapping)
+            @can('construction.accounting.view')
+                    <button type="button" class="btn btn-default btn-modal" data-href="{{ route('journal-entry.show', $sheet->cancellationAccountingPosting->accounting_mapping_id) }}" data-container=".view_modal">
+                        <i class="fa fa-undo"></i> @lang('construction::lang.view_reversal_accounting_entry')
+                    </button>
+                @endcan
+            @endif
             <a href="{{ route('construction.labor.preview', $sheet->id) }}" target="_blank" class="btn btn-default">
                 <i class="fa fa-eye"></i> @lang('construction::lang.print_preview')
             </a>
@@ -37,7 +51,7 @@
                     </a>
                 @endcan
             @endif
-            @if($sheet->status === 'approved' && $canCancelApproved)
+            @if($sheet->status === 'approved' && $canCancelApproved && $paidValue <= 0.0001)
                 <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#cancel-labor-sheet">
                     <i class="fa fa-ban"></i> @lang('construction::lang.cancel_approved_labor_sheet')
                 </button>
@@ -221,7 +235,95 @@
             @endcan
         @endif
     </div>
+
+    @if(in_array($sheet->status, ['approved', 'cancelled'], true))
+        <div class="ct-document-summary">
+            <div><span><i class="fa fa-file-invoice-dollar"></i></span><small>@lang('construction::lang.sheet_value')</small><strong>@include('construction::partials.money', ['value' => $sheet->totalCost()])</strong></div>
+            <div><span><i class="fa fa-money-check-alt"></i></span><small>@lang('construction::lang.paid_amount')</small><strong>@include('construction::partials.money', ['value' => $paidValue])</strong></div>
+            <div><span><i class="fa fa-hourglass-half"></i></span><small>@lang('construction::lang.remaining_amount')</small><strong>@include('construction::partials.money', ['value' => $remainingValue])</strong></div>
+            <div><span><i class="fa fa-info-circle"></i></span><small>@lang('construction::lang.payment_status')</small><strong>@lang('construction::lang.payment_status_'.$paymentStatus)</strong></div>
+        </div>
+
+        <div class="ct-material-panel ct-subcert-payments-panel">
+            <div class="ct-panel-heading">
+                <div>
+                    <h2>@lang('construction::lang.labor_payments')</h2>
+                    <p>@lang('construction::lang.labor_payment_accounting_notice')</p>
+                </div>
+                @if($sheet->status === 'approved' && $remainingValue > 0.0001 && $laborAccountingReady)
+                    @can('construction.payment.record')
+                        <button class="btn ct-primary-action" data-toggle="modal" data-target="#record-labor-payment"><i class="fa fa-money-bill-wave"></i> @lang('construction::lang.record_payment')</button>
+                    @endcan
+                @endif
+            </div>
+            @if($sheet->status === 'approved' && ! $laborAccountingReady)
+                <div class="ct-context-banner is-note"><i class="fa fa-exclamation-triangle"></i><span>@lang('construction::lang.labor_accounting_setup_notice') <a href="{{ route('construction.settings.accounting.index') }}">@lang('construction::lang.manage_construction_settings')</a></span></div>
+            @endif
+            <div class="table-responsive">
+                <table class="table ct-material-table">
+                    <thead><tr><th>@lang('construction::lang.payment_number')</th><th>@lang('construction::lang.payment_date')</th><th>@lang('construction::lang.payment_amount')</th><th>@lang('construction::lang.payment_method')</th><th>@lang('construction::lang.account')</th><th>@lang('construction::lang.payment_reference')</th><th>@lang('construction::lang.operations')</th></tr></thead>
+                    <tbody>
+                        @forelse($sheet->payments as $payment)
+                            <tr>
+                                <td><strong dir="ltr">{{ $payment->number }}</strong></td>
+                                <td>{{ @format_date($payment->payment_date) }}</td>
+                                <td><strong>@include('construction::partials.money', ['value' => $payment->amount])</strong></td>
+                                <td>{{ $paymentTypes[$payment->method] ?? $payment->method }}</td>
+                                <td>{{ $payment->accountingAccount?->name ?: '—' }}</td>
+                                <td>{{ $payment->reference_no ?: '—' }}</td>
+                                <td>
+                                    @if($payment->accountingPosting?->mapping)
+                                        @can('construction.accounting.view')
+                                            <button type="button" class="btn btn-xs btn-success btn-modal" data-href="{{ route('journal-entry.show', $payment->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_accounting_entry')"><i class="fa fa-book"></i></button>
+                                        @endcan
+                                    @endif
+                                    @if($payment->cancellationAccountingPosting?->mapping)
+                                        @can('construction.accounting.view')<button type="button" class="btn btn-xs btn-default btn-modal" data-href="{{ route('journal-entry.show', $payment->cancellationAccountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_reversal_accounting_entry')"><i class="fa fa-undo"></i></button>@endcan
+                                    @endif
+                                    @if($payment->isActive())
+                                        @can('construction.cancel')<button type="button" class="btn btn-xs btn-danger js-cancel-payment" data-toggle="modal" data-target="#cancel-payment" data-action="{{ route('construction.labor.payments.cancel', [$sheet->id, $payment->id]) }}"><i class="fa fa-ban"></i></button>@endcan
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="7"><div class="ct-empty-state is-compact"><span><i class="fa fa-money-check-alt"></i></span><strong>@lang('construction::lang.no_labor_payments')</strong></div></td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
 </section>
+
+@if($sheet->status === 'approved' && $remainingValue > 0.0001 && $laborAccountingReady && auth()->user()->can('construction.payment.record'))
+    <div class="modal fade" id="record-labor-payment">
+        <div class="modal-dialog">
+            <div class="modal-content ct-modern-modal">
+                <form method="POST" action="{{ route('construction.labor.payments.store', $sheet->id) }}">
+                    @csrf
+                    <div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4><i class="fa fa-money-bill-wave"></i> @lang('construction::lang.record_payment')</h4></div>
+                    <div class="modal-body">
+                        <div class="ct-payment-balance"><small>@lang('construction::lang.remaining_amount')</small><strong>@include('construction::partials.money', ['value' => $remainingValue])</strong></div>
+                        <div class="row">
+                            <div class="col-md-6 form-group"><label>@lang('construction::lang.payment_date') *</label><input name="payment_date" value="{{ old('payment_date', @format_date(now())) }}" class="form-control ct-date-picker" readonly required></div>
+                            <div class="col-md-6 form-group {{ $errors->has('amount') ? 'has-error' : '' }}"><label>@lang('construction::lang.payment_amount') *</label><input name="amount" value="{{ old('amount', @num_format($remainingValue)) }}" class="form-control input_number" required>@error('amount')<small class="help-block">{{ $message }}</small>@enderror</div>
+                            <div class="col-md-6 form-group"><label>@lang('construction::lang.payment_method') *</label><select name="method" class="form-control" required>@foreach($paymentTypes as $key => $label)<option value="{{ $key }}" @selected(old('method', 'cash') === $key)>{{ $label }}</option>@endforeach</select></div>
+                            <div class="col-md-6 form-group {{ $errors->has('accounting_account_id') ? 'has-error' : '' }}"><label>@lang('construction::lang.payment_account') *</label><select name="accounting_account_id" class="form-control select2" required><option value="">@lang('construction::lang.select_cash_bank_account')</option>@foreach($accountingPaymentAccounts as $id => $name)<option value="{{ $id }}" @selected((string) old('accounting_account_id', $accountingSettings->cash_account_id) === (string) $id)>{{ $name }}</option>@endforeach</select>@error('accounting_account_id')<small class="help-block">{{ $message }}</small>@enderror</div>
+                            <div class="col-md-12 form-group"><label>@lang('construction::lang.payment_reference')</label><input name="reference_no" value="{{ old('reference_no') }}" class="form-control" maxlength="120"></div>
+                            <div class="col-md-12 form-group"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea></div>
+                        </div>
+                        <div class="ct-context-banner"><i class="fa fa-info-circle"></i><span>@lang('construction::lang.labor_payment_accounting_notice')</span></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn ct-primary-action"><i class="fa fa-save"></i> @lang('construction::lang.record_payment')</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endif
+
+@if(in_array($sheet->status, ['approved', 'cancelled'], true))
+    <div class="modal fade" id="cancel-payment"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4>@lang('construction::lang.cancel_posted_payment')</h4></div><div class="modal-body"><div class="form-group"><label>@lang('construction::lang.cancellation_reason') *</label><textarea name="cancellation_reason" class="form-control" rows="4" required minlength="5"></textarea></div><div class="form-group"><label>@lang('construction::lang.manager_password') *</label><input type="password" name="current_password" class="form-control" required></div><div class="alert alert-warning">@lang('construction::lang.cancellation_creates_reversal_notice')</div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn btn-danger">@lang('construction::lang.confirm_cancellation')</button></div></form></div></div></div>
+@endif
 
 @if($sheet->status === 'approved' && $canCancelApproved)
     <div class="modal fade" id="cancel-labor-sheet" tabindex="-1">
@@ -372,6 +474,9 @@
             $(document).on('change', '.ct-labor-type', function () {
                 syncLaborQuantityLabel($(this));
             });
+            $(document).on('click', '.js-cancel-payment', function () {
+                $('#cancel-payment form').attr('action', $(this).data('action'));
+            });
         });
     </script>
 @endpush
@@ -379,5 +484,11 @@
 @if(($sheet->status === 'approved' && $canCancelApproved && request()->boolean('cancel')) || $errors->has('current_password') || $errors->has('cancellation_reason'))
     @push('ct_quick_js')
         <script>$(function () { $('#cancel-labor-sheet').modal('show'); });</script>
+    @endpush
+@endif
+
+@if($errors->has('amount') || $errors->has('accounting_account_id') || $errors->has('payment_date') || $errors->has('method'))
+    @push('ct_quick_js')
+        <script>$(function () { $('#record-labor-payment').modal('show'); });</script>
     @endpush
 @endif

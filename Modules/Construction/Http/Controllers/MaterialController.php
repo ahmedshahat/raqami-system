@@ -20,6 +20,7 @@ use Modules\Construction\Entities\ConstructionBoqItem;
 use Modules\Construction\Entities\ConstructionMaterialDocument;
 use Modules\Construction\Entities\ConstructionMaterialDocumentLine;
 use Modules\Construction\Entities\ConstructionProject;
+use Modules\Construction\Support\ConstructionAccountingPoster;
 
 class MaterialController extends BaseController
 {
@@ -151,6 +152,7 @@ class MaterialController extends BaseController
             'project:id,code,name', 'location:id,name', 'parentIssue:id,number',
             'lines.product.unit', 'lines.variation.product_variation', 'lines.boqItem:id,code,description',
             'approvedBy:id,surname,first_name,last_name,username',
+            'accountingPosting.mapping',
         ]);
 
         $products = collect();
@@ -277,6 +279,7 @@ class MaterialController extends BaseController
                     throw ValidationException::withMessages(['lines' => __('construction::lang.material_document_empty')]);
                 }
                 $document->type === 'issue' ? $this->approveIssue($document, $lines) : $this->approveReturn($document, $lines);
+                app(ConstructionAccountingPoster::class)->postMaterialDocumentApproval($document);
                 $document->update(['status' => 'approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
             });
         } catch (ValidationException $exception) {

@@ -70,6 +70,8 @@ class ProjectFinancialPositionReport
             ->where('business_id', $project->business_id)
             ->where('construction_project_id', $project->id)
             ->whereIn('type', ['expense', 'expense_refund'])
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('construction_expense_cancellations as expense_cancellations')
+                ->whereColumn('expense_cancellations.expense_transaction_id', 'transactions.id'))
             ->whereDate('transaction_date', '<=', $toDate)
             ->when($fromDate, fn ($query) => $query->whereDate('transaction_date', '>=', $fromDate))
             ->selectRaw("COALESCE(SUM(CASE WHEN type = 'expense_refund' THEN -final_total ELSE final_total END), 0) as total")

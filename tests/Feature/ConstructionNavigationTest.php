@@ -237,6 +237,44 @@ class ConstructionNavigationTest extends TestCase
         $this->assertStringContainsString(route('construction.projects.contracts.preview', [$project->id, $contract->id]), $html);
     }
 
+    public function test_projects_page_shows_delete_action_only_for_deletable_drafts(): void
+    {
+        $business = Business::whereHas('locations')->whereIn('id', Unit::select('business_id'))->firstOrFail();
+        $user = User::findOrFail($business->owner_id);
+        $customer = Contact::where('business_id', $business->id)->whereIn('type', ['customer', 'both'])->firstOrFail();
+        $this->actingAs($user);
+        $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+        $_SERVER['HTTP_USER_AGENT'] = 'PHPUnit';
+
+        $draft = ConstructionProject::create([
+            'business_id' => $business->id,
+            'code' => 'TEST-DELETE-DRAFT-'.uniqid(),
+            'name' => 'Deletable draft project',
+            'customer_id' => $customer->id,
+            'status' => 'draft',
+            'created_by' => $user->id,
+        ]);
+        $active = ConstructionProject::create([
+            'business_id' => $business->id,
+            'code' => 'TEST-DELETE-ACTIVE-'.uniqid(),
+            'name' => 'Protected active project',
+            'customer_id' => $customer->id,
+            'status' => 'active',
+            'created_by' => $user->id,
+        ]);
+
+        $html = $this->get(route('construction.projects.index'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('action="'.route('construction.projects.destroy', $draft->id).'"', $html);
+        $this->assertStringNotContainsString('action="'.route('construction.projects.destroy', $active->id).'"', $html);
+        $this->assertStringContainsString('ct-row-action--danger', $html);
+        $this->assertStringContainsString('onsubmit="return confirm(', $html);
+
+        $this->delete(route('construction.projects.destroy', $draft->id))
+            ->assertRedirect(route('construction.projects.index'));
+        $this->assertSoftDeleted('construction_projects', ['id' => $draft->id]);
+    }
+
     public function test_module_root_redirects_to_the_independent_overview_page(): void
     {
         $business = Business::whereHas('locations')->whereIn('id', Unit::select('business_id'))->firstOrFail();

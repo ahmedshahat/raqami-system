@@ -3,10 +3,10 @@
 namespace Tests\Feature;
 
 use App\Business;
+use App\Unit;
 use App\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\Construction\Entities\ConstructionAccountingSetting;
-use Modules\Construction\Entities\ConstructionProject;
 use Tests\TestCase;
 
 class ConstructionAccountingSettingsTest extends TestCase
@@ -15,8 +15,11 @@ class ConstructionAccountingSettingsTest extends TestCase
 
     public function test_construction_accounts_are_created_linked_and_not_duplicated(): void
     {
-        $project = ConstructionProject::query()->firstOrFail();
-        $business = Business::findOrFail($project->business_id);
+        // The module must be testable on a clean company before its first project
+        // is created; accounting setup is a prerequisite, not project data.
+        $business = Business::whereHas('locations')
+            ->whereIn('id', Unit::select('business_id'))
+            ->firstOrFail();
         $user = User::findOrFail($business->owner_id);
         $this->actingAs($user);
         $_SERVER['REMOTE_ADDR'] = '127.0.0.1';

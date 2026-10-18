@@ -52,6 +52,26 @@
 			{!! Form::text("cheque_number", $payment_line->cheque_number, ['class' => 'form-control', 'placeholder' => __('lang_v1.cheque_no')]); !!}
 		</div>
 	</div>
+	@php
+		$cheque_register_type = isset($transaction) ? \App\Cheque::typeForTransaction($transaction->type) : (isset($due_payment_type) ? \App\Cheque::typeForTransaction($due_payment_type) : null);
+	@endphp
+	@if(empty($payment_line->id) && !empty($cheque_register_type))
+	<div class="col-md-6">
+		<div class="form-group">
+			{!! Form::label("cheque_due_date", __('cheque.cheque_due_date') . ':*') !!}
+			<input type="date" name="cheque_due_date" id="cheque_due_date" class="form-control" value="{{ \Carbon::now()->format('Y-m-d') }}">
+		</div>
+	</div>
+	<div class="col-md-6">
+		<div class="form-group">
+			{!! Form::label("cheque_bank_name", __('cheque.bank_name')) !!}
+			{!! Form::text("cheque_bank_name", null, ['class' => 'form-control', 'placeholder' => __('cheque.bank_name')]); !!}
+		</div>
+	</div>
+	<div class="col-md-12">
+		<p class="help-block"><i class="fa fa-info-circle"></i> {{ $cheque_register_type == 'payable' ? __('cheque.register_hint_payable') : __('cheque.register_hint') }}</p>
+	</div>
+	@endif
 </div>
 <div class="payment_details_div @if( $payment_line->method !== 'bank_transfer' ) {{ 'hide' }} @endif" data-type="bank_transfer" >
 	<div class="col-md-12">

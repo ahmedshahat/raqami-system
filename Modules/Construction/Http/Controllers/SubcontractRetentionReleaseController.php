@@ -16,7 +16,7 @@ class SubcontractRetentionReleaseController extends BaseController
 {
     public function store(Request $request, int $subcontract, int $certificate)
     {
-        $this->authorizePermission('construction.subcontract.manage');
+        $this->authorizePermission('construction.payment.record');
         [$contract, $certificate] = $this->findCertificate($subcontract, $certificate);
         abort_unless($certificate->status === 'approved', 422, __('construction::lang.retention_release_requires_approved_certificate'));
         $this->normalizeBusinessDates($request, ['release_date']);
@@ -62,7 +62,7 @@ class SubcontractRetentionReleaseController extends BaseController
 
     public function cancel(Request $request, int $subcontract, int $certificate, int $release)
     {
-        $this->authorizePermission('construction.subcontract.manage');
+        $this->authorizePermission('construction.cancel');
         $validated = $request->validate(['cancellation_reason' => ['required', 'string', 'max:1000']]);
         [$contract, $certificate] = $this->findCertificate($subcontract, $certificate);
 

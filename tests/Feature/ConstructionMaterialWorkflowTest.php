@@ -11,8 +11,13 @@ use App\Utils\ProductUtil;
 use App\Utils\TransactionUtil;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Modules\Accounting\Entities\AccountingAccount;
+use Modules\Accounting\Entities\AccountingAccountsTransaction;
+use Modules\Construction\Entities\ConstructionAccountingPosting;
+use Modules\Construction\Entities\ConstructionAccountingSetting;
 use Modules\Construction\Entities\ConstructionMaterialDocument;
 use Modules\Construction\Entities\ConstructionProject;
+use Modules\Construction\Support\ConstructionAccountingPoster;
 use Tests\TestCase;
 
 class ConstructionMaterialWorkflowTest extends TestCase
@@ -44,6 +49,29 @@ class ConstructionMaterialWorkflowTest extends TestCase
         $this->actingAs($user);
         $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
         $_SERVER['HTTP_USER_AGENT'] = 'PHPUnit';
+        $inventoryAccount = AccountingAccount::create([
+            'business_id' => $business->id,
+            'name' => 'Test construction inventory '.uniqid(),
+            'account_primary_type' => 'asset',
+            'status' => 'active',
+            'created_by' => $user->id,
+        ]);
+        $materialCostAccount = AccountingAccount::create([
+            'business_id' => $business->id,
+            'name' => 'Test construction material cost '.uniqid(),
+            'account_primary_type' => 'expenses',
+            'status' => 'active',
+            'created_by' => $user->id,
+        ]);
+        $accountingSettings = ConstructionAccountingSetting::updateOrCreate(
+            ['business_id' => $business->id],
+            [
+                'inventory_account_id' => $inventoryAccount->id,
+                'material_cost_account_id' => $materialCostAccount->id,
+                'created_by' => $user->id,
+                'updated_by' => $user->id,
+            ]
+        );
 
         $project = ConstructionProject::create([
             'business_id' => $business->id, 'code' => 'MAT-TEST-'.uniqid(), 'name' => 'Material workflow test',
@@ -97,6 +125,25 @@ class ConstructionMaterialWorkflowTest extends TestCase
         $this->assertSame($issue->id, (int) $issue->stockAdjustment->construction_material_document_id);
         $this->assertEquals($before - 1, (float) VariationLocationDetails::findOrFail($candidate->stock_id)->qty_available);
         $this->assertGreaterThan(0, (float) $issue->lines()->value('total_cost'));
+        $issuePosting = ConstructionAccountingPosting::where([
+            'business_id' => $business->id,
+            'source_type' => 'material_document',
+            'source_id' => $issue->id,
+            'event' => 'issue',
+        ])->firstOrFail();
+        $issueJournalLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $issuePosting->accounting_mapping_id)
+            ->get()->keyBy('map_type');
+        $issueCost = (float) $issue->lines()->sum('total_cost');
+        $this->assertCount(2, $issueJournalLines);
+        $this->assertEquals($issueCost, (float) $issueJournalLines['construction_material_issue_cost']->amount);
+        $this->assertSame('debit', $issueJournalLines['construction_material_issue_cost']->type);
+        $this->assertSame((int) $accountingSettings->material_cost_account_id, (int) $issueJournalLines['construction_material_issue_cost']->accounting_account_id);
+        $this->assertEquals($issueCost, (float) $issueJournalLines['construction_material_issue_inventory']->amount);
+        $this->assertSame('credit', $issueJournalLines['construction_material_issue_inventory']->type);
+        $this->assertSame((int) $accountingSettings->inventory_account_id, (int) $issueJournalLines['construction_material_issue_inventory']->accounting_account_id);
+        $sameIssuePosting = DB::transaction(fn () => app(ConstructionAccountingPoster::class)
+            ->postMaterialDocumentApproval($issue->fresh()));
+        $this->assertSame($issuePosting->id, $sameIssuePosting->id);
         $this->assertEquals($adjustmentTotalBefore, (float) app(TransactionUtil::class)->getTransactionTotals(
             $business->id, ['stock_adjustment'], null, null, $candidate->location_id
         )['total_adjustment']);
@@ -106,7 +153,9 @@ class ConstructionMaterialWorkflowTest extends TestCase
             __('construction::lang.material_issue_stock_history'),
             collect(app(ProductUtil::class)->getVariationStockHistory($business->id, $candidate->variation_id, $candidate->location_id))->pluck('type_label')->implode('|')
         );
-        $this->get(route('construction.materials.show', $issue->id))->assertOk()->assertSee($issue->number);
+        $this->get(route('construction.materials.show', $issue->id))->assertOk()
+            ->assertSee($issue->number)
+            ->assertSee(route('journal-entry.show', $issuePosting->accounting_mapping_id), false);
         $this->get(route('construction.materials.preview', $issue->id))->assertOk()
             ->assertSee(__('construction::lang.material_issue_print_title'))
             ->assertSee(__('construction::lang.storekeeper_delivery'))
@@ -138,5 +187,28 @@ class ConstructionMaterialWorkflowTest extends TestCase
             (float) $return->lines()->sum('total_cost'),
             0.01
         );
+        $returnPosting = ConstructionAccountingPosting::where([
+            'business_id' => $business->id,
+            'source_type' => 'material_document',
+            'source_id' => $return->id,
+            'event' => 'return',
+        ])->firstOrFail();
+        $returnJournalLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $returnPosting->accounting_mapping_id)
+            ->get()->keyBy('map_type');
+        $returnCost = (float) $return->lines()->sum('total_cost');
+        $this->assertCount(2, $returnJournalLines);
+        $this->assertEquals($returnCost, (float) $returnJournalLines['construction_material_return_inventory']->amount);
+        $this->assertSame('debit', $returnJournalLines['construction_material_return_inventory']->type);
+        $this->assertSame((int) $accountingSettings->inventory_account_id, (int) $returnJournalLines['construction_material_return_inventory']->accounting_account_id);
+        $this->assertEquals($returnCost, (float) $returnJournalLines['construction_material_return_cost']->amount);
+        $this->assertSame('credit', $returnJournalLines['construction_material_return_cost']->type);
+        $this->assertSame((int) $accountingSettings->material_cost_account_id, (int) $returnJournalLines['construction_material_return_cost']->accounting_account_id);
+        $sameReturnPosting = DB::transaction(fn () => app(ConstructionAccountingPoster::class)
+            ->postMaterialDocumentApproval($return->fresh()));
+        $this->assertSame($returnPosting->id, $sameReturnPosting->id);
+        $this->assertSame(1, ConstructionAccountingPosting::where('source_type', 'material_document')
+            ->where('source_id', $return->id)->where('event', 'return')->count());
+        $this->get(route('construction.materials.show', $return->id))->assertOk()
+            ->assertSee(route('journal-entry.show', $returnPosting->accounting_mapping_id), false);
     }
 }

@@ -45,6 +45,7 @@
 	@if(!empty($for_pdf))
 	<br>
 	@endif
+	@include('contact.partials.ledger_pending_cheques')
 	<table class="table table-striped @if(!empty($for_pdf)) table-pdf td-border @endif" id="ledger_table">
 		<thead>
 			<tr class="row-border">

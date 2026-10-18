@@ -5,12 +5,16 @@ namespace Modules\Construction\Http\Controllers;
 use App\Business;
 use App\BusinessLocation;
 use App\Contact;
+use App\Account;
+use App\Utils\Util;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Modules\Construction\Entities\ConstructionBoqItem;
 use Modules\Construction\Entities\ConstructionProject;
 use Modules\Construction\Entities\ConstructionSubcontract;
+use Modules\Construction\Entities\ConstructionAccountingSetting;
+use Modules\Accounting\Entities\AccountingAccount;
 
 class SubcontractorController extends BaseController
 {
@@ -65,7 +69,7 @@ class SubcontractorController extends BaseController
     {
         $this->authorizePermission('construction.subcontract.view');
         $subcontract = $this->findContract($subcontract);
-        $subcontract->load(['project:id,code,name', 'subcontractor:id,name,supplier_business_name,mobile,address_line_1,address_line_2,city,state,country', 'items.boqItem:id,code,description,sales_total', 'certificates.items', 'createdBy:id,surname,first_name,last_name', 'approvedBy:id,surname,first_name,last_name']);
+        $subcontract->load(['project:id,code,name', 'subcontractor:id,name,supplier_business_name,mobile,address_line_1,address_line_2,city,state,country', 'items.boqItem:id,code,description,sales_total', 'certificates.items', 'advances.account:id,name', 'advances.accountingAccount:id,name', 'advances.accountingPosting.mapping', 'advances.cancellationAccountingPosting.mapping', 'createdBy:id,surname,first_name,last_name', 'approvedBy:id,surname,first_name,last_name']);
 
         return view('construction::subcontractors.show', compact('subcontract') + $this->contractOptions($subcontract));
     }
@@ -179,9 +183,17 @@ class SubcontractorController extends BaseController
     private function contractOptions(ConstructionSubcontract $subcontract): array
     {
         $versionId = $subcontract->project->approvedBoq()->value('id') ?: $subcontract->project->boqVersions()->latest('version_number')->value('id');
+        $accountingSettings = ConstructionAccountingSetting::where('business_id', $this->businessId())->first();
         return [
             'suppliers' => $this->suppliers(),
             'boqItems' => ConstructionBoqItem::where('business_id', $this->businessId())->where('project_id', $subcontract->project_id)->where('boq_version_id', $versionId)->where('row_type', 'item')->orderBy('sort_order')->get(['id', 'code', 'description', 'sales_total']),
+            'paymentTypes' => (new Util())->payment_types(null, false, $this->businessId()),
+            'paymentAccounts' => Account::forDropdown($this->businessId(), true, false, false),
+            'accountingSettings' => $accountingSettings,
+            'accountingPaymentAccounts' => $accountingSettings ? AccountingAccount::where('business_id', $this->businessId())->where('status', 'active')->where('account_primary_type', 'asset')->where('account_sub_type_id', 3)->orderBy('name')->pluck('name', 'id') : collect(),
+            'advanceTotal' => $subcontract->advanceTotal(),
+            'advanceRecovered' => $subcontract->advanceRecovered(),
+            'advanceRemaining' => $subcontract->advanceRemaining(),
         ];
     }
 

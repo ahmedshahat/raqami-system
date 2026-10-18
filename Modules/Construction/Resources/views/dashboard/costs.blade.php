@@ -61,7 +61,7 @@
         </div>
         <div class="table-responsive">
             <table class="table table-hover ct-cost-table">
-                <thead><tr><th>@lang('construction::lang.date')</th><th>@lang('construction::lang.expense_reference')</th><th>@lang('construction::lang.project')</th><th>@lang('construction::lang.project_item')</th><th>@lang('construction::lang.location')</th><th class="text-left">@lang('construction::lang.amount')</th></tr></thead>
+                <thead><tr><th>@lang('construction::lang.date')</th><th>@lang('construction::lang.expense_reference')</th><th>@lang('construction::lang.project')</th><th>@lang('construction::lang.project_item')</th><th>@lang('construction::lang.location')</th><th class="text-left">@lang('construction::lang.amount')</th><th>@lang('construction::lang.actions')</th></tr></thead>
                 <tbody>
                 @forelse($recentExpenses as $expense)
                     <tr data-expense-reference="{{ $expense->ref_no }}">
@@ -71,9 +71,29 @@
                         <td>{{ $expense->constructionProjectItem ? $expense->constructionProjectItem->code.' — '.$expense->constructionProjectItem->description : __('construction::lang.general_project_expense') }}</td>
                         <td>{{ $expense->location?->name ?: '—' }}</td>
                         <td class="text-left"><strong class="{{ $expense->type === 'expense_refund' ? 'text-success' : '' }}">@if($expense->type === 'expense_refund')− @endif @include('construction::partials.money', ['value' => $expense->final_total])</strong></td>
+                        <td>
+                            @if($expense->type === 'expense')
+                                @can('construction.cancel')
+                                <button type="button" class="btn btn-xs btn-danger" data-toggle="modal" data-target="#cancelExpense{{ $expense->id }}"><i class="fa fa-undo"></i> @lang('construction::lang.cancel_and_reverse')</button>
+                                @endcan
+                            @endif
+                        </td>
                     </tr>
+                    @can('construction.cancel')
+                    @if($expense->type === 'expense')
+                    <div class="modal fade" id="cancelExpense{{ $expense->id }}" tabindex="-1"><div class="modal-dialog"><form method="POST" action="{{ route('construction.costs.expenses.cancel', $expense->id) }}" class="modal-content">@csrf
+                        <div class="modal-header"><button type="button" class="close" data-dismiss="modal">&times;</button><h4 class="modal-title">@lang('construction::lang.cancel_project_expense')</h4></div>
+                        <div class="modal-body">
+                            <p>@lang('construction::lang.cancel_project_expense_hint', ['reference' => $expense->ref_no ?: $expense->id])</p>
+                            <div class="form-group"><label>@lang('construction::lang.cancellation_reason')</label><textarea name="cancellation_reason" class="form-control" rows="3" required minlength="5"></textarea></div>
+                            <div class="form-group"><label>@lang('construction::lang.current_password')</label><input type="password" name="current_password" class="form-control" required autocomplete="current-password"></div>
+                        </div>
+                        <div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.close')</button><button class="btn btn-danger">@lang('construction::lang.confirm_cancel_and_reverse')</button></div>
+                    </form></div></div>
+                    @endif
+                    @endcan
                 @empty
-                    <tr><td colspan="6" class="text-center text-muted">@lang('construction::lang.no_cost_expenses')</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted">@lang('construction::lang.no_cost_expenses')</td></tr>
                 @endforelse
                 </tbody>
             </table>

@@ -57,14 +57,14 @@
                                 <td data-label="@lang('construction::lang.quantity')">{{ @format_quantity((float) $item->contract_quantity) }}</td>
                                 <td data-label="@lang('construction::lang.unit_price')">@include('construction::partials.money', ['value' => $item->sales_unit_price])</td>
                                 <td data-label="@lang('construction::lang.total')"><strong>@include('construction::partials.money', ['value' => $item->sales_total])</strong></td>
-                                @if($canEditItems)<td class="ct-boq-table__action">@can('construction.boq.manage')<button type="button" data-toggle="modal" data-target="#ct-edit-item-{{ $item->id }}"><i class="fa fa-edit"></i></button> <form method="POST" action="{{ route('construction.projects.boq.items.destroy', [$project->id, $version->id, $item->id]) }}" onsubmit="return confirm('{{ __('construction::lang.delete_item_confirmation') }}')">@csrf @method('DELETE')<button type="submit"><i class="fa fa-trash"></i></button></form>@endcan</td>@endif
+                                @if($canEditItems)<td class="ct-boq-table__action">@can('construction.boq.manage')<button type="button" data-toggle="modal" data-target="#ct-edit-item-{{ $item->id }}" aria-label="@lang('construction::lang.edit_project_item')"><i class="fa fa-edit" aria-hidden="true"></i></button> <form method="POST" action="{{ route('construction.projects.boq.items.destroy', [$project->id, $version->id, $item->id]) }}" onsubmit="return confirm('{{ __('construction::lang.delete_item_confirmation') }}')">@csrf @method('DELETE')<button type="submit" aria-label="@lang('messages.delete')"><i class="fa fa-trash" aria-hidden="true"></i></button></form>@endcan</td>@endif
                             </tr>
                         @endif
                     @empty
-                        <tr><td colspan="{{ $canEditItems ? 6 : 5 }}"><div class="ct-boq-empty"><i class="fa fa-list-ul"></i><strong>@lang('construction::lang.simple_boq_empty')</strong><span>@lang('construction::lang.simple_boq_empty_hint')</span></div></td></tr>
+                        <tr class="ct-boq-empty-row"><td colspan="{{ $canEditItems ? 6 : 5 }}"><div class="ct-boq-empty"><i class="fa fa-list-ul" aria-hidden="true"></i><strong>@lang('construction::lang.simple_boq_empty')</strong><span>@lang('construction::lang.simple_boq_empty_hint')</span></div></td></tr>
                     @endforelse
                 </tbody>
-                <tfoot><tr><td colspan="4">@lang('construction::lang.boq_total_value')</td><td><strong>@include('construction::partials.money', ['value' => $version->sales_total])</strong></td>@if($canEditItems)<td></td>@endif</tr></tfoot>
+                <tfoot><tr><td class="ct-boq-total-label" colspan="4">@lang('construction::lang.boq_total_value')</td><td class="ct-boq-total-value"><strong>@include('construction::partials.money', ['value' => $version->sales_total])</strong></td>@if($canEditItems)<td class="ct-boq-total-spacer"></td>@endif</tr></tfoot>
             </table>
         </div>
     </div>
@@ -84,12 +84,12 @@
                             @foreach($formRows as $rowIndex => $row)
                                 <tr class="ct-boq-entry-row">
                                     <td class="ct-boq-entry-number">{{ $loop->iteration }}</td>
-                                    <td><input type="hidden" name="items[{{ $rowIndex }}][row_type]" value="item"><input type="hidden" name="items[{{ $rowIndex }}][item_kind]" value="standard"><input name="items[{{ $rowIndex }}][description]" class="form-control" maxlength="500" value="{{ $row['description'] ?? '' }}" placeholder="@lang('construction::lang.item_name_example')" required></td>
-                                    <td><select name="items[{{ $rowIndex }}][unit_id]" class="form-control" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected((string)($row['unit_id'] ?? '') === (string)$unit->id)>{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select></td>
-                                    <td><input type="text" name="items[{{ $rowIndex }}][contract_quantity]" class="form-control input_number input_quantity ct-boq-quantity" value="{{ @format_quantity($row['contract_quantity'] ?? 0) }}" required></td>
-                                    <td><input type="text" name="items[{{ $rowIndex }}][sales_unit_price]" class="form-control input_number ct-boq-price" value="{{ @num_format($row['sales_unit_price'] ?? 0) }}" required></td>
-                                    <td><output class="ct-boq-row-total">0.00</output></td>
-                                    <td><button class="ct-boq-remove-row" type="button" title="@lang('construction::lang.remove_row')"><i class="fa fa-times"></i></button></td>
+                                    <td data-label="@lang('construction::lang.item_name')"><input type="hidden" name="items[{{ $rowIndex }}][row_type]" value="item"><input type="hidden" name="items[{{ $rowIndex }}][item_kind]" value="standard"><input name="items[{{ $rowIndex }}][description]" class="form-control" maxlength="500" value="{{ $row['description'] ?? '' }}" placeholder="@lang('construction::lang.item_name_example')" required></td>
+                                    <td data-label="@lang('construction::lang.unit')"><select name="items[{{ $rowIndex }}][unit_id]" class="form-control" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected((string)($row['unit_id'] ?? '') === (string)$unit->id)>{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select></td>
+                                    <td data-label="@lang('construction::lang.quantity')"><input type="text" name="items[{{ $rowIndex }}][contract_quantity]" class="form-control input_number input_quantity ct-boq-quantity" value="{{ @format_quantity($row['contract_quantity'] ?? 0) }}" required></td>
+                                    <td data-label="@lang('construction::lang.unit_price')"><input type="text" name="items[{{ $rowIndex }}][sales_unit_price]" class="form-control input_number ct-boq-price" value="{{ @num_format($row['sales_unit_price'] ?? 0) }}" required></td>
+                                    <td data-label="@lang('construction::lang.row_total')"><output class="ct-boq-row-total">0.00</output></td>
+                                    <td><button class="ct-boq-remove-row" type="button" title="@lang('construction::lang.remove_row')" aria-label="@lang('construction::lang.remove_row')"><i class="fa fa-times" aria-hidden="true"></i></button></td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -144,12 +144,12 @@
 <template id="ct-boq-row-template">
     <tr class="ct-boq-entry-row">
         <td class="ct-boq-entry-number"></td>
-        <td><input type="hidden" data-name="row_type" value="item"><input type="hidden" data-name="item_kind" value="standard"><input data-name="description" class="form-control" maxlength="500" placeholder="@lang('construction::lang.item_name_example')" required></td>
-        <td><select data-name="unit_id" class="form-control" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select></td>
-        <td><input type="text" data-name="contract_quantity" class="form-control input_number input_quantity ct-boq-quantity" value="{{ @format_quantity(0) }}" required></td>
-        <td><input type="text" data-name="sales_unit_price" class="form-control input_number ct-boq-price" value="{{ @num_format(0) }}" required></td>
-        <td><output class="ct-boq-row-total">0.00</output></td>
-        <td><button class="ct-boq-remove-row" type="button" title="@lang('construction::lang.remove_row')"><i class="fa fa-times"></i></button></td>
+        <td data-label="@lang('construction::lang.item_name')"><input type="hidden" data-name="row_type" value="item"><input type="hidden" data-name="item_kind" value="standard"><input data-name="description" class="form-control" maxlength="500" placeholder="@lang('construction::lang.item_name_example')" required></td>
+        <td data-label="@lang('construction::lang.unit')"><select data-name="unit_id" class="form-control" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select></td>
+        <td data-label="@lang('construction::lang.quantity')"><input type="text" data-name="contract_quantity" class="form-control input_number input_quantity ct-boq-quantity" value="{{ @format_quantity(0) }}" required></td>
+        <td data-label="@lang('construction::lang.unit_price')"><input type="text" data-name="sales_unit_price" class="form-control input_number ct-boq-price" value="{{ @num_format(0) }}" required></td>
+        <td data-label="@lang('construction::lang.row_total')"><output class="ct-boq-row-total">0.00</output></td>
+        <td><button class="ct-boq-remove-row" type="button" title="@lang('construction::lang.remove_row')" aria-label="@lang('construction::lang.remove_row')"><i class="fa fa-times" aria-hidden="true"></i></button></td>
     </tr>
 </template>
 <script>
@@ -158,6 +158,31 @@
     var addButton = document.getElementById('ct-add-boq-row');
     var template = document.getElementById('ct-boq-row-template');
     if (!rows || !addButton || !template) return;
+
+    function ensureCurrencyGlobals() {
+        var defaults = {
+            __currency_symbol: '',
+            __currency_thousand_separator: ',',
+            __currency_decimal_separator: '.',
+            __currency_symbol_placement: 'after',
+            __currency_precision: 2,
+            __quantity_precision: 2
+        };
+        var fields = {
+            __currency_symbol: '__symbol',
+            __currency_thousand_separator: '__thousand',
+            __currency_decimal_separator: '__decimal',
+            __currency_symbol_placement: '__symbol_placement',
+            __currency_precision: '__precision',
+            __quantity_precision: '__quantity_precision'
+        };
+        Object.keys(fields).forEach(function (key) {
+            if (typeof window[key] !== 'undefined') return;
+            var field = document.getElementById(fields[key]);
+            window[key] = field && field.value !== '' ? field.value : defaults[key];
+        });
+    }
+    ensureCurrencyGlobals();
 
     function refreshRows() {
         var allRows = rows.querySelectorAll('.ct-boq-entry-row');

@@ -8,6 +8,7 @@ use App\BusinessLocation;
 use App\Utils\Util;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Construction\Entities\ConstructionSubcontract;
@@ -21,7 +22,7 @@ class SubcontractPaymentController extends BaseController
 {
     public function store(Request $request, int $subcontract, int $certificate)
     {
-        $this->authorizePermission('construction.subcontract.manage');
+        $this->authorizePermission('construction.payment.record');
         [$contract, $certificate] = $this->findCertificate($subcontract, $certificate);
         abort_unless($certificate->status === 'approved', 422, __('construction::lang.payment_requires_approved_certificate'));
         $this->normalizeBusinessDates($request, ['payment_date']);
@@ -82,6 +83,36 @@ class SubcontractPaymentController extends BaseController
                 ? __('construction::lang.subcontract_payment_recorded_and_posted', ['number' => $payment->number])
                 : __('construction::lang.subcontract_payment_recorded', ['number' => $payment->number]),
         ]);
+    }
+
+    public function cancel(Request $request, int $subcontract, int $certificate, int $payment)
+    {
+        $this->authorizePermission('construction.cancel');
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'cancellation_reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ]);
+        if (! Hash::check($validated['current_password'], auth()->user()->password)) {
+            throw ValidationException::withMessages(['current_password' => __('construction::lang.invalid_manager_password')]);
+        }
+
+        DB::transaction(function () use ($certificate, $payment, $validated) {
+            $payment = ConstructionSubcontractPayment::where('business_id', $this->businessId())
+                ->where('certificate_id', $certificate)->lockForUpdate()->findOrFail($payment);
+            abort_unless($payment->status === 'recorded', 422, __('construction::lang.payment_already_cancelled'));
+            $payment->update([
+                'status' => 'cancelled', 'cancellation_reason' => $validated['cancellation_reason'],
+                'cancelled_by' => auth()->id(), 'cancelled_at' => now(),
+            ]);
+            app(ConstructionAccountingPoster::class)->reversePostedDocument(
+                $payment->business_id, 'subcontract_payment', $payment->id, 'recorded',
+                'CT-PAY-CAN-'.$payment->number,
+                __('construction::lang.payment_reversal_note', ['number' => $payment->number]),
+                $payment->cancelled_at
+            );
+        });
+
+        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.payment_cancelled_and_reversed')]);
     }
 
     public function preview(int $subcontract, int $certificate, int $payment)

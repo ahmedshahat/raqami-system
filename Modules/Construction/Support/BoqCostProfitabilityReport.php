@@ -41,7 +41,10 @@ class BoqCostProfitabilityReport
             ->where('certificates.status', 'approved')->whereDate('certificates.certificate_date', '<=', $toDate)
             ->get(['agreement_items.boq_item_id', 'lines.current_value'])->map(fn ($line) => (object) ['boq_item_id' => $line->boq_item_id, 'amount' => (float) $line->current_value]);
         $expenses = Transaction::query()->where('business_id', $project->business_id)->where('construction_project_id', $project->id)
-            ->whereIn('type', ['expense', 'expense_refund'])->whereDate('transaction_date', '<=', $toDate)
+            ->whereIn('type', ['expense', 'expense_refund'])
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('construction_expense_cancellations as expense_cancellations')
+                ->whereColumn('expense_cancellations.expense_transaction_id', 'transactions.id'))
+            ->whereDate('transaction_date', '<=', $toDate)
             ->get(['construction_boq_item_id as boq_item_id', 'type', 'final_total'])
             ->map(fn ($expense) => (object) ['boq_item_id' => $expense->boq_item_id, 'amount' => ($expense->type === 'expense_refund' ? -1 : 1) * (float) $expense->final_total]);
 

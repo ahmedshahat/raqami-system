@@ -166,7 +166,9 @@ class ProjectController extends BaseController
         $expenseQuery = Transaction::query()
             ->where('business_id', $this->businessId())
             ->where('construction_project_id', $project->id)
-            ->whereIn('type', ['expense', 'expense_refund']);
+            ->whereIn('type', ['expense', 'expense_refund'])
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('construction_expense_cancellations as expense_cancellations')
+                ->whereColumn('expense_cancellations.expense_transaction_id', 'transactions.id'));
         $expenseStats = (clone $expenseQuery)->selectRaw('COUNT(*) as expense_count')
             ->selectRaw("COALESCE(SUM(CASE WHEN type = 'expense_refund' THEN -final_total ELSE final_total END), 0) as expense_total")
             ->first();
@@ -241,15 +243,41 @@ class ProjectController extends BaseController
     public function destroy(int $project)
     {
         $this->authorizePermission('construction.project.delete');
-        $project = $this->findProject($project);
+        $quoteRestored = DB::transaction(function () use ($project) {
+            $project = ConstructionProject::query()
+                ->where('business_id', $this->businessId())
+                ->whereKey($project)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        abort_unless($project->status === 'draft', 422, __('construction::lang.only_draft_project_can_be_deleted'));
-        abort_if($project->quote_id, 422, __('construction::lang.quote_project_cannot_delete'));
-        $project->delete();
+            abort_unless($project->status === 'draft', 422, __('construction::lang.only_draft_project_can_be_deleted'));
+            $quoteRestored = false;
+
+            if ($project->quote_id) {
+                $quote = ConstructionQuote::query()
+                    ->where('business_id', $this->businessId())
+                    ->whereKey($project->quote_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($quote && (int) $quote->project_id === $project->id) {
+                    $quote->update(['project_id' => null, 'status' => 'accepted']);
+                    $quoteRestored = true;
+                }
+
+                $project->update(['quote_id' => null]);
+            }
+
+            $project->delete();
+
+            return $quoteRestored;
+        });
 
         return redirect()->route('construction.projects.index')->with('status', [
             'success' => 1,
-            'msg' => __('construction::lang.project_deleted'),
+            'msg' => __($quoteRestored
+                ? 'construction::lang.project_deleted_quote_restored'
+                : 'construction::lang.project_deleted'),
         ]);
     }
 

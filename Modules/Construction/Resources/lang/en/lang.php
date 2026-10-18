@@ -1748,4 +1748,9 @@ return [
     'import_file_rows' => 'File rows',
     'import_show_errors_only' => 'Show only rows with errors',
     'import_row_check' => 'Check result',
+    'of_portfolio' => 'of the portfolio',
+    'project_more_actions' => 'More project actions',
+    'no_matching_projects' => 'No matching projects',
+    'no_matching_projects_hint' => 'Change the search words or pick another status to see projects.',
+    'project_unit' => 'projects',
 ];

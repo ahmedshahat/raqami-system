@@ -6,9 +6,11 @@ use App\BusinessLocation;
 use App\Transaction;
 use App\User;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Construction\Support\ProtectsPostedConstructionDocument;
 
 class ConstructionMaterialDocument extends Model
 {
+    use ProtectsPostedConstructionDocument;
     protected $table = 'construction_material_documents';
 
     protected $guarded = ['id'];
@@ -48,6 +50,12 @@ class ConstructionMaterialDocument extends Model
         return $this->belongsTo(Transaction::class, 'stock_adjustment_transaction_id');
     }
 
+    public function accountingPosting()
+    {
+        return $this->hasOne(ConstructionAccountingPosting::class, 'source_id')
+            ->where('source_type', 'material_document');
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -62,4 +70,5 @@ class ConstructionMaterialDocument extends Model
     {
         return $this->status === 'draft';
     }
+    protected function constructionAccountingSourceType(): string { return 'material_document'; }
 }

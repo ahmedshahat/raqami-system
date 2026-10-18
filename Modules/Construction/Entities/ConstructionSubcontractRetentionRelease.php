@@ -4,9 +4,11 @@ namespace Modules\Construction\Entities;
 
 use App\User;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Construction\Support\ProtectsPostedConstructionDocument;
 
 class ConstructionSubcontractRetentionRelease extends Model
 {
+    use ProtectsPostedConstructionDocument;
     protected $table = 'construction_subcontract_retention_releases';
     protected $guarded = ['id'];
     protected $casts = ['release_date' => 'date', 'amount' => 'decimal:4', 'cancelled_at' => 'datetime'];
@@ -28,4 +30,5 @@ class ConstructionSubcontractRetentionRelease extends Model
             ->where('event', 'cancelled');
     }
     public function isActive(): bool { return $this->status === 'recorded'; }
+    protected function constructionAccountingSourceType(): string { return 'subcontract_retention_release'; }
 }

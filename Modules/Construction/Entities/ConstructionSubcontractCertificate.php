@@ -4,9 +4,11 @@ namespace Modules\Construction\Entities;
 
 use App\User;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Construction\Support\ProtectsPostedConstructionDocument;
 
 class ConstructionSubcontractCertificate extends Model
 {
+    use ProtectsPostedConstructionDocument;
     protected $table = 'construction_subcontract_certificates';
     protected $guarded = ['id'];
     protected $casts = [
@@ -15,6 +17,14 @@ class ConstructionSubcontractCertificate extends Model
         'period_to' => 'date',
         'retention_due_date' => 'date',
         'approved_at' => 'datetime',
+        'gross_value' => 'decimal:4',
+        'tax_percent' => 'decimal:4',
+        'tax_value' => 'decimal:4',
+        'retention_percent' => 'decimal:4',
+        'retention_value' => 'decimal:4',
+        'other_deductions' => 'decimal:4',
+        'advance_recovery_value' => 'decimal:4',
+        'net_value' => 'decimal:4',
     ];
 
     public function subcontract() { return $this->belongsTo(ConstructionSubcontract::class, 'subcontract_id'); }
@@ -32,6 +42,11 @@ class ConstructionSubcontractCertificate extends Model
             ->where('source_type', 'subcontract_certificate')
             ->where('event', 'approval');
     }
+    public function cancellationAccountingPosting()
+    {
+        return $this->hasOne(ConstructionAccountingPosting::class, 'source_id')
+            ->where('source_type', 'subcontract_certificate')->where('event', 'cancelled');
+    }
     public function isEditable(): bool { return $this->status === 'draft'; }
     public function paidValue(): float { return round((float) $this->activePayments()->sum('amount'), 4); }
     public function releasedRetentionValue(): float { return round((float) $this->activeRetentionReleases()->sum('amount'), 4); }
@@ -44,4 +59,5 @@ class ConstructionSubcontractCertificate extends Model
         if ($paid <= 0.0001) return 'unpaid';
         return $this->remainingValue() <= 0.0001 ? 'paid' : 'partially_paid';
     }
+    protected function constructionAccountingSourceType(): string { return 'subcontract_certificate'; }
 }

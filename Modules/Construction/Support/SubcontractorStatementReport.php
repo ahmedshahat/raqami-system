@@ -8,6 +8,7 @@ use Modules\Construction\Entities\ConstructionSubcontract;
 use Modules\Construction\Entities\ConstructionSubcontractCertificate;
 use Modules\Construction\Entities\ConstructionSubcontractPayment;
 use Modules\Construction\Entities\ConstructionSubcontractRetentionRelease;
+use Modules\Construction\Entities\ConstructionSubcontractAdvance;
 
 class SubcontractorStatementReport
 {
@@ -33,19 +34,24 @@ class SubcontractorStatementReport
             ->where('business_id', $subcontractor->business_id)->whereIn('certificate_id', $certificateIds)
             ->where('status', 'recorded')->whereDate('payment_date', '<=', $toDate)
             ->with(['certificate.project:id,code,name', 'subcontract:id,number,title', 'account:id,name'])->get();
+        $allAdvances = ConstructionSubcontractAdvance::query()
+            ->where('business_id', $subcontractor->business_id)->whereIn('subcontract_id', $contractIds)
+            ->where('status', 'recorded')->whereDate('advance_date', '<=', $toDate)
+            ->with(['project:id,code,name', 'subcontract:id,number,title', 'account:id,name'])->get();
 
         $openingBalance = 0.0;
         if ($fromDate) {
-            $openingBalance = (float) $allCertificates->where('certificate_date', '<', $fromDate)->sum('net_value')
+            $openingBalance = (float) $allCertificates->where('certificate_date', '<', $fromDate)->sum(fn ($certificate) => (float) $certificate->net_value + (float) $certificate->advance_recovery_value)
                 + (float) $allReleases->where('release_date', '<', $fromDate)->sum('amount')
-                - (float) $allPayments->where('payment_date', '<', $fromDate)->sum('amount');
+                - (float) $allPayments->where('payment_date', '<', $fromDate)->sum('amount')
+                - (float) $allAdvances->where('advance_date', '<', $fromDate)->sum('amount');
         }
 
         $certificateMovements = $this->inPeriod($allCertificates, 'certificate_date', $fromDate, $toDate)->map(fn ($certificate) => [
             'date' => $certificate->certificate_date->toDateString(), 'sort' => 10, 'type' => 'certificate', 'number' => $certificate->number,
             'project' => trim(($certificate->project?->code ?: '').' — '.($certificate->project?->name ?: ''), ' —'), 'agreement' => $certificate->subcontract?->number,
             'description' => __('construction::lang.statement_certificate_description', ['gross' => CurrencyFormatter::parts($certificate->gross_value)['amount'], 'retention' => CurrencyFormatter::parts($certificate->retention_value)['amount']]),
-            'debit' => 0.0, 'credit' => (float) $certificate->net_value,
+            'debit' => 0.0, 'credit' => (float) $certificate->net_value + (float) $certificate->advance_recovery_value,
         ]);
         $releaseMovements = $this->inPeriod($allReleases, 'release_date', $fromDate, $toDate)->map(fn ($release) => [
             'date' => $release->release_date->toDateString(), 'sort' => 20, 'type' => 'retention_release', 'number' => $release->number,
@@ -58,9 +64,15 @@ class SubcontractorStatementReport
             'description' => collect([$payment->reference_no, $payment->account?->name, $payment->notes])->filter()->implode(' — ') ?: __('construction::lang.statement_payment_description'),
             'debit' => (float) $payment->amount, 'credit' => 0.0,
         ]);
+        $advanceMovements = $this->inPeriod($allAdvances, 'advance_date', $fromDate, $toDate)->map(fn ($advance) => [
+            'date' => $advance->advance_date->toDateString(), 'sort' => 5, 'type' => 'advance', 'number' => $advance->number,
+            'project' => trim(($advance->project?->code ?: '').' — '.($advance->project?->name ?: ''), ' —'), 'agreement' => $advance->subcontract?->number,
+            'description' => collect([$advance->reference_no, $advance->account?->name, $advance->notes])->filter()->implode(' — ') ?: __('construction::lang.statement_advance_description'),
+            'debit' => (float) $advance->amount, 'credit' => 0.0,
+        ]);
 
         $runningBalance = round($openingBalance, 4);
-        $movements = $certificateMovements->concat($releaseMovements)->concat($paymentMovements)
+        $movements = $advanceMovements->concat($certificateMovements)->concat($releaseMovements)->concat($paymentMovements)
             ->sortBy(fn ($movement) => $movement['date'].'-'.str_pad((string) $movement['sort'], 2, '0', STR_PAD_LEFT).'-'.$movement['number'])->values()
             ->map(function ($movement) use (&$runningBalance) {
                 $runningBalance = round($runningBalance + $movement['credit'] - $movement['debit'], 4);
@@ -73,15 +85,21 @@ class SubcontractorStatementReport
         $retention = (float) $allCertificates->sum('retention_value');
         $released = (float) $allReleases->sum('amount');
         $paid = (float) $allPayments->sum('amount');
+        $tax = (float) $allCertificates->sum('tax_value');
+        $advanceRecovery = (float) $allCertificates->sum('advance_recovery_value');
+        $advances = (float) $allAdvances->sum('amount');
 
         return [
             'period' => ['from' => $fromDate, 'to' => $toDate],
             'summary' => [
                 'contracts_value' => round($contractsValue, 4), 'gross' => round($gross, 4),
-                'deductions' => round(max(0, $gross - $net - $retention), 4),
+                'deductions' => round((float) $allCertificates->sum('other_deductions'), 4),
+                'tax' => round($tax, 4), 'advances' => round($advances, 4),
+                'advance_recovered' => round($advanceRecovery, 4),
+                'advance_remaining' => round(max(0, $advances - $advanceRecovery), 4),
                 'retention_original' => round($retention, 4), 'retention_released' => round($released, 4),
                 'retention_remaining' => round(max(0, $retention - $released), 4), 'payable' => round($net + $released, 4),
-                'paid' => round($paid, 4), 'balance' => round($net + $released - $paid, 4),
+                'paid' => round($paid, 4), 'balance' => round($net + $released - $paid - max(0, $advances - $advanceRecovery), 4),
                 'opening_balance' => round($openingBalance, 4), 'period_debit' => round((float) $movements->sum('debit'), 4),
                 'period_credit' => round((float) $movements->sum('credit'), 4), 'closing_balance' => round($runningBalance, 4),
                 'certificates_count' => $allCertificates->count(),

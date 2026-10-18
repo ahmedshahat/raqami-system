@@ -12,6 +12,7 @@ use App\TransactionPayment;
 use App\User;
 use App\Unit;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Hash;
 use Modules\Accounting\Entities\AccountingAccountsTransaction;
 use Modules\Construction\Entities\ConstructionAccountingPosting;
 use Modules\Construction\Entities\ConstructionCustomerRetentionRelease;
@@ -117,8 +118,35 @@ class ConstructionCertificateWorkflowTest extends TestCase
         $this->assertSame($customer->id, $certificate->invoice->contact_id);
         $this->assertSame('due', $certificate->invoice->payment_status);
         $this->assertEquals((float) $certificate->net_due, (float) $certificate->invoice->final_total);
+        $lockedRedirect = action([\App\Http\Controllers\SellController::class, 'index']);
+        $this->get(action([\App\Http\Controllers\SellController::class, 'edit'], $invoiceId))
+            ->assertRedirect($lockedRedirect)
+            ->assertSessionHas('status.msg', __('construction::lang.construction_invoice_locked'));
+        $this->get(action([\App\Http\Controllers\SellPosController::class, 'edit'], $invoiceId))
+            ->assertRedirect($lockedRedirect)
+            ->assertSessionHas('status.msg', __('construction::lang.construction_invoice_locked'));
+        $this->put(action([\App\Http\Controllers\SellPosController::class, 'update'], $invoiceId), [
+            'status' => 'final',
+            'products' => [['product_id' => 1]],
+        ])->assertRedirect($lockedRedirect)
+            ->assertSessionHas('status.msg', __('construction::lang.construction_invoice_locked'));
+        $this->withHeader('X-Requested-With', 'XMLHttpRequest')
+            ->delete(action([\App\Http\Controllers\SellPosController::class, 'destroy'], $invoiceId))
+            ->assertOk()
+            ->assertJson(['success' => false, 'msg' => __('construction::lang.construction_invoice_locked')]);
+        $this->assertDatabaseHas('transactions', [
+            'id' => $invoiceId,
+            'business_id' => $business->id,
+            'source' => 'construction_certificate',
+            'status' => 'final',
+        ]);
         $posting = ConstructionAccountingPosting::where('source_type', 'customer_certificate')
             ->where('source_id', $certificate->id)->where('event', 'invoiced')->firstOrFail();
+        $this->assertSame(1, ConstructionAccountingPosting::where('source_type', 'customer_certificate')
+            ->where('source_id', $certificate->id)->where('event', 'invoiced')->count());
+        $this->assertSame(0, AccountingAccountsTransaction::where('transaction_id', $invoiceId)
+            ->whereNull('transaction_payment_id')
+            ->whereIn('map_type', ['payment_account', 'deposit_to'])->count());
         $journalLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $posting->accounting_mapping_id)
             ->get()->keyBy('map_type');
         $this->assertEquals((float) $certificate->net_due, (float) $journalLines['construction_customer_receivable']->amount);
@@ -234,5 +262,25 @@ class ConstructionCertificateWorkflowTest extends TestCase
         $this->assertSame($invoiceId, $certificate->fresh()->invoice_transaction_id);
         $this->assertSame(1, ConstructionAccountingPosting::where('source_type', 'customer_certificate')
             ->where('source_id', $certificate->id)->where('event', 'invoiced')->count());
+
+        $user->update(['password' => Hash::make('Test-pass-123')]);
+        $this->post(route('construction.projects.certificates.cancel', [$project->id, $certificate->id]), [
+            'current_password' => 'Test-pass-123',
+            'cancellation_reason' => 'Customer certificate cancelled by agreement',
+        ])->assertRedirect();
+        $certificate = $certificate->fresh();
+        $this->assertSame('cancelled', $certificate->status);
+        $this->assertNotNull($certificate->credit_note_transaction_id);
+        $this->assertDatabaseHas('transactions', [
+            'id' => $certificate->credit_note_transaction_id,
+            'type' => 'sell_return',
+            'return_parent_id' => $invoiceId,
+            'source' => 'construction_certificate_cancellation',
+        ]);
+        $certificateReversal = ConstructionAccountingPosting::where('source_type', 'customer_certificate')
+            ->where('source_id', $certificate->id)->where('event', 'cancelled')->firstOrFail();
+        $certificateReversalLines = AccountingAccountsTransaction::where('acc_trans_mapping_id', $certificateReversal->accounting_mapping_id)->get();
+        $this->assertEquals((float) $journalLines->where('type', 'debit')->sum('amount'), (float) $certificateReversalLines->where('type', 'credit')->sum('amount'));
+        $this->assertEquals((float) $journalLines->where('type', 'credit')->sum('amount'), (float) $certificateReversalLines->where('type', 'debit')->sum('amount'));
     }
 }

@@ -52,7 +52,7 @@
 .ct-project-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
 .ct-project-action { --action:#1769e0; display:flex; flex-direction:column; min-height:201px; padding:19px; border-radius:17px; transition:transform .18s,box-shadow .18s; }
 .ct-project-action:hover { transform:translateY(-3px); box-shadow:0 16px 32px rgba(25,54,93,.11); }
-.ct-project-action--violet { --action:#7c5ce7; }.ct-project-action--amber { --action:#d58c00; }.ct-project-action--green { --action:#0da877; }
+.ct-project-action--teal { --action:var(--ct-brand-600,#0f8098); }.ct-project-action--amber { --action:#d58c00; }.ct-project-action--green { --action:#0da877; }
 .ct-project-action__top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .ct-project-action__icon { display:grid; place-items:center; width:43px; height:43px; border-radius:12px; color:var(--action); background:color-mix(in srgb,var(--action) 11%,white); font-size:17px; }
 .ct-project-action__status { padding:5px 8px; border-radius:999px; color:#53647b; background:#f2f5f9; font-size:14px; font-weight:800; }

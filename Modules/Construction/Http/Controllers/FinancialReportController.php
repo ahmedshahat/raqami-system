@@ -14,7 +14,7 @@ class FinancialReportController extends BaseController
 {
     public function index(Request $request, ProjectFinancialPositionReport $reportBuilder)
     {
-        $this->authorizePermission('construction.access');
+        $this->authorizePermission('construction.reports.view');
         $data = $this->reportData($request, $reportBuilder);
 
         return view('construction::dashboard.reports', $data);
@@ -22,7 +22,7 @@ class FinancialReportController extends BaseController
 
     public function print(Request $request, ProjectFinancialPositionReport $reportBuilder)
     {
-        $this->authorizePermission('construction.access');
+        $this->authorizePermission('construction.reports.view');
         $data = $this->reportData($request, $reportBuilder, true);
         abort_unless($data['selectedProject'], 422, __('construction::lang.financial_report_select_project'));
         $data['business'] = Business::findOrFail($this->businessId());

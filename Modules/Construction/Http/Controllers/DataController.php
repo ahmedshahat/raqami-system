@@ -232,6 +232,26 @@ class DataController extends Controller
                 'label' => __('construction::lang.manage_construction_settings'),
                 'default' => false,
             ],
+            [
+                'value' => 'construction.reports.view',
+                'label' => __('construction::lang.view_construction_reports'),
+                'default' => false,
+            ],
+            [
+                'value' => 'construction.accounting.view',
+                'label' => __('construction::lang.view_construction_accounting'),
+                'default' => false,
+            ],
+            [
+                'value' => 'construction.payment.record',
+                'label' => __('construction::lang.record_construction_payments'),
+                'default' => false,
+            ],
+            [
+                'value' => 'construction.cancel',
+                'label' => __('construction::lang.cancel_posted_construction_documents'),
+                'default' => false,
+            ],
         ];
     }
 

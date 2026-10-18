@@ -18,7 +18,11 @@ class MapCustomerCollection
                 return;
             }
 
-            $poster->syncCustomerCollection($payment);
+            $posting = $poster->syncCustomerCollection($payment);
+            if (! $posting) {
+                return;
+            }
+
             // The Construction entry is authoritative for certificate collections.
             // Remove the generic Accounting payment mapping if its listener ran first.
             app(\Modules\Accounting\Utils\AccountingUtil::class)->deleteMap(null, $payment->id);

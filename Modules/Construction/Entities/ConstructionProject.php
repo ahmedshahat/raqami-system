@@ -100,7 +100,9 @@ class ConstructionProject extends Model
     public function expenses()
     {
         return $this->hasMany(Transaction::class, 'construction_project_id')
-            ->whereIn('type', ['expense', 'expense_refund']);
+            ->whereIn('type', ['expense', 'expense_refund'])
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('construction_expense_cancellations as expense_cancellations')
+                ->whereColumn('expense_cancellations.expense_transaction_id', 'transactions.id'));
     }
 
     public function materialDocuments()

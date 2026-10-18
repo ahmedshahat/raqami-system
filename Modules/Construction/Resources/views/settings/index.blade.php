@@ -24,6 +24,16 @@
             </span>
             <i class="fa fa-chevron-left ct-settings-card__arrow"></i>
         </a>
+        @can('construction.accounting.view')
+        <a href="{{ route('construction.settings.accounting.reconciliation') }}" class="ct-settings-card">
+            <span class="ct-settings-card__icon"><i class="fa fa-balance-scale"></i></span>
+            <span class="ct-settings-card__content">
+                <strong>@lang('construction::lang.accounting_reconciliation')</strong>
+                <small>@lang('construction::lang.accounting_reconciliation_description')</small>
+            </span>
+            <i class="fa fa-chevron-left ct-settings-card__arrow"></i>
+        </a>
+        @endcan
     </div>
 </section>
 @endsection

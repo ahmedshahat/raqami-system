@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Business;
+use App\BusinessLocation;
 use App\Contact;
 use App\Transaction;
 use App\Unit;
@@ -10,7 +11,12 @@ use App\User;
 use App\Utils\ModuleUtil;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Mockery;
+use Modules\Accounting\Entities\AccountingAccount;
+use Modules\Accounting\Entities\AccountingAccountsTransaction;
+use Modules\Construction\Entities\ConstructionExpenseCancellation;
+use Modules\Construction\Support\AccountingReconciliationReport;
 use Modules\Construction\Entities\ConstructionProject;
 use Modules\Construction\Entities\ConstructionSubcontract;
 use Modules\Construction\Entities\ConstructionSubcontractCertificate;
@@ -131,6 +137,114 @@ class ConstructionExpenseLinkTest extends TestCase
             route('expenses.index', ['construction_only' => 1, 'construction_project_id' => $projectA->id]),
             html_entity_decode($filtered->getContent())
         );
+    }
+
+    public function test_project_expense_uses_the_expense_module_accounting_entry_once(): void
+    {
+        [$business, $user, $customer, $locationId] = $this->context();
+        $this->actingAs($user);
+        [$project] = $this->projectWithItem($business->id, $user->id, $customer->id, 'ACCOUNTING');
+
+        $expenseAccount = AccountingAccount::create([
+            'business_id' => $business->id, 'name' => 'Test project general expense '.uniqid(),
+            'account_primary_type' => 'expenses', 'status' => 'active', 'created_by' => $user->id,
+        ]);
+        $cashAccount = AccountingAccount::create([
+            'business_id' => $business->id, 'name' => 'Test project expense cash '.uniqid(),
+            'account_primary_type' => 'asset', 'account_sub_type_id' => 3,
+            'status' => 'active', 'created_by' => $user->id,
+        ]);
+        $location = BusinessLocation::where('business_id', $business->id)->findOrFail($locationId);
+        $location->accounting_default_map = json_encode([
+            'expense' => ['deposit_to' => $expenseAccount->id, 'payment_account' => $cashAccount->id],
+        ]);
+        $location->save();
+
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-ACCOUNTING-ONCE', 275) + [
+            'construction_project_id' => $project->id,
+        ])->assertRedirect('expenses');
+        $expense = Transaction::where('business_id', $business->id)->where('ref_no', 'EXP-ACCOUNTING-ONCE')->firstOrFail();
+        $lines = AccountingAccountsTransaction::where('transaction_id', $expense->id)
+            ->whereNull('transaction_payment_id')->get()->keyBy('map_type');
+        $this->assertCount(2, $lines);
+        $this->assertTrue($lines->every(fn ($line) => (int) $line->construction_project_id === $project->id));
+        $this->assertSame('debit', $lines['deposit_to']->type);
+        $this->assertSame($expenseAccount->id, (int) $lines['deposit_to']->accounting_account_id);
+        $this->assertSame('credit', $lines['payment_account']->type);
+        $this->assertSame($cashAccount->id, (int) $lines['payment_account']->accounting_account_id);
+        $this->assertEquals(275, (float) $lines['deposit_to']->amount);
+        $this->assertEquals(275, (float) $project->expenses()->sum('final_total'));
+
+        $this->put(route('expenses.update', $expense->id), $this->expensePayload($locationId, 'EXP-ACCOUNTING-ONCE', 325) + [
+            'construction_project_id' => $project->id,
+        ])->assertStatus(422);
+        $updatedLines = AccountingAccountsTransaction::where('transaction_id', $expense->id)
+            ->whereNull('transaction_payment_id')->get();
+        $this->assertCount(2, $updatedLines, 'A posted project expense must preserve its original entry.');
+        $this->assertEquals(275, (float) $updatedLines->firstWhere('map_type', 'deposit_to')->amount);
+        $this->assertEquals(275, (float) $project->expenses()->sum('final_total'));
+        $this->get(route('accounting.projectProfitLoss', [
+            'construction_project_id' => $project->id,
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->toDateString(),
+        ]))->assertOk()->assertSee($project->code)->assertSee($expenseAccount->name)->assertSee('275');
+    }
+
+    public function test_posted_project_expense_is_cancelled_with_a_reversing_entry(): void
+    {
+        [$business, $user, $customer, $locationId] = $this->context();
+        $user->update(['password' => Hash::make('Test-pass-123')]);
+        $this->actingAs($user);
+        [$project] = $this->projectWithItem($business->id, $user->id, $customer->id, 'REVERSAL');
+        $expenseAccount = AccountingAccount::create([
+            'business_id' => $business->id, 'name' => 'Reversal expense '.uniqid(),
+            'account_primary_type' => 'expenses', 'status' => 'active', 'created_by' => $user->id,
+        ]);
+        $cashAccount = AccountingAccount::create([
+            'business_id' => $business->id, 'name' => 'Reversal cash '.uniqid(),
+            'account_primary_type' => 'asset', 'account_sub_type_id' => 3, 'status' => 'active', 'created_by' => $user->id,
+        ]);
+        $location = BusinessLocation::where('business_id', $business->id)->findOrFail($locationId);
+        $location->update(['accounting_default_map' => json_encode([
+            'expense' => ['deposit_to' => $expenseAccount->id, 'payment_account' => $cashAccount->id],
+        ])]);
+
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-REVERSE', 450) + [
+            'construction_project_id' => $project->id,
+        ])->assertRedirect('expenses');
+        $expense = Transaction::where('business_id', $business->id)->where('ref_no', 'EXP-REVERSE')->firstOrFail();
+        $beforeCancellation = app(AccountingReconciliationReport::class)->build($business->id);
+        $expenseTotalBeforeCancellation = (float) app(\App\Utils\TransactionUtil::class)
+            ->getExpenseReport($business->id, [], 'total')->total_expense;
+        $this->assertFalse($beforeCancellation['issues']->contains(fn ($issue) => $issue['source_type'] === 'project_expense' && $issue['source_id'] === $expense->id));
+        $this->get(route('construction.settings.accounting.reconciliation'))
+            ->assertOk()->assertSee(__('construction::lang.accounting_reconciliation'));
+
+        $this->post(route('construction.costs.expenses.cancel', $expense->id), [
+            'current_password' => 'Test-pass-123',
+            'cancellation_reason' => 'Duplicate supplier expense',
+        ])->assertRedirect();
+
+        $cancellation = ConstructionExpenseCancellation::where('expense_transaction_id', $expense->id)->firstOrFail();
+        $refund = Transaction::findOrFail($cancellation->refund_transaction_id);
+        $this->assertSame('expense_refund', $refund->type);
+        $this->assertSame('construction_expense_cancellation', $refund->source);
+        $this->assertEquals(450, (float) $refund->final_total);
+        $this->assertNull($refund->construction_project_id);
+        $this->assertSame(0, AccountingAccountsTransaction::where('transaction_id', $refund->id)->count());
+        $reversal = AccountingAccountsTransaction::where('acc_trans_mapping_id', $cancellation->accounting_mapping_id)->get();
+        $this->assertCount(2, $reversal);
+        $this->assertEquals(450, (float) $reversal->where('type', 'debit')->sum('amount'));
+        $this->assertEquals(450, (float) $reversal->where('type', 'credit')->sum('amount'));
+        $this->assertEquals(0, (float) $project->expenses()->sum('final_total'));
+        $this->assertDatabaseHas('transactions', ['id' => $expense->id, 'final_total' => 450]);
+        $expenseTotalAfterCancellation = (float) app(\App\Utils\TransactionUtil::class)
+            ->getExpenseReport($business->id, [], 'total')->total_expense;
+        $this->assertEquals($expenseTotalBeforeCancellation - 450, $expenseTotalAfterCancellation);
+        $this->get(action([\App\Http\Controllers\ExpenseController::class, 'edit'], $refund->id))
+            ->assertStatus(422);
+        $afterCancellation = app(AccountingReconciliationReport::class)->build($business->id);
+        $this->assertFalse($afterCancellation['issues']->contains(fn ($issue) => $issue['source_type'] === 'project_expense_reversal' && $issue['source_id'] === $cancellation->id));
     }
 
     public function test_expenses_remain_independent_when_construction_is_not_in_the_company_subscription(): void

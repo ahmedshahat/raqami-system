@@ -109,7 +109,9 @@ class DashboardController extends BaseController
         $expenseQuery = Transaction::query()
             ->where('business_id', $businessId)
             ->whereNotNull('construction_project_id')
-            ->whereIn('type', ['expense', 'expense_refund']);
+            ->whereIn('type', ['expense', 'expense_refund'])
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('construction_expense_cancellations as expense_cancellations')
+                ->whereColumn('expense_cancellations.expense_transaction_id', 'transactions.id'));
 
         if ($selectedProjectId) {
             $expenseQuery->where('construction_project_id', $selectedProjectId);

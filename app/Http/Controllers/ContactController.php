@@ -1309,6 +1309,15 @@ class ContactController extends Controller
 
         $ledger_details = $this->transactionUtil->getLedgerDetails($contact_id, $start_date, $end_date, $format, $location_id, $line_details);
 
+        //Cheques not collected / cleared yet are not payments; show them so the statement explains the due.
+        $pending_cheques = \App\Cheque::where('business_id', $business_id)
+            ->where('contact_id', $contact_id)
+            ->where('status', \App\Cheque::STATUS_PENDING)
+            ->with('transaction')
+            ->orderBy('due_date')
+            ->get();
+        view()->share('pending_cheques', $pending_cheques);
+
         $location = null;
         if (! empty($location_id)) {
             $location = BusinessLocation::where('business_id', $business_id)->find($location_id);

@@ -5,6 +5,7 @@ namespace Modules\Construction\Http\Controllers;
 use App\Business;
 use App\BusinessLocation;
 use App\User;
+use App\Utils\Util;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,9 @@ use Illuminate\Validation\ValidationException;
 use Modules\Construction\Entities\ConstructionBoqItem;
 use Modules\Construction\Entities\ConstructionLaborSheet;
 use Modules\Construction\Entities\ConstructionProject;
+use Modules\Construction\Entities\ConstructionAccountingSetting;
+use Modules\Construction\Support\ConstructionAccountingPoster;
+use Modules\Accounting\Entities\AccountingAccount;
 
 class LaborController extends BaseController
 {
@@ -42,7 +46,7 @@ class LaborController extends BaseController
                     ->orWhereHas('project', fn ($project) => $project->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
             }))->latest('period_end')->latest('id')->paginate(20)->withQueryString();
 
-        $canCancelApproved = $this->isAdmin();
+        $canCancelApproved = $this->isAdmin() || auth()->user()->can('construction.cancel');
 
         return view('construction::labor.index', compact('projects', 'selectedProjectId', 'status', 'search', 'stats', 'sheets', 'canCancelApproved'));
     }
@@ -68,9 +72,25 @@ class LaborController extends BaseController
     {
         $this->authorizePermission('construction.labor.view');
         $sheet = $this->findSheet($sheet);
-        $sheet->load(['project:id,code,name,customer_id,manager_id', 'lines.worker:id,surname,first_name,last_name', 'lines.boqItem:id,code,description', 'approvedBy:id,surname,first_name,last_name', 'cancelledBy:id,surname,first_name,last_name']);
-        $canCancelApproved = $this->isAdmin();
-        return view('construction::labor.show', array_merge($this->lineOptions($sheet), compact('sheet', 'canCancelApproved')));
+        $sheet->load(['project:id,code,name,customer_id,manager_id', 'lines.worker:id,surname,first_name,last_name', 'lines.boqItem:id,code,description', 'approvedBy:id,surname,first_name,last_name', 'cancelledBy:id,surname,first_name,last_name', 'accountingPosting.mapping', 'cancellationAccountingPosting.mapping', 'payments.accountingAccount:id,name', 'payments.accountingPosting.mapping']);
+        $canCancelApproved = $this->isAdmin() || auth()->user()->can('construction.cancel');
+        $accountingSettings = ConstructionAccountingSetting::where('business_id', $this->businessId())->first();
+        $accountingPaymentAccounts = $accountingSettings
+            ? AccountingAccount::where('business_id', $this->businessId())->where('status', 'active')
+                ->where('account_primary_type', 'asset')->where('account_sub_type_id', 3)->orderBy('name')->pluck('name', 'id')
+            : collect();
+        $paymentTypes = (new Util())->payment_types(null, false, $this->businessId());
+        $laborAccountingReady = $accountingSettings
+            && $accountingSettings->labor_cost_account_id
+            && $accountingSettings->labor_payable_account_id
+            && $accountingPaymentAccounts->isNotEmpty();
+        $paidValue = $sheet->paidValue();
+        $remainingValue = $sheet->remainingValue();
+        $paymentStatus = $sheet->paymentStatus();
+        return view('construction::labor.show', array_merge($this->lineOptions($sheet), compact(
+            'sheet', 'canCancelApproved', 'accountingSettings', 'accountingPaymentAccounts',
+            'paymentTypes', 'laborAccountingReady', 'paidValue', 'remainingValue', 'paymentStatus'
+        )));
     }
 
     public function edit(int $sheet)
@@ -136,6 +156,7 @@ class LaborController extends BaseController
             $sheet = ConstructionLaborSheet::where('business_id', $this->businessId())->lockForUpdate()->findOrFail($sheet);
             abort_unless($sheet->isEditable(), 422);
             abort_if(! $sheet->lines()->exists(), 422, __('construction::lang.labor_sheet_empty'));
+            app(ConstructionAccountingPoster::class)->postLaborSheetApproval($sheet);
             $sheet->update(['status' => 'approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
         });
         return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.labor_sheet_approved')]);
@@ -143,8 +164,7 @@ class LaborController extends BaseController
 
     public function cancel(Request $request, int $sheet)
     {
-        $this->authorizePermission('construction.labor.approve');
-        abort_unless($this->isAdmin(), 403, __('construction::lang.only_manager_can_cancel_labor_sheet'));
+        $this->authorizePermission('construction.cancel');
 
         $validated = $request->validate([
             'current_password' => ['required', 'string'],
@@ -160,12 +180,18 @@ class LaborController extends BaseController
         DB::transaction(function () use ($sheet, $validated) {
             $sheet = ConstructionLaborSheet::where('business_id', $this->businessId())->lockForUpdate()->findOrFail($sheet);
             abort_unless($sheet->status === 'approved', 422, __('construction::lang.only_approved_labor_sheet_can_be_cancelled'));
+            if ($sheet->activePayments()->exists()) {
+                throw ValidationException::withMessages([
+                    'cancellation_reason' => __('construction::lang.labor_sheet_with_payments_cannot_be_cancelled'),
+                ]);
+            }
             $sheet->update([
                 'status' => 'cancelled',
                 'cancellation_reason' => $validated['cancellation_reason'],
                 'cancelled_by' => auth()->id(),
                 'cancelled_at' => now(),
             ]);
+            app(ConstructionAccountingPoster::class)->reverseLaborSheetApproval($sheet->fresh());
         });
 
         return redirect()->route('construction.labor.show', $sheet)

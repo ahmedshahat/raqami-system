@@ -24,7 +24,7 @@
         <tr>
             <td>{{ $loop->iteration }}</td>
             <td>
-                @if($sell->source === 'construction_certificate' && $sell_line->product->sku === 'CONST-IPC-SERVICE' && $sell_line->sell_line_note)
+                @if(($sell->source ?? null) === 'construction_certificate' && $sell_line->product->sku === 'CONST-IPC-SERVICE' && $sell_line->sell_line_note)
                     {{ $sell_line->sell_line_note }}
                 @else
                     {{ $sell_line->product->name }}
@@ -33,7 +33,7 @@
                 - {{ $sell_line->variations->product_variation->name ?? ''}}
                 - {{ $sell_line->variations->name ?? ''}},
                 @endif
-                @if(!($sell->source === 'construction_certificate' && $sell_line->product->sku === 'CONST-IPC-SERVICE')){{ $sell_line->variations->sub_sku ?? ''}}@endif
+                @if(!(($sell->source ?? null) === 'construction_certificate' && $sell_line->product->sku === 'CONST-IPC-SERVICE')){{ $sell_line->variations->sub_sku ?? ''}}@endif
                 @php
                 $brand = $sell_line->product->brand;
                 @endphp
@@ -41,7 +41,7 @@
                 , {{$brand->name}}
                 @endif
 
-                @if(!empty($sell_line->sell_line_note) && !($sell->source === 'construction_certificate' && $sell_line->product->sku === 'CONST-IPC-SERVICE'))
+                @if(!empty($sell_line->sell_line_note) && !(($sell->source ?? null) === 'construction_certificate' && $sell_line->product->sku === 'CONST-IPC-SERVICE'))
                 <br> {{$sell_line->sell_line_note}}
                 @endif
                 @if($is_warranty_enabled && !empty($sell_line->warranties->first()) )

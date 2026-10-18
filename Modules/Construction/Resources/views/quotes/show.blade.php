@@ -217,24 +217,7 @@
                     </div>
                     <form method="POST" action="{{ route('construction.quotes.items.store', $quote->id) }}">
                         @csrf
-                        <div class="rr-table-scroll">
-                            <table class="rr-table rr-table--wide">
-                                <caption class="rr-sr">@lang('construction::lang.add_quote_items')</caption>
-                                <thead>
-                                    <tr>
-                                        <th class="rr-th" scope="col">@lang('construction::lang.boq_code')</th>
-                                        <th class="rr-th" scope="col">@lang('construction::lang.boq_description')<span class="rr-field__req" aria-hidden="true">*</span></th>
-                                        <th class="rr-th" scope="col">@lang('construction::lang.unit')<span class="rr-field__req" aria-hidden="true">*</span></th>
-                                        <th class="rr-th" scope="col">@lang('construction::lang.quantity')<span class="rr-field__req" aria-hidden="true">*</span></th>
-                                        <th class="rr-th" scope="col">@lang('construction::lang.unit_price')<span class="rr-field__req" aria-hidden="true">*</span></th>
-                                        <th class="rr-th" scope="col">@lang('construction::lang.notes')</th>
-                                        <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.total')</th>
-                                        <th class="rr-th" scope="col"><span class="rr-sr">@lang('construction::lang.actions')</span></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ct-quote-entry-rows"></tbody>
-                            </table>
-                        </div>
+                        <div class="rr-entry" id="ct-quote-entry-rows" aria-label="@lang('construction::lang.add_quote_items')"></div>
                         <div class="rr-toolbar">
                             <button class="rr-btn rr-btn--secondary rr-btn--sm" id="ct-quote-add-row" type="button">@include('construction::partials.rr_icon', ['name' => 'plus'])@lang('construction::lang.add_row')</button>
                             <div class="rr-toolbar__end">
@@ -245,16 +228,37 @@
                 </section>
 
                 <template id="ct-quote-row-template">
-                    <tr class="rr-tr">
-                        <td class="rr-td rr-td--input rr-col--code"><div class="rr-control rr-control--sm"><input class="rr-control__input" name="items[__INDEX__][code]" maxlength="60" placeholder="ITM-001" aria-label="@lang('construction::lang.boq_code')"></div></td>
-                        <td class="rr-td rr-td--input rr-col--text"><div class="rr-control rr-control--sm"><input class="rr-control__input" name="items[__INDEX__][description]" maxlength="500" required aria-label="@lang('construction::lang.boq_description')"></div></td>
-                        <td class="rr-td rr-td--input rr-col--unit"><div class="rr-control rr-control--sm"><select class="rr-control__input rr-control__select" name="items[__INDEX__][unit_id]" required aria-label="@lang('construction::lang.unit')"><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select><span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span></div></td>
-                        <td class="rr-td rr-td--input rr-col--qty"><div class="rr-control rr-control--sm"><input class="rr-control__input rr-control__input--num ct-quote-qty" type="number" step="0.0001" min="0.0001" name="items[__INDEX__][quantity]" value="1" required aria-label="@lang('construction::lang.quantity')"></div></td>
-                        <td class="rr-td rr-td--input rr-col--price"><div class="rr-control rr-control--sm"><input class="rr-control__input rr-control__input--num ct-quote-price" type="number" step="0.0001" min="0" name="items[__INDEX__][unit_price]" value="0" required aria-label="@lang('construction::lang.unit_price')"></div></td>
-                        <td class="rr-td rr-td--input rr-col--notes"><div class="rr-control rr-control--sm"><input class="rr-control__input" name="items[__INDEX__][notes]" maxlength="1000" aria-label="@lang('construction::lang.notes')"></div></td>
-                        <td class="rr-td rr-td--num"><span class="rr-money rr-money--sm"><span class="print-money print-money--{{ $currencyParts['position'] }}">@if($currencyParts['position'] === 'before')@include('construction::partials.money_symbol', ['money' => $currencyParts, 'isSaudiRiyal' => $currencyParts['code'] === 'SAR', 'symbolSource' => asset('img/saudi-riyal-new.svg')])@endif<output class="rr-num">0</output>@if($currencyParts['position'] === 'after')@include('construction::partials.money_symbol', ['money' => $currencyParts, 'isSaudiRiyal' => $currencyParts['code'] === 'SAR', 'symbolSource' => asset('img/saudi-riyal-new.svg')])@endif</span></span></td>
-                        <td class="rr-td rr-td--actions"><button class="rr-btn rr-btn--danger-ghost rr-btn--sm rr-btn--icon ct-quote-remove-row" type="button" aria-label="@lang('construction::lang.delete')">@include('construction::partials.rr_icon', ['name' => 'close', 'size' => 18])</button></td>
-                    </tr>
+                    <div class="rr-entry-row" data-rr-entry-row>
+                        <span class="rr-entry-row__num" aria-hidden="true"></span>
+                        <div class="rr-entry-row__fields">
+                            <div class="rr-entry-field rr-entry-field--grow">
+                                <label class="rr-entry-field__label" for="rr-entry-__INDEX__-desc">@lang('construction::lang.boq_description')<span class="rr-field__req" aria-hidden="true">*</span></label>
+                                <div class="rr-control rr-control--sm"><input id="rr-entry-__INDEX__-desc" class="rr-control__input" name="items[__INDEX__][description]" maxlength="500" required></div>
+                            </div>
+                            <div class="rr-entry-field rr-entry-field--unit">
+                                <label class="rr-entry-field__label" for="rr-entry-__INDEX__-unit">@lang('construction::lang.unit')<span class="rr-field__req" aria-hidden="true">*</span></label>
+                                <div class="rr-control rr-control--sm"><select id="rr-entry-__INDEX__-unit" class="rr-control__input rr-control__select" name="items[__INDEX__][unit_id]" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select><span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span></div>
+                            </div>
+                            <span class="rr-entry-row__break" aria-hidden="true"></span>
+                            <div class="rr-entry-field rr-entry-field--num">
+                                <label class="rr-entry-field__label" for="rr-entry-__INDEX__-qty">@lang('construction::lang.quantity')<span class="rr-field__req" aria-hidden="true">*</span></label>
+                                <div class="rr-control rr-control--sm"><input id="rr-entry-__INDEX__-qty" class="rr-control__input rr-control__input--num ct-quote-qty" type="number" step="0.0001" min="0.0001" name="items[__INDEX__][quantity]" value="1" required></div>
+                            </div>
+                            <div class="rr-entry-field rr-entry-field--num">
+                                <label class="rr-entry-field__label" for="rr-entry-__INDEX__-price">@lang('construction::lang.unit_price')<span class="rr-field__req" aria-hidden="true">*</span></label>
+                                <div class="rr-control rr-control--sm"><input id="rr-entry-__INDEX__-price" class="rr-control__input rr-control__input--num ct-quote-price" type="number" step="0.0001" min="0" name="items[__INDEX__][unit_price]" value="0" required></div>
+                            </div>
+                            <div class="rr-entry-field rr-entry-field--note">
+                                <label class="rr-entry-field__label" for="rr-entry-__INDEX__-notes">@lang('construction::lang.notes')</label>
+                                <div class="rr-control rr-control--sm"><input id="rr-entry-__INDEX__-notes" class="rr-control__input" name="items[__INDEX__][notes]" maxlength="1000"></div>
+                            </div>
+                            <div class="rr-entry-field rr-entry-field--total">
+                                <span class="rr-entry-field__label">@lang('construction::lang.total')</span>
+                                <div class="rr-entry-field__value" aria-live="polite"><span class="rr-money rr-money--sm"><span class="print-money print-money--{{ $currencyParts['position'] }}">@if($currencyParts['position'] === 'before')@include('construction::partials.money_symbol', ['money' => $currencyParts, 'isSaudiRiyal' => $currencyParts['code'] === 'SAR', 'symbolSource' => asset('img/saudi-riyal-new.svg')])@endif<output class="rr-num">0</output>@if($currencyParts['position'] === 'after')@include('construction::partials.money_symbol', ['money' => $currencyParts, 'isSaudiRiyal' => $currencyParts['code'] === 'SAR', 'symbolSource' => asset('img/saudi-riyal-new.svg')])@endif</span></span></div>
+                            </div>
+                        </div>
+                        <button class="rr-btn rr-btn--danger-ghost rr-btn--sm rr-btn--icon ct-quote-remove-row" type="button" aria-label="@lang('construction::lang.delete_item')" title="@lang('construction::lang.delete_item')">@include('construction::partials.rr_icon', ['name' => 'trash', 'size' => 18])</button>
+                    </div>
                 </template>
             @endif
         </div>
@@ -450,22 +454,23 @@ $(function () {
     var body = document.getElementById('ct-quote-entry-rows'), template = document.getElementById('ct-quote-row-template'), add = document.getElementById('ct-quote-add-row'), next = 0;
     if (body && template && add) {
         function update() {
-            body.querySelectorAll('tr').forEach(function (row) {
+            body.querySelectorAll('[data-rr-entry-row]').forEach(function (row) {
                 var qty = parseFloat(row.querySelector('.ct-quote-qty').value) || 0, price = parseFloat(row.querySelector('.ct-quote-price').value) || 0;
                 row.querySelector('output').textContent = __currency_trans_from_en(qty * price, false);
             });
         }
-        function addRow() {
+        function addRow(focus) {
             body.insertAdjacentHTML('beforeend', template.innerHTML.replace(/__INDEX__/g, String(next++)));
             update();
+            if (focus) body.lastElementChild.querySelector('input, select').focus();
         }
-        add.addEventListener('click', addRow);
+        add.addEventListener('click', function () { addRow(true); });
         body.addEventListener('input', update);
         body.addEventListener('click', function (event) {
             var button = event.target.closest('.ct-quote-remove-row');
-            if (button && body.rows.length > 1) { button.closest('tr').remove(); update(); }
+            if (button && body.querySelectorAll('[data-rr-entry-row]').length > 1) { button.closest('[data-rr-entry-row]').remove(); update(); }
         });
-        addRow();
+        addRow(false);
     }
     @if($errors->has('quote_file') || request()->boolean('import'))$('#ct-quote-import').modal('show');@endif
 });

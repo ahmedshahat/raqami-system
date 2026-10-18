@@ -4,7 +4,9 @@ namespace Modules\Construction\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use App\Business;
 use App\BusinessLocation;
 use App\Product;
@@ -192,7 +194,8 @@ class CustomerCertificateController extends BaseController
         $project = $this->findProject($project);
         $certificate = $this->findCertificate($project, $certificate);
         $certificate->load([
-            'items.boqItem', 'boqVersion', 'contract', 'measurement', 'invoice', 'accountingPosting.mapping',
+            'items.boqItem', 'boqVersion', 'contract', 'measurement', 'invoice', 'creditNote',
+            'accountingPosting.mapping', 'cancellationAccountingPosting.mapping',
             'retentionReleases.accountingPosting.mapping', 'retentionReleases.cancellationAccountingPosting.mapping',
             'approvedBy:id,surname,first_name,last_name,username',
         ]);
@@ -246,15 +249,78 @@ class CustomerCertificateController extends BaseController
         return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.certificate_approved')]);
     }
 
-    public function cancel(int $project, int $certificate)
+    public function cancel(Request $request, int $project, int $certificate)
     {
-        $this->authorizePermission('construction.certificate.manage');
+        $this->authorizePermission('construction.cancel');
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'cancellation_reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ]);
+        if (! Hash::check($validated['current_password'], auth()->user()->password)) {
+            throw ValidationException::withMessages(['current_password' => __('construction::lang.invalid_manager_password')]);
+        }
         $project = $this->findProject($project);
         $certificate = $this->findCertificate($project, $certificate);
-        abort_unless(in_array($certificate->status, ['draft', 'submitted'], true), 422, __('construction::lang.approved_certificate_cannot_be_cancelled'));
-        DB::transaction(function () use ($certificate) {
+        abort_if($certificate->status === 'cancelled', 422, __('construction::lang.certificate_already_cancelled'));
+
+        DB::transaction(function () use ($certificate, $validated) {
+            $certificate = ConstructionCustomerCertificate::whereKey($certificate->id)->lockForUpdate()->firstOrFail();
+            abort_if($certificate->status === 'cancelled', 422, __('construction::lang.certificate_already_cancelled'));
+            $previousStatus = $certificate->status;
+
+            $creditNote = null;
+            $reversal = null;
+            if ($certificate->invoice_transaction_id) {
+                $invoice = $certificate->invoice()->with('sell_lines')->lockForUpdate()->firstOrFail();
+                $hasCollections = DB::table('transaction_payments')
+                    ->where('transaction_id', $invoice->id)
+                    ->where('amount', '>', 0)
+                    ->exists();
+                abort_if($hasCollections, 422, __('construction::lang.customer_certificate_has_collections'));
+                abort_if($certificate->activeRetentionReleases()->exists(), 422, __('construction::lang.customer_certificate_has_retention_releases'));
+
+                $products = $invoice->sell_lines->map(fn ($line) => [
+                    'sell_line_id' => $line->id,
+                    'quantity' => (float) $line->quantity,
+                    'unit_price_inc_tax' => (float) $line->unit_price_inc_tax,
+                ])->all();
+                abort_if(empty($products), 422, __('construction::lang.customer_invoice_lines_missing'));
+
+                $creditNote = app(TransactionUtil::class)->addSellReturn([
+                    'transaction_id' => $invoice->id,
+                    'transaction_date' => now(),
+                    'products' => $products,
+                    'discount_type' => $invoice->discount_type ?: 'fixed',
+                    'discount_amount' => (float) $invoice->discount_amount,
+                    'tax_id' => $invoice->tax_id,
+                ], $certificate->business_id, auth()->id(), false);
+                $creditNote->forceFill([
+                    'source' => 'construction_certificate_cancellation',
+                    'construction_project_id' => $certificate->project_id,
+                ])->save();
+
+                $reversal = app(ConstructionAccountingPoster::class)->reversePostedDocument(
+                    $certificate->business_id,
+                    'customer_certificate',
+                    $certificate->id,
+                    'invoiced',
+                    'CT-CUS-CAN-'.$certificate->number,
+                    __('construction::lang.customer_certificate_reversal_note', ['number' => $certificate->number]),
+                    now()
+                );
+            }
+
             DB::table('construction_measurement_items')->where('certificate_id', $certificate->id)->update(['certificate_id' => null, 'updated_at' => now()]);
-            $certificate->update(['status' => 'cancelled']);
+            $certificate->update([
+                'status' => 'cancelled',
+                'credit_note_transaction_id' => $creditNote?->id,
+                'cancellation_reason' => $validated['cancellation_reason'],
+                'cancelled_by' => auth()->id(),
+                'cancelled_at' => now(),
+            ]);
+            AuditTrail::record('customer_certificate_cancelled', $certificate, $certificate->project_id,
+                ['status' => $previousStatus],
+                ['status' => 'cancelled', 'credit_note_transaction_id' => $creditNote?->id, 'accounting_mapping_id' => $reversal?->accounting_mapping_id]);
         });
 
         return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.certificate_cancelled')]);
@@ -308,7 +374,7 @@ class CustomerCertificateController extends BaseController
 
     public function createInvoice(int $project, int $certificate)
     {
-        $this->authorizePermission('construction.certificate.view');
+        $this->authorizePermission('construction.certificate.approve');
         abort_unless(auth()->user()->can('sell.create') || auth()->user()->can('direct_sell.access') || $this->isAdmin(), 403);
         $project = $this->findProject($project);
         $certificate = $this->findCertificate($project, $certificate);

@@ -16,8 +16,13 @@ class ConstructionSubcontract extends Model
     public function subcontractor() { return $this->belongsTo(Contact::class, 'subcontractor_id'); }
     public function items() { return $this->hasMany(ConstructionSubcontractItem::class, 'subcontract_id')->orderBy('sort_order')->orderBy('id'); }
     public function certificates() { return $this->hasMany(ConstructionSubcontractCertificate::class, 'subcontract_id')->latest('certificate_date')->latest('id'); }
+    public function advances() { return $this->hasMany(ConstructionSubcontractAdvance::class, 'subcontract_id')->latest('advance_date')->latest('id'); }
+    public function activeAdvances() { return $this->hasMany(ConstructionSubcontractAdvance::class, 'subcontract_id')->where('status', 'recorded'); }
     public function createdBy() { return $this->belongsTo(User::class, 'created_by'); }
     public function approvedBy() { return $this->belongsTo(User::class, 'approved_by'); }
     public function isEditable(): bool { return $this->status === 'draft'; }
     public function retentionValue(): float { return round((float) $this->total_value * (float) $this->retention_percent / 100, 4); }
+    public function advanceTotal(): float { return round((float) $this->activeAdvances()->sum('amount'), 4); }
+    public function advanceRecovered(): float { return round((float) $this->certificates()->where('status', 'approved')->sum('advance_recovery_value'), 4); }
+    public function advanceRemaining(): float { return round(max(0, $this->advanceTotal() - $this->advanceRecovered()), 4); }
 }
