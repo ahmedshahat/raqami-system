@@ -2,210 +2,643 @@
 
 @section('title', $certificate->number)
 
+@php
+    $certificateTones = ['draft' => 'warning', 'approved' => 'success', 'cancelled' => 'neutral'];
+    $paymentTones = ['unpaid' => 'warning', 'partially_paid' => 'info', 'paid' => 'success'];
+    $isApproved = $certificate->status === 'approved';
+    $isEditable = $certificate->isEditable();
+    $canEditCertificate = $isEditable && auth()->user()->can('construction.subcontract.manage');
+    $subcontractorName = $contract->subcontractor->supplier_business_name ?: $contract->subcontractor->name;
+    $canCancelCertificate = $isApproved && ! $certificate->activePayments()->exists() && ! $certificate->activeRetentionReleases()->exists();
+    if ($isApproved) {
+        $paidValue = $certificate->paidValue();
+        $releasedRetentionValue = $certificate->releasedRetentionValue();
+        $retentionRemainingValue = $certificate->retentionRemainingValue();
+        $payableValue = $certificate->payableValue();
+        $remainingValue = $certificate->remainingValue();
+        $certificatePaymentStatus = $certificate->paymentStatus();
+    }
+    $req = '<span class="rr-field__req" aria-hidden="true">*</span>';
+@endphp
+
 @section('module_content')
-<section class="content ct-materials-page ct-subcert-page">
-    @if($errors->any())
-        <div class="alert alert-danger ct-subcert-validation-alert"><i class="fa fa-exclamation-triangle"></i><div><strong>@lang('construction::lang.subcontract_form_has_errors')</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div></div>
-    @endif
-    <div class="ct-document-hero ct-subcontract-hero">
-        <div>
-            <a href="{{ route('construction.subcontractors.show', $contract->id) }}" class="ct-back-link"><i class="fa fa-arrow-right"></i> @lang('construction::lang.back_to_subcontract')</a>
-            <div class="ct-document-title">
-                <span class="ct-document-title__icon"><i class="fa fa-file-invoice-dollar"></i></span>
-                <div><div class="ct-document-kicker">@lang('construction::lang.subcontract_certificate') <span class="ct-status-pill {{ $certificate->status === 'approved' ? 'is-approved' : 'is-draft' }}">@lang('construction::lang.'.$certificate->status)</span></div><h1>{{ $certificate->number }}</h1><p>{{ $contract->number }} — {{ $contract->title }}</p></div>
+<main class="content rr-page" aria-labelledby="rr-subcert-title">
+
+    {{-- ═══ رأس الصفحة ═══ --}}
+    <header class="rr-head">
+        <span class="rr-chip rr-chip--lg rr-chip--warning" aria-hidden="true">@include('construction::partials.rr_icon', ['name' => 'file', 'size' => 24])</span>
+        <div class="rr-head__titles">
+            <nav aria-label="@lang('construction::lang.breadcrumb_nav')">
+                <ol class="rr-crumbs">
+                    <li><a href="{{ route('construction.subcontractors.index') }}">@lang('construction::lang.subcontract_agreements')</a></li>
+                    <li><a href="{{ route('construction.subcontractors.show', $contract->id) }}" class="rr-num">{{ $contract->number }}</a></li>
+                    <li><span aria-current="page" class="rr-num">{{ $certificate->number }}</span></li>
+                </ol>
+            </nav>
+            <h1 id="rr-subcert-title" class="rr-head__title">@lang('construction::lang.subcontract_certificate'): <span class="rr-num">{{ $certificate->number }}</span></h1>
+            <div class="rr-head__meta">
+                <span class="rr-badge rr-badge--{{ $certificateTones[$certificate->status] ?? 'neutral' }}"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.' . $certificate->status)</span>
+                <span class="rr-head__meta-item">@include('construction::partials.rr_icon', ['name' => 'user', 'size' => 18]){{ $subcontractorName }}</span>
+                <span class="rr-head__meta-item">@include('construction::partials.rr_icon', ['name' => 'building', 'size' => 18]){{ $contract->project->name }}</span>
+                <span class="rr-head__meta-item">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])<span class="rr-num">{{ @format_date($certificate->certificate_date) }}</span></span>
+                <span class="rr-head__meta-item">@include('construction::partials.rr_icon', ['name' => 'lock', 'size' => 18])@lang('construction::lang.retention_percent') <span class="rr-num">{{ @num_format($certificate->retention_percent) }}%</span></span>
             </div>
         </div>
-        <div class="ct-document-actions">
-            @if($certificate->status === 'approved' && ! $certificate->activePayments()->exists() && ! $certificate->activeRetentionReleases()->exists())
-                @can('construction.cancel')<button type="button" class="btn btn-danger" data-toggle="modal" data-target="#cancel-subcontract-certificate"><i class="fa fa-ban"></i> @lang('construction::lang.cancel_posted_certificate')</button>@endcan
-            @endif
-            @can('construction.cancel')
-                @foreach($certificate->payments->where('status', 'recorded') as $payment)
-                    <button type="button" class="btn btn-danger js-cancel-subcontract-payment" data-toggle="modal" data-target="#cancel-subcontract-payment" data-action="{{ route('construction.subcontractors.certificates.payments.cancel',[$contract->id,$certificate->id,$payment->id]) }}"><i class="fa fa-ban"></i> @lang('construction::lang.cancel_posted_payment') {{ $payment->number }}</button>
-                @endforeach
-            @endcan
-            <a href="{{ route('construction.subcontractors.certificates.preview', [$contract->id, $certificate->id]) }}" target="_blank" class="btn btn-default"><i class="fa fa-eye"></i> @lang('construction::lang.print_preview')</a>
-            <a href="{{ route('construction.subcontractors.certificates.print', [$contract->id, $certificate->id]) }}" target="_blank" class="btn btn-primary"><i class="fa fa-print"></i> @lang('construction::lang.print')</a>
+        <div class="rr-head__actions">
+            <a href="{{ route('construction.subcontractors.show', $contract->id) }}" class="rr-btn rr-btn--secondary">@include('construction::partials.rr_icon', ['name' => 'arrow-back'])@lang('construction::lang.back_to_subcontract')</a>
+            <a href="{{ route('construction.subcontractors.certificates.preview', [$contract->id, $certificate->id]) }}" target="_blank" rel="noopener" class="rr-btn rr-btn--ghost">@include('construction::partials.rr_icon', ['name' => 'eye'])@lang('construction::lang.print_preview')</a>
+            <a href="{{ route('construction.subcontractors.certificates.print', [$contract->id, $certificate->id]) }}" target="_blank" rel="noopener" class="rr-btn rr-btn--ghost">@include('construction::partials.rr_icon', ['name' => 'print'])@lang('construction::lang.print')</a>
         </div>
-    </div>
+    </header>
 
-    <div class="ct-document-summary">
-        <div><span><i class="fa fa-hard-hat"></i></span><small>@lang('construction::lang.subcontractor')</small><strong>{{ $contract->subcontractor->supplier_business_name ?: $contract->subcontractor->name }}</strong></div>
-        <div><span><i class="fa fa-project-diagram"></i></span><small>@lang('construction::lang.project')</small><strong>{{ $contract->project->code }} — {{ $contract->project->name }}</strong></div>
-        <div><span><i class="fa fa-calendar"></i></span><small>@lang('construction::lang.certificate_date')</small><strong>{{ @format_date($certificate->certificate_date) }}</strong></div>
-        <div><span><i class="fa fa-percentage"></i></span><small>@lang('construction::lang.retention_percent')</small><strong>{{ @num_format($certificate->retention_percent) }}%</strong></div>
-    </div>
-
-    @if($certificate->accountingPosting?->mapping)
-        <div class="ct-accounting-posting-banner">
-            <span><i class="fa fa-check-circle"></i></span>
+    @if($errors->any())
+        <div class="rr-alert rr-alert--danger" role="alert">
             <div>
+                <strong>@lang('construction::lang.subcontract_form_has_errors')</strong>
+                <ul class="rr-error-list">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+            </div>
+        </div>
+    @endif
+
+    {{-- ═══ الخطوة التالية ═══ --}}
+    @if($isEditable)
+        <section class="rr-card rr-card--tint rr-card__body" aria-labelledby="rr-subcert-next-title">
+            <div class="rr-next">
+                <span class="rr-next__icon">@include('construction::partials.rr_icon', ['name' => 'shield', 'size' => 22])</span>
+                <div class="rr-next__copy">
+                    <div class="rr-eyebrow">@lang('construction::lang.next_action')</div>
+                    <h2 id="rr-subcert-next-title" class="rr-next__title">@lang('construction::lang.ready_for_approval')</h2>
+                    <p class="rr-next__text">@lang('construction::lang.approved_subcontract_certificate_locked')</p>
+                </div>
+                @can('construction.subcontract.approve')
+                    <form class="rr-inline-form" method="POST" action="{{ route('construction.subcontractors.certificates.approve', [$contract->id, $certificate->id]) }}" onsubmit="return confirm(@js(__('construction::lang.approve_subcontract_certificate_confirmation')))">
+                        @csrf
+                        <button class="rr-btn rr-btn--primary rr-btn--lg" type="submit">@include('construction::partials.rr_icon', ['name' => 'check'])@lang('construction::lang.approve_certificate')</button>
+                    </form>
+                @endcan
+                @can('construction.subcontract.manage')
+                    <form class="rr-inline-form" method="POST" action="{{ route('construction.subcontractors.certificates.destroy', [$contract->id, $certificate->id]) }}" onsubmit="return confirm(@js(__('construction::lang.delete_certificate_confirmation')))">
+                        @csrf
+                        @method('DELETE')
+                        <button class="rr-btn rr-btn--ghost" type="submit">@include('construction::partials.rr_icon', ['name' => 'trash'])@lang('messages.delete')</button>
+                    </form>
+                @endcan
+            </div>
+        </section>
+    @elseif($isApproved)
+        <section class="rr-card rr-card--tint rr-card__body" aria-labelledby="rr-subcert-next-title">
+            <div class="rr-next">
+                <span class="rr-next__icon">@include('construction::partials.rr_icon', ['name' => 'lock', 'size' => 22])</span>
+                <div class="rr-next__copy">
+                    <div class="rr-eyebrow">@lang('construction::lang.payment_status')</div>
+                    <h2 id="rr-subcert-next-title" class="rr-next__title"><span class="rr-badge rr-badge--lg rr-badge--{{ $paymentTones[$certificatePaymentStatus] ?? 'neutral' }}"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.payment_status_' . $certificatePaymentStatus)</span></h2>
+                    <p class="rr-next__text">@lang('construction::lang.remaining_amount'): <span class="rr-money rr-money--sm">@include('construction::partials.money', ['value' => $remainingValue])</span></p>
+                </div>
+                @if($remainingValue > 0.0001)
+                    @can('construction.payment.record')
+                        <button type="button" class="rr-btn rr-btn--primary rr-btn--lg" data-toggle="modal" data-target="#record-subcontract-payment">@include('construction::partials.rr_icon', ['name' => 'plus'])@lang('construction::lang.record_payment')</button>
+                    @endcan
+                @endif
+                @if($canCancelCertificate)
+                    @can('construction.cancel')
+                        <button type="button" class="rr-btn rr-btn--ghost" data-toggle="modal" data-target="#cancel-subcontract-certificate">@include('construction::partials.rr_icon', ['name' => 'close'])@lang('construction::lang.cancel_posted_certificate')</button>
+                    @endcan
+                @endif
+            </div>
+        </section>
+    @endif
+
+    {{-- ═══ القيود المحاسبية ═══ --}}
+    @if($certificate->accountingPosting?->mapping)
+        <div class="rr-callout rr-callout--success">
+            <span class="rr-callout__icon">@include('construction::partials.rr_icon', ['name' => 'check-circle', 'size' => 22])</span>
+            <div class="rr-callout__copy">
                 <strong>@lang('construction::lang.accounting_entry_created')</strong>
-                <small>@lang('construction::lang.accounting_entry_reference', ['reference' => $certificate->accountingPosting->mapping->ref_no])</small>
+                <p>@lang('construction::lang.accounting_entry_reference', ['reference' => $certificate->accountingPosting->mapping->ref_no])</p>
             </div>
             @can('construction.accounting.view')
-                <button type="button"
-                    class="btn btn-default btn-modal"
-                    data-href="{{ route('journal-entry.show', $certificate->accountingPosting->accounting_mapping_id) }}"
-                    data-container=".view_modal">
-                    <i class="fa fa-external-link-alt"></i> @lang('construction::lang.view_accounting_entry')
-                </button>
+                <div class="rr-callout__actions">
+                    <button type="button" class="rr-btn rr-btn--secondary btn-modal" data-href="{{ route('journal-entry.show', $certificate->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal">@include('construction::partials.rr_icon', ['name' => 'eye'])@lang('construction::lang.view_accounting_entry')</button>
+                </div>
+            @endcan
+        </div>
+    @endif
+    @if($certificate->cancellationAccountingPosting?->mapping)
+        <div class="rr-callout rr-callout--danger">
+            <span class="rr-callout__icon">@include('construction::partials.rr_icon', ['name' => 'arrow-back', 'size' => 22])</span>
+            <div class="rr-callout__copy">
+                <strong>@lang('construction::lang.reversal_entry_created')</strong>
+                <p>{{ $certificate->cancellation_reason }}</p>
+            </div>
+            @can('construction.accounting.view')
+                <div class="rr-callout__actions">
+                    <button type="button" class="rr-btn rr-btn--secondary btn-modal" data-href="{{ route('journal-entry.show', $certificate->cancellationAccountingPosting->accounting_mapping_id) }}" data-container=".view_modal">@include('construction::partials.rr_icon', ['name' => 'eye'])@lang('construction::lang.view_reversal_accounting_entry')</button>
+                </div>
             @endcan
         </div>
     @endif
 
-    @if($certificate->cancellationAccountingPosting?->mapping)
-        <div class="ct-accounting-posting-banner"><span><i class="fa fa-undo"></i></span><div><strong>@lang('construction::lang.reversal_entry_created')</strong><small>{{ $certificate->cancellation_reason }}</small></div>@can('construction.accounting.view')<button type="button" class="btn btn-default btn-modal" data-href="{{ route('journal-entry.show', $certificate->cancellationAccountingPosting->accounting_mapping_id) }}" data-container=".view_modal"><i class="fa fa-external-link-alt"></i> @lang('construction::lang.view_reversal_accounting_entry')</button>@endcan</div>
+    {{-- ═══ موقف السداد ═══ --}}
+    @if($isApproved)
+        <div class="rr-statgroup-wrap">
+            <div class="rr-statgroup rr-statgroup--5" style="--rr-stats: 5">
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'file', 'size' => 18])@lang('construction::lang.net_certificate_due')</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg">@include('construction::partials.money', ['value' => $certificate->net_value])</span></div>
+                </div>
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'lock', 'size' => 18])@lang('construction::lang.released_retention')</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg {{ $releasedRetentionValue == 0 ? 'rr-money--zero' : '' }}">@include('construction::partials.money', ['value' => $releasedRetentionValue])</span></div>
+                </div>
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'pie', 'size' => 18])@lang('construction::lang.total_payable_after_release')</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg">@include('construction::partials.money', ['value' => $payableValue])</span></div>
+                </div>
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'check-circle', 'size' => 18])@lang('construction::lang.paid_amount')</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg {{ $paidValue == 0 ? 'rr-money--zero' : 'rr-money--pos' }}">@include('construction::partials.money', ['value' => $paidValue])</span></div>
+                </div>
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'clock', 'size' => 18])@lang('construction::lang.remaining_amount')</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg {{ $remainingValue == 0 ? 'rr-money--zero' : '' }}">@include('construction::partials.money', ['value' => $remainingValue])</span></div>
+                </div>
+            </div>
+        </div>
     @endif
 
-    @if($certificate->status === 'approved')
-    @php($paidValue = $certificate->paidValue())
-    @php($releasedRetentionValue = $certificate->releasedRetentionValue())
-    @php($retentionRemainingValue = $certificate->retentionRemainingValue())
-    @php($payableValue = $certificate->payableValue())
-    @php($remainingValue = $certificate->remainingValue())
-    @php($certificatePaymentStatus = $certificate->paymentStatus())
-    <div class="ct-subcert-payment-overview">
-        <div><span class="is-blue"><i class="fa fa-file-invoice-dollar"></i></span><small>@lang('construction::lang.net_certificate_due')</small><strong>@include('construction::partials.money',['value'=>$certificate->net_value])</strong></div>
-        <div><span class="is-violet"><i class="fa fa-unlock-alt"></i></span><small>@lang('construction::lang.released_retention')</small><strong>@include('construction::partials.money',['value'=>$releasedRetentionValue])</strong></div>
-        <div><span class="is-blue"><i class="fa fa-wallet"></i></span><small>@lang('construction::lang.total_payable_after_release')</small><strong>@include('construction::partials.money',['value'=>$payableValue])</strong></div>
-        <div><span class="is-green"><i class="fa fa-money-check-alt"></i></span><small>@lang('construction::lang.paid_amount')</small><strong>@include('construction::partials.money',['value'=>$paidValue])</strong></div>
-        <div><span class="is-amber"><i class="fa fa-hourglass-half"></i></span><small>@lang('construction::lang.remaining_amount')</small><strong>@include('construction::partials.money',['value'=>$remainingValue])</strong></div>
-        <div><span class="is-violet"><i class="fa fa-info-circle"></i></span><small>@lang('construction::lang.payment_status')</small><strong class="ct-payment-status is-{{ $certificatePaymentStatus }}">@lang('construction::lang.payment_status_'.$certificatePaymentStatus)</strong></div>
+    {{-- ═══ بنود المستخلص والإجماليات ═══ --}}
+    @if($canEditCertificate)<form method="POST" action="{{ route('construction.subcontractors.certificates.update', [$contract->id, $certificate->id]) }}" id="subcontract-certificate-form" class="rr-form">@csrf @method('PUT')@endif
+
+    @if($canEditCertificate)
+        <section class="rr-card" aria-labelledby="rr-subcert-meta-title">
+            <header class="rr-card__head">
+                <div class="rr-card__titles">
+                    <h2 id="rr-subcert-meta-title" class="rr-card__title">@lang('construction::lang.certificate_progress')</h2>
+                    <p class="rr-card__desc">@lang('construction::lang.certificate_stage_two_hint')</p>
+                </div>
+            </header>
+            <div class="rr-card__body rr-form-wrap">
+                <div class="rr-form-grid rr-form-grid--3">
+                    <div class="rr-field">
+                        <label class="rr-field__label" for="ct-subcert-date">@lang('construction::lang.certificate_date'){!! $req !!}</label>
+                        <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input type="text" id="ct-subcert-date" name="certificate_date" value="{{ old('certificate_date', @format_date($certificate->certificate_date)) }}" class="rr-control__input ct-date-picker" readonly required></div>
+                    </div>
+                    <div class="rr-field">
+                        <label class="rr-field__label" for="ct-subcert-from">@lang('construction::lang.period_from')</label>
+                        <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input type="text" id="ct-subcert-from" name="period_from" value="{{ old('period_from', $certificate->period_from ? @format_date($certificate->period_from) : '') }}" class="rr-control__input ct-date-picker" readonly></div>
+                    </div>
+                    <div class="rr-field">
+                        <label class="rr-field__label" for="ct-subcert-to">@lang('construction::lang.period_to')</label>
+                        <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input type="text" id="ct-subcert-to" name="period_to" value="{{ old('period_to', $certificate->period_to ? @format_date($certificate->period_to) : '') }}" class="rr-control__input ct-date-picker" readonly></div>
+                    </div>
+                    <div class="rr-field">
+                        <label class="rr-field__label" for="ct-subcert-retention-due">@lang('construction::lang.retention_due_date')</label>
+                        <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input type="text" id="ct-subcert-retention-due" name="retention_due_date" value="{{ old('retention_due_date', $certificate->retention_due_date ? @format_date($certificate->retention_due_date) : '') }}" class="rr-control__input ct-date-picker" readonly></div>
+                    </div>
+                    <div class="rr-field">
+                        <label class="rr-field__label" for="ct-subcert-other">@lang('construction::lang.other_deductions')</label>
+                        <div class="rr-control @error('other_deductions') rr-control--invalid @enderror"><input id="ct-subcert-other" name="other_deductions" value="{{ old('other_deductions', @num_format($certificate->other_deductions)) }}" class="rr-control__input rr-control__input--num input_number ct-subcert-deduction" inputmode="decimal"></div>
+                        @error('other_deductions')<p class="rr-field__error">{{ $message }}</p>@enderror
+                    </div>
+                    <div class="rr-field">
+                        <label class="rr-field__label" for="ct-subcert-tax">@lang('construction::lang.input_vat_percent')</label>
+                        <div class="rr-control @error('tax_percent') rr-control--invalid @enderror"><input id="ct-subcert-tax" name="tax_percent" value="{{ old('tax_percent', @num_format($certificate->tax_percent)) }}" class="rr-control__input rr-control__input--num input_number ct-subcert-tax-percent" inputmode="decimal"><span class="rr-control__affix">%</span></div>
+                        @error('tax_percent')<p class="rr-field__error">{{ $message }}</p>@enderror
+                    </div>
+                    <div class="rr-field">
+                        <label class="rr-field__label" for="ct-subcert-advance">@lang('construction::lang.advance_recovery')</label>
+                        <div class="rr-control @error('advance_recovery_value') rr-control--invalid @enderror"><input id="ct-subcert-advance" name="advance_recovery_value" value="{{ old('advance_recovery_value', @num_format($certificate->advance_recovery_value)) }}" class="rr-control__input rr-control__input--num input_number ct-subcert-advance" inputmode="decimal"></div>
+                        <p class="rr-field__hint">@lang('construction::lang.advance_available'): <span class="rr-money rr-money--sm">@include('construction::partials.money', ['value' => $availableAdvance])</span></p>
+                        @error('advance_recovery_value')<p class="rr-field__error">{{ $message }}</p>@enderror
+                    </div>
+                </div>
+            </div>
+        </section>
+    @endif
+
+    <div class="rr-cols">
+        <div class="rr-cols__main">
+            <section class="rr-table-wrap" aria-labelledby="rr-subcert-items-title">
+                <div class="rr-table-head">
+                    <div>
+                        <h2 id="rr-subcert-items-title" class="rr-table-head__title">@lang('construction::lang.certificate_items')</h2>
+                        @if($canEditCertificate)<p class="rr-table-head__sub">@lang('construction::lang.certificate_stage_two_hint')</p>@endif
+                    </div>
+                    <span class="rr-badge rr-badge--brand"><span class="rr-num">{{ $certificate->items->count() }}</span></span>
+                </div>
+                <div class="rr-table-scroll">
+                    <table class="rr-table ct-subcert-table">
+                        <caption class="rr-sr">@lang('construction::lang.certificate_items')</caption>
+                        <thead>
+                            <tr>
+                                <th class="rr-th rr-col--index" scope="col">#</th>
+                                <th class="rr-th rr-col--text" scope="col">@lang('construction::lang.work_description')</th>
+                                <th class="rr-th" scope="col">@lang('construction::lang.calculation_type')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.contract_quantity')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.previous_quantity')</th>
+                                <th class="rr-th rr-th--num rr-th--focus" scope="col">@lang('construction::lang.current_quantity')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.cumulative_quantity')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.current_value')</th>
+                            </tr>
+                        </thead>
+                        <tbody class="rr-tbody">
+                            @foreach($certificate->items as $line)
+                                <tr class="rr-tr @error('items.' . $line->id) has-limit-error @enderror" data-rate="{{ (float) $line->unit_rate }}" data-type="{{ $line->calculation_type }}" data-previous="{{ (float) $line->previous_quantity }}" data-contract="{{ (float) $line->contract_quantity }}">
+                                    <td class="rr-td rr-td--muted"><span class="rr-num">{{ $loop->iteration }}</span></td>
+                                    <td class="rr-td rr-td--wrap">
+                                        <span class="rr-entity__name">{{ $line->description }}</span>
+                                        <div class="rr-td__sub"><span class="rr-money rr-money--sm">@include('construction::partials.money', ['value' => $line->unit_rate])</span></div>
+                                    </td>
+                                    <td class="rr-td"><span class="rr-badge">@lang('construction::lang.subcalc_' . $line->calculation_type)</span></td>
+                                    <td class="rr-td rr-td--num"><span class="rr-num">{{ @num_format($line->contract_quantity) }}</span></td>
+                                    <td class="rr-td rr-td--num"><span class="rr-num">{{ @num_format($line->previous_quantity) }}</span></td>
+                                    <td class="rr-td rr-td--num rr-td--focus {{ $canEditCertificate ? 'rr-td--input' : '' }}">
+                                        @if($canEditCertificate)
+                                            <div class="rr-control rr-control--sm"><input name="items[{{ $line->id }}]" value="{{ old('items.' . $line->id, @num_format($line->current_quantity)) }}" class="rr-control__input rr-control__input--num input_number ct-subcert-qty" inputmode="decimal" required aria-label="@lang('construction::lang.current_quantity'): {{ $line->description }}"></div>
+                                            @error('items.' . $line->id)<small class="rr-field__error">{{ $message }}</small>@enderror
+                                        @else
+                                            <strong class="rr-num">{{ @num_format($line->current_quantity) }}</strong>
+                                        @endif
+                                    </td>
+                                    <td class="rr-td rr-td--num"><span class="rr-num ct-subcert-cumulative">{{ @num_format($line->cumulativeQuantity()) }}</span></td>
+                                    <td class="rr-td rr-td--num"><strong class="rr-money rr-money--sm ct-subcert-line-value" data-value="{{ (float) $line->current_value }}">@include('construction::partials.money', ['value' => $line->current_value])</strong></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            @if($canEditCertificate)
+                <section class="rr-card" aria-labelledby="rr-subcert-notes-title">
+                    <div class="rr-card__body rr-field">
+                        <label id="rr-subcert-notes-title" class="rr-field__label" for="ct-subcert-notes">@lang('construction::lang.notes')</label>
+                        <div class="rr-control rr-control--area"><textarea id="ct-subcert-notes" name="notes" class="rr-control__input rr-control__input--short" rows="3">{{ old('notes', $certificate->notes) }}</textarea></div>
+                    </div>
+                </section>
+            @elseif($certificate->notes)
+                <div class="rr-alert rr-alert--info"><div><strong>@lang('construction::lang.notes'):</strong> {{ $certificate->notes }}</div></div>
+            @endif
+        </div>
+
+        <aside class="rr-cols__side">
+            <section class="rr-card" aria-labelledby="rr-subcert-totals-title">
+                <header class="rr-card__head">
+                    <div class="rr-card__titles">
+                        <h2 id="rr-subcert-totals-title" class="rr-card__title">@lang('construction::lang.deductions_and_adjustments')</h2>
+                    </div>
+                </header>
+                <dl class="rr-deflist ct-subcert-totals" data-retention="{{ (float) $certificate->retention_percent }}">
+                    <div class="rr-deflist__item"><dt>@lang('construction::lang.gross_certificate')</dt><dd><span class="rr-money rr-money--sm ct-subcert-gross">@include('construction::partials.money', ['value' => $certificate->gross_value])</span></dd></div>
+                    <div class="rr-deflist__item"><dt>@lang('construction::lang.input_vat')</dt><dd><span class="rr-money rr-money--sm ct-subcert-tax">@include('construction::partials.money', ['value' => $certificate->tax_value])</span></dd></div>
+                    <div class="rr-deflist__item"><dt>@lang('construction::lang.retention_value') <span class="rr-num">{{ @num_format($certificate->retention_percent) }}%</span></dt><dd><span class="rr-money rr-money--sm ct-subcert-retention">@include('construction::partials.money', ['value' => $certificate->retention_value])</span></dd></div>
+                    <div class="rr-deflist__item"><dt>@lang('construction::lang.other_deductions')</dt><dd><span class="rr-money rr-money--sm ct-subcert-other">@include('construction::partials.money', ['value' => $certificate->other_deductions])</span></dd></div>
+                    <div class="rr-deflist__item"><dt>@lang('construction::lang.advance_recovery')</dt><dd><span class="rr-money rr-money--sm ct-subcert-advance-value">@include('construction::partials.money', ['value' => $certificate->advance_recovery_value])</span></dd></div>
+                    <div class="rr-deflist__item rr-deflist__item--total"><dt>@lang('construction::lang.net_certificate_due')</dt><dd><span class="rr-money ct-subcert-net">@include('construction::partials.money', ['value' => $certificate->net_value])</span></dd></div>
+                </dl>
+            </section>
+
+            @if($isApproved)
+                @can('construction.subcontract.manage')
+                    <section class="rr-card" aria-labelledby="rr-subcert-retention-date-title">
+                        <header class="rr-card__head">
+                            <div class="rr-card__titles">
+                                <h2 id="rr-subcert-retention-date-title" class="rr-card__title">@lang('construction::lang.retention_due_date')</h2>
+                                <p class="rr-card__desc">@lang('construction::lang.retention_due_date_subcontractor_hint')</p>
+                            </div>
+                        </header>
+                        <form method="POST" action="{{ route('construction.subcontractors.certificates.retention-due-date.update', [$contract->id, $certificate->id]) }}" class="rr-card__body rr-form">
+                            @csrf
+                            @method('PATCH')
+                            <div class="rr-field">
+                                <label class="rr-field__label rr-sr" for="ct-subcert-retention-date">@lang('construction::lang.retention_due_date')</label>
+                                <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input type="text" id="ct-subcert-retention-date" name="retention_due_date" value="{{ $certificate->retention_due_date ? @format_date($certificate->retention_due_date) : '' }}" class="rr-control__input ct-date-picker" readonly></div>
+                            </div>
+                            <button class="rr-btn rr-btn--secondary" type="submit">@include('construction::partials.rr_icon', ['name' => 'check'])@lang('construction::lang.save_retention_due_date')</button>
+                        </form>
+                    </section>
+                @endcan
+            @endif
+        </aside>
     </div>
-    @can('construction.subcontract.manage')
-    <div class="ct-material-panel ct-retention-due-panel"><div class="ct-panel-heading"><div><span>@lang('construction::lang.retention_management')</span><h2>@lang('construction::lang.retention_due_date')</h2><p>@lang('construction::lang.retention_due_date_subcontractor_hint')</p></div></div><form method="POST" action="{{ route('construction.subcontractors.certificates.retention-due-date.update',[$contract->id,$certificate->id]) }}" class="ct-retention-date-form">@csrf @method('PATCH')<input name="retention_due_date" value="{{ $certificate->retention_due_date ? @format_date($certificate->retention_due_date) : '' }}" class="form-control ct-date-picker" readonly><button class="btn btn-primary">@lang('construction::lang.save_retention_due_date')</button></form></div>
-    @endcan
+
+    @if($canEditCertificate)
+        <div class="rr-form-actions">
+            <button type="submit" class="rr-btn rr-btn--primary">@include('construction::partials.rr_icon', ['name' => 'check'])@lang('construction::lang.save_certificate')</button>
+        </div>
+        </form>
     @endif
 
-    @if($certificate->isEditable())
-    @can('construction.subcontract.manage')
-    <form method="POST" action="{{ route('construction.subcontractors.certificates.update', [$contract->id, $certificate->id]) }}" id="subcontract-certificate-form">
-        @csrf @method('PUT')
-        <div class="ct-material-panel ct-subcert-meta">
-            <div class="ct-panel-heading"><div><span>@lang('construction::lang.subcontract_certificates')</span><h2>@lang('construction::lang.certificate_progress')</h2><p>@lang('construction::lang.certificate_stage_two_hint')</p></div></div>
-            <div class="ct-subcert-meta-grid">
-                <div class="form-group"><label>@lang('construction::lang.certificate_date') *</label><input name="certificate_date" value="{{ old('certificate_date', @format_date($certificate->certificate_date)) }}" class="form-control ct-date-picker" readonly required></div>
-                <div class="form-group"><label>@lang('construction::lang.period_from')</label><input name="period_from" value="{{ old('period_from', $certificate->period_from ? @format_date($certificate->period_from) : '') }}" class="form-control ct-date-picker" readonly></div>
-                <div class="form-group"><label>@lang('construction::lang.period_to')</label><input name="period_to" value="{{ old('period_to', $certificate->period_to ? @format_date($certificate->period_to) : '') }}" class="form-control ct-date-picker" readonly></div>
-                <div class="form-group"><label>@lang('construction::lang.retention_due_date')</label><input name="retention_due_date" value="{{ old('retention_due_date', $certificate->retention_due_date ? @format_date($certificate->retention_due_date) : '') }}" class="form-control ct-date-picker" readonly></div>
-                <div class="form-group"><label>@lang('construction::lang.other_deductions')</label><input name="other_deductions" value="{{ old('other_deductions', @num_format($certificate->other_deductions)) }}" class="form-control input_number ct-subcert-deduction @error('other_deductions') is-invalid @enderror">@error('other_deductions')<small class="text-danger">{{ $message }}</small>@enderror</div>
-                <div class="form-group"><label>@lang('construction::lang.input_vat_percent')</label><input name="tax_percent" value="{{ old('tax_percent', @num_format($certificate->tax_percent)) }}" class="form-control input_number ct-subcert-tax-percent @error('tax_percent') is-invalid @enderror">@error('tax_percent')<small class="text-danger">{{ $message }}</small>@enderror</div>
-                <div class="form-group"><label>@lang('construction::lang.advance_recovery')</label><input name="advance_recovery_value" value="{{ old('advance_recovery_value', @num_format($certificate->advance_recovery_value)) }}" class="form-control input_number ct-subcert-advance @error('advance_recovery_value') is-invalid @enderror"><small>@lang('construction::lang.advance_available'): @include('construction::partials.money',['value'=>$availableAdvance])</small>@error('advance_recovery_value')<small class="text-danger">{{ $message }}</small>@enderror</div>
+    @if($isApproved)
+        {{-- ═══ الإفراج عن المحتجز ═══ --}}
+        <section class="rr-table-wrap" aria-labelledby="rr-subcert-releases-title">
+            <div class="rr-table-head">
+                <div>
+                    <h2 id="rr-subcert-releases-title" class="rr-table-head__title">@lang('construction::lang.retention_releases')</h2>
+                    <p class="rr-table-head__sub">@lang('construction::lang.retention_release_hint')</p>
+                </div>
+                @if($retentionRemainingValue > 0.0001)
+                    @can('construction.payment.record')
+                        <button type="button" class="rr-btn rr-btn--secondary rr-btn--sm" data-toggle="modal" data-target="#record-retention-release">@include('construction::partials.rr_icon', ['name' => 'lock', 'size' => 16])@lang('construction::lang.release_retention')</button>
+                    @endcan
+                @endif
+            </div>
+            <div class="rr-statgroup-wrap">
+                <div class="rr-statgroup rr-statgroup--3 rr-statgroup--flat" style="--rr-stats: 3">
+                    <div class="rr-stat">
+                        <div class="rr-stat__label">@lang('construction::lang.original_retention')</div>
+                        <div class="rr-stat__value"><span class="rr-money rr-money--lg">@include('construction::partials.money', ['value' => $certificate->retention_value])</span></div>
+                    </div>
+                    <div class="rr-stat">
+                        <div class="rr-stat__label">@lang('construction::lang.released_retention')</div>
+                        <div class="rr-stat__value"><span class="rr-money rr-money--lg {{ $releasedRetentionValue == 0 ? 'rr-money--zero' : '' }}">@include('construction::partials.money', ['value' => $releasedRetentionValue])</span></div>
+                    </div>
+                    <div class="rr-stat">
+                        <div class="rr-stat__label">@lang('construction::lang.remaining_retention')</div>
+                        <div class="rr-stat__value"><span class="rr-money rr-money--lg {{ $retentionRemainingValue == 0 ? 'rr-money--zero' : '' }}">@include('construction::partials.money', ['value' => $retentionRemainingValue])</span></div>
+                    </div>
+                </div>
+            </div>
+            @if($certificate->retentionReleases->isEmpty())
+                <div class="rr-empty">
+                    <span class="rr-empty__icon">@include('construction::partials.rr_icon', ['name' => 'shield', 'size' => 22])</span>
+                    <h3 class="rr-empty__title">@lang('construction::lang.no_retention_releases')</h3>
+                </div>
+            @else
+                <div class="rr-table-scroll">
+                    <table class="rr-table">
+                        <caption class="rr-sr">@lang('construction::lang.retention_releases')</caption>
+                        <thead>
+                            <tr>
+                                <th class="rr-th" scope="col">@lang('construction::lang.release_number')</th>
+                                <th class="rr-th" scope="col">@lang('construction::lang.release_date')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.release_amount')</th>
+                                <th class="rr-th" scope="col">@lang('construction::lang.status')</th>
+                                <th class="rr-th rr-col--notes" scope="col">@lang('construction::lang.notes')</th>
+                                <th class="rr-th" scope="col"><span class="rr-sr">@lang('construction::lang.operations')</span></th>
+                            </tr>
+                        </thead>
+                        <tbody class="rr-tbody">
+                            @foreach($certificate->retentionReleases as $release)
+                                <tr class="rr-tr">
+                                    <td class="rr-td"><span class="rr-code">{{ $release->number }}</span></td>
+                                    <td class="rr-td"><span class="rr-num">{{ @format_date($release->release_date) }}</span></td>
+                                    <td class="rr-td rr-td--num"><span class="rr-money rr-money--sm {{ $release->status === 'cancelled' ? 'rr-money--zero' : '' }}">@include('construction::partials.money', ['value' => $release->amount])</span></td>
+                                    <td class="rr-td"><span class="rr-badge rr-badge--{{ $release->status === 'recorded' ? 'success' : 'neutral' }}"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.retention_release_status_' . $release->status)</span></td>
+                                    <td class="rr-td rr-td--wrap rr-td--muted">{{ $release->status === 'cancelled' ? $release->cancellation_reason : ($release->notes ?: '—') }}</td>
+                                    <td class="rr-td rr-td--actions">
+                                        <div class="rr-row-actions">
+                                            @can('construction.accounting.view')
+                                                @if($release->accountingPosting?->mapping)
+                                                    <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon btn-modal" data-href="{{ route('journal-entry.show', $release->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_release_accounting_entry')" aria-label="@lang('construction::lang.view_release_accounting_entry')">@include('construction::partials.rr_icon', ['name' => 'eye', 'size' => 16])</button>
+                                                @endif
+                                                @if($release->cancellationAccountingPosting?->mapping)
+                                                    <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon btn-modal" data-href="{{ route('journal-entry.show', $release->cancellationAccountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_reversal_accounting_entry')" aria-label="@lang('construction::lang.view_reversal_accounting_entry')">@include('construction::partials.rr_icon', ['name' => 'arrow-back', 'size' => 16])</button>
+                                                @endif
+                                            @endcan
+                                            @if($release->isActive())
+                                                @can('construction.cancel')
+                                                    <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm js-cancel-retention-release" data-toggle="modal" data-target="#cancel-retention-release" data-action="{{ route('construction.subcontractors.certificates.retention-releases.cancel', [$contract->id, $certificate->id, $release->id]) }}">@include('construction::partials.rr_icon', ['name' => 'close', 'size' => 16])@lang('construction::lang.cancel_release')</button>
+                                                @endcan
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+
+        {{-- ═══ المدفوعات ═══ --}}
+        <section class="rr-table-wrap" aria-labelledby="rr-subcert-payments-title">
+            <div class="rr-table-head">
+                <div>
+                    <h2 id="rr-subcert-payments-title" class="rr-table-head__title">@lang('construction::lang.subcontract_payments')</h2>
+                    <p class="rr-table-head__sub">@lang('construction::lang.payment_stage_accounting_notice')</p>
+                </div>
+                @if($remainingValue > 0.0001)
+                    @can('construction.payment.record')
+                        <button type="button" class="rr-btn rr-btn--secondary rr-btn--sm" data-toggle="modal" data-target="#record-subcontract-payment">@include('construction::partials.rr_icon', ['name' => 'plus', 'size' => 16])@lang('construction::lang.record_payment')</button>
+                    @endcan
+                @endif
+            </div>
+            @if($certificate->payments->isEmpty())
+                <div class="rr-empty">
+                    <span class="rr-empty__icon">@include('construction::partials.rr_icon', ['name' => 'download', 'size' => 22])</span>
+                    <h3 class="rr-empty__title">@lang('construction::lang.no_subcontract_payments')</h3>
+                </div>
+            @else
+                <div class="rr-table-scroll">
+                    <table class="rr-table">
+                        <caption class="rr-sr">@lang('construction::lang.subcontract_payments')</caption>
+                        <thead>
+                            <tr>
+                                <th class="rr-th" scope="col">@lang('construction::lang.payment_number')</th>
+                                <th class="rr-th" scope="col">@lang('construction::lang.payment_date')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.payment_amount')</th>
+                                <th class="rr-th" scope="col">@lang('construction::lang.payment_method')</th>
+                                <th class="rr-th" scope="col">@lang('construction::lang.payment_account')</th>
+                                <th class="rr-th" scope="col">@lang('construction::lang.payment_reference')</th>
+                                <th class="rr-th" scope="col"><span class="rr-sr">@lang('construction::lang.operations')</span></th>
+                            </tr>
+                        </thead>
+                        <tbody class="rr-tbody">
+                            @foreach($certificate->payments as $payment)
+                                <tr class="rr-tr">
+                                    <td class="rr-td">
+                                        <span class="rr-code">{{ $payment->number }}</span>
+                                        @if($payment->status !== 'recorded')<div><span class="rr-badge"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.cancelled')</span></div>@endif
+                                    </td>
+                                    <td class="rr-td"><span class="rr-num">{{ @format_date($payment->payment_date) }}</span></td>
+                                    <td class="rr-td rr-td--num"><span class="rr-money rr-money--sm {{ $payment->status !== 'recorded' ? 'rr-money--zero' : '' }}">@include('construction::partials.money', ['value' => $payment->amount])</span></td>
+                                    <td class="rr-td">{{ $paymentTypes[$payment->method] ?? $payment->method }}</td>
+                                    <td class="rr-td rr-td--wrap">{{ $payment->accountingAccount?->name ?: ($payment->account?->name ?: '—') }}</td>
+                                    <td class="rr-td rr-td--muted">{{ $payment->reference_no ?: '—' }}</td>
+                                    <td class="rr-td rr-td--actions">
+                                        <div class="rr-row-actions">
+                                            <a href="{{ route('construction.subcontractors.certificates.payments.preview', [$contract->id, $certificate->id, $payment->id]) }}" target="_blank" rel="noopener" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon" title="@lang('construction::lang.print_preview')" aria-label="@lang('construction::lang.print_preview'): {{ $payment->number }}">@include('construction::partials.rr_icon', ['name' => 'eye', 'size' => 16])</a>
+                                            <a href="{{ route('construction.subcontractors.certificates.payments.print', [$contract->id, $certificate->id, $payment->id]) }}" target="_blank" rel="noopener" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon" title="@lang('construction::lang.print')" aria-label="@lang('construction::lang.print'): {{ $payment->number }}">@include('construction::partials.rr_icon', ['name' => 'print', 'size' => 16])</a>
+                                            @if($payment->accountingPosting?->mapping)
+                                                @can('construction.accounting.view')
+                                                    <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon btn-modal" data-href="{{ route('journal-entry.show', $payment->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_accounting_entry')" aria-label="@lang('construction::lang.view_accounting_entry')">@include('construction::partials.rr_icon', ['name' => 'list', 'size' => 16])</button>
+                                                @endcan
+                                            @endif
+                                            @if($payment->status === 'recorded')
+                                                @can('construction.cancel')
+                                                    <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm js-cancel-subcontract-payment" data-toggle="modal" data-target="#cancel-subcontract-payment" data-action="{{ route('construction.subcontractors.certificates.payments.cancel', [$contract->id, $certificate->id, $payment->id]) }}">@include('construction::partials.rr_icon', ['name' => 'close', 'size' => 16])@lang('construction::lang.cancel_posted_payment')</button>
+                                                @endcan
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+    @endif
+</main>
+
+{{-- ═══ النوافذ ═══ --}}
+@if($isApproved)
+    @can('construction.payment.record')
+        <div class="modal fade rr-scope" id="record-retention-release" tabindex="-1" role="dialog" aria-labelledby="rr-record-release-title">
+            <div class="modal-dialog rr-modal-dialog rr-modal-dialog--compact" role="document">
+                <div class="modal-content rr-modal">
+                    <form method="POST" action="{{ route('construction.subcontractors.certificates.retention-releases.store', [$contract->id, $certificate->id]) }}">
+                        @csrf
+                        <header class="rr-modal__head">
+                            <div class="rr-modal__titles">
+                                <h2 class="rr-modal__title" id="rr-record-release-title">@lang('construction::lang.release_retention')</h2>
+                                <p class="rr-modal__desc">@lang('construction::lang.remaining_retention'): <span class="rr-money rr-money--sm">@include('construction::partials.money', ['value' => $retentionRemainingValue])</span></p>
+                            </div>
+                            <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon" data-dismiss="modal" aria-label="@lang('construction::lang.close_dialog')">@include('construction::partials.rr_icon', ['name' => 'close', 'size' => 18])</button>
+                        </header>
+                        <div class="rr-modal__body">
+                            <div class="rr-form-wrap">
+                                <div class="rr-form-grid">
+                                    <div class="rr-field">
+                                        <label class="rr-field__label" for="ct-release-date">@lang('construction::lang.release_date'){!! $req !!}</label>
+                                        <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input type="text" id="ct-release-date" name="release_date" value="{{ old('release_date', @format_date(now())) }}" class="rr-control__input ct-date-picker" readonly required></div>
+                                    </div>
+                                    <div class="rr-field">
+                                        <label class="rr-field__label" for="ct-release-amount">@lang('construction::lang.release_amount'){!! $req !!}</label>
+                                        <div class="rr-control @error('retention_amount') rr-control--invalid @enderror"><input id="ct-release-amount" name="retention_amount" value="{{ old('retention_amount', @num_format($retentionRemainingValue)) }}" class="rr-control__input rr-control__input--num input_number" inputmode="decimal" required></div>
+                                        @error('retention_amount')<p class="rr-field__error">{{ $message }}</p>@enderror
+                                    </div>
+                                    <div class="rr-field rr-field--full">
+                                        <label class="rr-field__label" for="ct-release-notes">@lang('construction::lang.notes')</label>
+                                        <div class="rr-control rr-control--area"><textarea id="ct-release-notes" name="notes" class="rr-control__input rr-control__input--short" rows="3">{{ old('notes') }}</textarea></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="rr-modal__note">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 16])@lang('construction::lang.retention_release_no_cost_notice')</p>
+                        </div>
+                        <footer class="rr-modal__foot">
+                            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'check'])@lang('construction::lang.confirm_release')</button>
+                            <button type="button" class="rr-btn rr-btn--secondary" data-dismiss="modal">@lang('messages.cancel')</button>
+                        </footer>
+                    </form>
+                </div>
             </div>
         </div>
 
-        <div class="ct-material-panel">
-            <div class="table-responsive"><table class="table ct-material-table ct-subcert-table">
-                <thead><tr><th>#</th><th>@lang('construction::lang.work_description')</th><th>@lang('construction::lang.calculation_type')</th><th>@lang('construction::lang.contract_quantity')</th><th>@lang('construction::lang.previous_quantity')</th><th>@lang('construction::lang.current_quantity')</th><th>@lang('construction::lang.cumulative_quantity')</th><th>@lang('construction::lang.current_value')</th></tr></thead>
-                <tbody>
-                    @foreach($certificate->items as $line)
-                    <tr class="@error('items.'.$line->id) has-limit-error @enderror" data-rate="{{ (float)$line->unit_rate }}" data-type="{{ $line->calculation_type }}" data-previous="{{ (float)$line->previous_quantity }}" data-contract="{{ (float)$line->contract_quantity }}">
-                        <td>{{ $loop->iteration }}</td>
-                        <td><strong>{{ $line->description }}</strong><small class="ct-table-muted">@include('construction::partials.money',['value'=>$line->unit_rate])</small></td>
-                        <td><span class="ct-type-pill">@lang('construction::lang.subcalc_'.$line->calculation_type)</span></td>
-                        <td>{{ @num_format($line->contract_quantity) }}</td>
-                        <td>{{ @num_format($line->previous_quantity) }}</td>
-                        <td><input name="items[{{ $line->id }}]" value="{{ old('items.'.$line->id, @num_format($line->current_quantity)) }}" class="form-control input_number ct-subcert-qty" required>@error('items.'.$line->id)<small class="ct-subcert-row-error">{{ $message }}</small>@enderror</td>
-                        <td class="ct-subcert-cumulative">{{ @num_format($line->cumulativeQuantity()) }}</td>
-                        <td><strong class="ct-subcert-line-value" data-value="{{ (float)$line->current_value }}">@include('construction::partials.money',['value'=>$line->current_value])</strong></td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table></div>
-        </div>
-
-        <div class="ct-subcert-bottom">
-        <div class="ct-material-panel ct-subcert-notes"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="4">{{ old('notes', $certificate->notes) }}</textarea></div>
-            <div class="ct-subcert-totals" data-retention="{{ (float)$certificate->retention_percent }}">
-                <div><span>@lang('construction::lang.gross_certificate')</span><strong class="ct-subcert-gross">@include('construction::partials.money',['value'=>$certificate->gross_value])</strong></div>
-                <div><span>@lang('construction::lang.input_vat')</span><strong class="ct-subcert-tax">@include('construction::partials.money',['value'=>$certificate->tax_value])</strong></div>
-                <div><span>@lang('construction::lang.retention_value') ({{ @num_format($certificate->retention_percent) }}%)</span><strong class="ct-subcert-retention">@include('construction::partials.money',['value'=>$certificate->retention_value])</strong></div>
-                <div><span>@lang('construction::lang.other_deductions')</span><strong class="ct-subcert-other">@include('construction::partials.money',['value'=>$certificate->other_deductions])</strong></div>
-                <div><span>@lang('construction::lang.advance_recovery')</span><strong class="ct-subcert-advance-value">@include('construction::partials.money',['value'=>$certificate->advance_recovery_value])</strong></div>
-                <div class="is-net"><span>@lang('construction::lang.net_certificate_due')</span><strong class="ct-subcert-net">@include('construction::partials.money',['value'=>$certificate->net_value])</strong></div>
+        <div class="modal fade rr-scope" id="record-subcontract-payment" tabindex="-1" role="dialog" aria-labelledby="rr-record-payment-title">
+            <div class="modal-dialog rr-modal-dialog rr-modal-dialog--compact" role="document">
+                <div class="modal-content rr-modal">
+                    <form method="POST" action="{{ route('construction.subcontractors.certificates.payments.store', [$contract->id, $certificate->id]) }}">
+                        @csrf
+                        <header class="rr-modal__head">
+                            <div class="rr-modal__titles">
+                                <h2 class="rr-modal__title" id="rr-record-payment-title">@lang('construction::lang.new_payment')</h2>
+                                <p class="rr-modal__desc">@lang('construction::lang.remaining_amount'): <span class="rr-money rr-money--sm">@include('construction::partials.money', ['value' => $remainingValue])</span></p>
+                            </div>
+                            <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon" data-dismiss="modal" aria-label="@lang('construction::lang.close_dialog')">@include('construction::partials.rr_icon', ['name' => 'close', 'size' => 18])</button>
+                        </header>
+                        <div class="rr-modal__body">
+                            <div class="rr-form-wrap">
+                                <div class="rr-form-grid">
+                                    <div class="rr-field">
+                                        <label class="rr-field__label" for="ct-payment-date">@lang('construction::lang.payment_date'){!! $req !!}</label>
+                                        <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input type="text" id="ct-payment-date" name="payment_date" value="{{ old('payment_date', @format_date(now())) }}" class="rr-control__input ct-date-picker" readonly required></div>
+                                    </div>
+                                    <div class="rr-field">
+                                        <label class="rr-field__label" for="ct-payment-amount">@lang('construction::lang.payment_amount'){!! $req !!}</label>
+                                        <div class="rr-control @error('amount') rr-control--invalid @enderror"><input id="ct-payment-amount" name="amount" value="{{ old('amount', @num_format($remainingValue)) }}" class="rr-control__input rr-control__input--num input_number" inputmode="decimal" required></div>
+                                        @error('amount')<p class="rr-field__error">{{ $message }}</p>@enderror
+                                    </div>
+                                    <div class="rr-field">
+                                        <label class="rr-field__label" for="ct-payment-method">@lang('construction::lang.payment_method'){!! $req !!}</label>
+                                        <div class="rr-control">
+                                            <select id="ct-payment-method" name="method" class="rr-control__input rr-control__select" required>
+                                                @foreach($paymentTypes as $key => $label)<option value="{{ $key }}" @selected(old('method', 'cash') === $key)>{{ $label }}</option>@endforeach
+                                            </select>
+                                            <span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span>
+                                        </div>
+                                    </div>
+                                    <div class="rr-field">
+                                        <label class="rr-field__label" for="ct-payment-account">@lang('construction::lang.payment_account')@if($accountingSettings){!! $req !!}@endif</label>
+                                        @if($accountingSettings)
+                                            <select id="ct-payment-account" name="accounting_account_id" class="form-control select2" required>
+                                                <option value="">@lang('construction::lang.select_cash_bank_account')</option>
+                                                @foreach($accountingPaymentAccounts as $id => $name)<option value="{{ $id }}" @selected((string) old('accounting_account_id', $accountingSettings->cash_account_id) === (string) $id)>{{ $name }}</option>@endforeach
+                                            </select>
+                                            @error('accounting_account_id')<p class="rr-field__error">{{ $message }}</p>@enderror
+                                        @else
+                                            <select id="ct-payment-account" name="account_id" class="form-control select2">
+                                                <option value="">@lang('lang_v1.none')</option>
+                                                @foreach($paymentAccounts as $id => $name)@if($id !== '')<option value="{{ $id }}" @selected((string) old('account_id') === (string) $id)>{{ $name }}</option>@endif @endforeach
+                                            </select>
+                                        @endif
+                                    </div>
+                                    <div class="rr-field rr-field--full">
+                                        <label class="rr-field__label" for="ct-payment-reference">@lang('construction::lang.payment_reference')</label>
+                                        <div class="rr-control"><input id="ct-payment-reference" name="reference_no" value="{{ old('reference_no') }}" class="rr-control__input" maxlength="120"></div>
+                                    </div>
+                                    <div class="rr-field rr-field--full">
+                                        <label class="rr-field__label" for="ct-payment-notes">@lang('construction::lang.notes')</label>
+                                        <div class="rr-control rr-control--area"><textarea id="ct-payment-notes" name="notes" class="rr-control__input rr-control__input--short" rows="3">{{ old('notes') }}</textarea></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="rr-modal__note">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 16])@lang('construction::lang.payment_stage_accounting_notice')</p>
+                        </div>
+                        <footer class="rr-modal__foot">
+                            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'check'])@lang('construction::lang.record_payment')</button>
+                            <button type="button" class="rr-btn rr-btn--secondary" data-dismiss="modal">@lang('messages.cancel')</button>
+                        </footer>
+                    </form>
+                </div>
             </div>
         </div>
-        <div class="ct-subcert-savebar"><button class="btn ct-primary-action"><i class="fa fa-save"></i> @lang('construction::lang.save_certificate')</button></div>
-    </form>
     @endcan
-    @else
-        <div class="ct-material-panel">
-            <div class="table-responsive"><table class="table ct-material-table"><thead><tr><th>#</th><th>@lang('construction::lang.work_description')</th><th>@lang('construction::lang.contract_quantity')</th><th>@lang('construction::lang.previous_quantity')</th><th>@lang('construction::lang.current_quantity')</th><th>@lang('construction::lang.cumulative_quantity')</th><th>@lang('construction::lang.current_value')</th></tr></thead><tbody>@foreach($certificate->items as $line)<tr><td>{{ $loop->iteration }}</td><td><strong>{{ $line->description }}</strong></td><td>{{ @num_format($line->contract_quantity) }}</td><td>{{ @num_format($line->previous_quantity) }}</td><td>{{ @num_format($line->current_quantity) }}</td><td>{{ @num_format($line->cumulativeQuantity()) }}</td><td><strong>@include('construction::partials.money',['value'=>$line->current_value])</strong></td></tr>@endforeach</tbody></table></div>
+@endif
+
+@can('construction.cancel')
+    @foreach([
+        ['cancel-retention-release', 'cancel_release', '', false, 'retention_release_cancel_notice'],
+        ['cancel-subcontract-payment', 'cancel_posted_payment', '', true, 'cancellation_creates_reversal_notice'],
+        ['cancel-subcontract-certificate', 'cancel_posted_certificate', route('construction.subcontractors.certificates.cancel', [$contract->id, $certificate->id]), true, 'cancellation_creates_reversal_notice'],
+    ] as [$modalId, $modalTitle, $modalAction, $needsPassword, $modalNotice])
+        <div class="modal fade rr-scope" id="{{ $modalId }}" tabindex="-1" role="dialog" aria-labelledby="{{ $modalId }}-title">
+            <div class="modal-dialog rr-modal-dialog rr-modal-dialog--compact" role="document">
+                <div class="modal-content rr-modal">
+                    <form method="POST" action="{{ $modalAction }}">
+                        @csrf
+                        <header class="rr-modal__head">
+                            <div class="rr-modal__titles">
+                                <h2 class="rr-modal__title" id="{{ $modalId }}-title">@lang('construction::lang.' . $modalTitle)</h2>
+                                <p class="rr-modal__desc"><span class="rr-code">{{ $certificate->number }}</span></p>
+                            </div>
+                            <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon" data-dismiss="modal" aria-label="@lang('construction::lang.close_dialog')">@include('construction::partials.rr_icon', ['name' => 'close', 'size' => 18])</button>
+                        </header>
+                        <div class="rr-modal__body">
+                            <div class="rr-alert rr-alert--warning"><div>@lang('construction::lang.' . $modalNotice)</div></div>
+                            <div class="rr-form-wrap">
+                                <div class="rr-field rr-field--full">
+                                    <label class="rr-field__label" for="{{ $modalId }}-reason">@lang('construction::lang.cancellation_reason'){!! $req !!}</label>
+                                    <div class="rr-control rr-control--area"><textarea id="{{ $modalId }}-reason" name="cancellation_reason" class="rr-control__input rr-control__input--short" rows="3" required @if($needsPassword) minlength="5" @endif></textarea></div>
+                                </div>
+                                @if($needsPassword)
+                                    <div class="rr-field rr-field--full">
+                                        <label class="rr-field__label" for="{{ $modalId }}-password">@lang('construction::lang.manager_password'){!! $req !!}</label>
+                                        <div class="rr-control"><input type="password" id="{{ $modalId }}-password" name="current_password" class="rr-control__input" required autocomplete="current-password"></div>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                        <footer class="rr-modal__foot">
+                            <button class="rr-btn rr-btn--danger" type="submit">@lang('construction::lang.confirm_cancellation')</button>
+                            <button type="button" class="rr-btn rr-btn--secondary" data-dismiss="modal">@lang('messages.cancel')</button>
+                        </footer>
+                    </form>
+                </div>
+            </div>
         </div>
-        <div class="ct-subcert-totals is-readonly"><div><span>@lang('construction::lang.gross_certificate')</span><strong>@include('construction::partials.money',['value'=>$certificate->gross_value])</strong></div><div><span>@lang('construction::lang.input_vat')</span><strong>@include('construction::partials.money',['value'=>$certificate->tax_value])</strong></div><div><span>@lang('construction::lang.retention_value')</span><strong>@include('construction::partials.money',['value'=>$certificate->retention_value])</strong></div><div><span>@lang('construction::lang.other_deductions')</span><strong>@include('construction::partials.money',['value'=>$certificate->other_deductions])</strong></div><div><span>@lang('construction::lang.advance_recovery')</span><strong>@include('construction::partials.money',['value'=>$certificate->advance_recovery_value])</strong></div><div class="is-net"><span>@lang('construction::lang.net_certificate_due')</span><strong>@include('construction::partials.money',['value'=>$certificate->net_value])</strong></div></div>
-    @endif
-
-    @if($certificate->isEditable())
-    <div class="ct-approval-bar">
-        <div><i class="fa fa-shield-alt"></i><span><strong>@lang('construction::lang.ready_for_approval')</strong><small>@lang('construction::lang.approved_subcontract_certificate_locked')</small></span></div>
-        <div class="ct-subcert-approval-actions">
-            @can('construction.subcontract.manage')<form method="POST" action="{{ route('construction.subcontractors.certificates.destroy', [$contract->id, $certificate->id]) }}" onsubmit="return confirm('@lang('construction::lang.delete_certificate_confirmation')')">@csrf @method('DELETE')<button class="btn btn-danger"><i class="fa fa-trash"></i> @lang('messages.delete')</button></form>@endcan
-            @can('construction.subcontract.approve')<form method="POST" action="{{ route('construction.subcontractors.certificates.approve', [$contract->id, $certificate->id]) }}" onsubmit="return confirm('@lang('construction::lang.approve_subcontract_certificate_confirmation')')">@csrf<button class="btn btn-success"><i class="fa fa-check-circle"></i> @lang('construction::lang.approve_certificate')</button></form>@endcan
-        </div>
-    </div>
-    @endif
-
-    @if($certificate->status === 'approved')
-    <div class="ct-material-panel ct-subcert-retention-panel">
-        <div class="ct-panel-heading"><div><span>@lang('construction::lang.retention_management')</span><h2>@lang('construction::lang.retention_releases')</h2><p>@lang('construction::lang.retention_release_hint')</p></div>@if($retentionRemainingValue > 0.0001)@can('construction.payment.record')<button class="btn ct-primary-action" data-toggle="modal" data-target="#record-retention-release"><i class="fa fa-unlock-alt"></i> @lang('construction::lang.release_retention')</button>@endcan @endif</div>
-        <div class="ct-retention-summary">
-            <div><small>@lang('construction::lang.original_retention')</small><strong>@include('construction::partials.money',['value'=>$certificate->retention_value])</strong></div>
-            <div><small>@lang('construction::lang.released_retention')</small><strong>@include('construction::partials.money',['value'=>$releasedRetentionValue])</strong></div>
-            <div><small>@lang('construction::lang.remaining_retention')</small><strong>@include('construction::partials.money',['value'=>$retentionRemainingValue])</strong></div>
-        </div>
-        <div class="table-responsive"><table class="table ct-material-table"><thead><tr><th>@lang('construction::lang.release_number')</th><th>@lang('construction::lang.release_date')</th><th>@lang('construction::lang.release_amount')</th><th>@lang('construction::lang.status')</th><th>@lang('construction::lang.notes')</th><th>@lang('construction::lang.operations')</th></tr></thead><tbody>
-            @forelse($certificate->retentionReleases as $release)
-                <tr class="{{ $release->status === 'cancelled' ? 'text-muted' : '' }}">
-                    <td><strong dir="ltr">{{ $release->number }}</strong></td>
-                    <td>{{ @format_date($release->release_date) }}</td>
-                    <td><strong>@include('construction::partials.money',['value'=>$release->amount])</strong></td>
-                    <td><span class="ct-status-pill {{ $release->status === 'recorded' ? 'is-approved' : 'is-draft' }}">@lang('construction::lang.retention_release_status_'.$release->status)</span></td>
-                    <td>{{ $release->status === 'cancelled' ? $release->cancellation_reason : ($release->notes ?: '—') }}</td>
-                    <td>
-                        @if($release->accountingPosting?->mapping)
-                            @can('construction.accounting.view')
-                                <button type="button" class="btn btn-xs btn-success btn-modal" data-href="{{ route('journal-entry.show',$release->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_release_accounting_entry')"><i class="fa fa-book"></i></button>
-                            @endcan
-                        @endif
-                        @if($release->cancellationAccountingPosting?->mapping)
-                            @can('construction.accounting.view')
-                                <button type="button" class="btn btn-xs btn-default btn-modal" data-href="{{ route('journal-entry.show',$release->cancellationAccountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_reversal_accounting_entry')"><i class="fa fa-undo"></i></button>
-                            @endcan
-                        @endif
-                        @if($release->isActive())
-                            @can('construction.cancel')
-                                <button type="button" class="btn btn-xs btn-danger js-cancel-retention-release" data-toggle="modal" data-target="#cancel-retention-release" data-action="{{ route('construction.subcontractors.certificates.retention-releases.cancel',[$contract->id,$certificate->id,$release->id]) }}"><i class="fa fa-ban"></i> @lang('construction::lang.cancel_release')</button>
-                            @endcan
-                        @endif
-                    </td>
-                </tr>
-            @empty
-                <tr><td colspan="6"><div class="ct-empty-state is-compact"><span><i class="fa fa-shield-alt"></i></span><strong>@lang('construction::lang.no_retention_releases')</strong></div></td></tr>
-            @endforelse
-        </tbody></table></div>
-    </div>
-    @can('construction.payment.record')
-    <div class="modal fade" id="record-retention-release"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="{{ route('construction.subcontractors.certificates.retention-releases.store',[$contract->id,$certificate->id]) }}">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4><i class="fa fa-unlock-alt"></i> @lang('construction::lang.release_retention')</h4></div><div class="modal-body"><div class="ct-payment-balance"><small>@lang('construction::lang.remaining_retention')</small><strong>@include('construction::partials.money',['value'=>$retentionRemainingValue])</strong></div><div class="row"><div class="col-md-6 form-group"><label>@lang('construction::lang.release_date') *</label><input name="release_date" value="{{ old('release_date', @format_date(now())) }}" class="form-control ct-date-picker" readonly required></div><div class="col-md-6 form-group"><label>@lang('construction::lang.release_amount') *</label><input name="retention_amount" value="{{ old('retention_amount', @num_format($retentionRemainingValue)) }}" class="form-control input_number" required>@error('retention_amount')<small class="text-danger">{{ $message }}</small>@enderror</div><div class="col-md-12 form-group"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea></div></div><div class="ct-context-banner"><i class="fa fa-info-circle"></i><span>@lang('construction::lang.retention_release_no_cost_notice')</span></div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn ct-primary-action"><i class="fa fa-save"></i> @lang('construction::lang.confirm_release')</button></div></form></div></div></div>
-    @endcan
-    @can('construction.cancel')
-    <div class="modal fade" id="cancel-retention-release"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4><i class="fa fa-ban"></i> @lang('construction::lang.cancel_release')</h4></div><div class="modal-body"><div class="form-group"><label>@lang('construction::lang.cancellation_reason') *</label><textarea name="cancellation_reason" class="form-control" rows="4" required>{{ old('cancellation_reason') }}</textarea>@error('cancellation_reason')<small class="text-danger">{{ $message }}</small>@enderror</div><div class="alert alert-warning">@lang('construction::lang.retention_release_cancel_notice')</div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn btn-danger"><i class="fa fa-ban"></i> @lang('construction::lang.confirm_cancellation')</button></div></form></div></div></div>
-    @endcan
-
-    <div class="ct-material-panel ct-subcert-payments-panel">
-        <div class="ct-panel-heading"><div><span>@lang('construction::lang.subcontract_payments')</span><h2>@lang('construction::lang.subcontract_payments')</h2><p>@lang('construction::lang.payment_stage_accounting_notice')</p></div>@if($remainingValue > 0.0001)@can('construction.payment.record')<button class="btn ct-primary-action" data-toggle="modal" data-target="#record-subcontract-payment"><i class="fa fa-money-bill-wave"></i> @lang('construction::lang.record_payment')</button>@endcan @endif</div>
-        <div class="table-responsive"><table class="table ct-material-table"><thead><tr><th>@lang('construction::lang.payment_number')</th><th>@lang('construction::lang.payment_date')</th><th>@lang('construction::lang.payment_amount')</th><th>@lang('construction::lang.payment_method')</th><th>@lang('construction::lang.payment_account')</th><th>@lang('construction::lang.payment_reference')</th><th>@lang('construction::lang.operations')</th></tr></thead><tbody>
-            @forelse($certificate->payments as $payment)<tr><td><strong dir="ltr">{{ $payment->number }}</strong></td><td>{{ @format_date($payment->payment_date) }}</td><td><strong>@include('construction::partials.money',['value'=>$payment->amount])</strong></td><td>{{ $paymentTypes[$payment->method] ?? $payment->method }}</td><td>{{ $payment->accountingAccount?->name ?: ($payment->account?->name ?: '—') }}</td><td>{{ $payment->reference_no ?: '—' }}</td><td><a href="{{ route('construction.subcontractors.certificates.payments.preview',[$contract->id,$certificate->id,$payment->id]) }}" target="_blank" class="btn btn-xs btn-default"><i class="fa fa-eye"></i></a> <a href="{{ route('construction.subcontractors.certificates.payments.print',[$contract->id,$certificate->id,$payment->id]) }}" target="_blank" class="btn btn-xs btn-primary"><i class="fa fa-print"></i></a> @if($payment->accountingPosting?->mapping)@can('construction.accounting.view')<button type="button" class="btn btn-xs btn-success btn-modal" data-href="{{ route('journal-entry.show',$payment->accountingPosting->accounting_mapping_id) }}" data-container=".view_modal" title="@lang('construction::lang.view_accounting_entry')"><i class="fa fa-book"></i></button>@endcan @endif</td></tr>@empty<tr><td colspan="7"><div class="ct-empty-state is-compact"><span><i class="fa fa-money-check-alt"></i></span><strong>@lang('construction::lang.no_subcontract_payments')</strong></div></td></tr>@endforelse
-        </tbody></table></div>
-    </div>
-    @can('construction.payment.record')
-    <div class="modal fade" id="record-subcontract-payment"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="{{ route('construction.subcontractors.certificates.payments.store',[$contract->id,$certificate->id]) }}">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4><i class="fa fa-money-bill-wave"></i> @lang('construction::lang.new_payment')</h4></div><div class="modal-body"><div class="ct-payment-balance"><small>@lang('construction::lang.remaining_amount')</small><strong>@include('construction::partials.money',['value'=>$remainingValue])</strong></div><div class="row"><div class="col-md-6 form-group"><label>@lang('construction::lang.payment_date') *</label><input name="payment_date" value="{{ old('payment_date', @format_date(now())) }}" class="form-control ct-date-picker" readonly required></div><div class="col-md-6 form-group"><label>@lang('construction::lang.payment_amount') *</label><input name="amount" value="{{ old('amount', @num_format($remainingValue)) }}" class="form-control input_number" required>@error('amount')<small class="text-danger">{{ $message }}</small>@enderror</div><div class="col-md-6 form-group"><label>@lang('construction::lang.payment_method') *</label><select name="method" class="form-control" required>@foreach($paymentTypes as $key=>$label)<option value="{{ $key }}" @selected(old('method','cash')===$key)>{{ $label }}</option>@endforeach</select></div><div class="col-md-6 form-group"><label>@lang('construction::lang.payment_account'){{ $accountingSettings ? ' *' : '' }}</label>@if($accountingSettings)<select name="accounting_account_id" class="form-control select2" required><option value="">@lang('construction::lang.select_cash_bank_account')</option>@foreach($accountingPaymentAccounts as $id=>$name)<option value="{{ $id }}" @selected((string)old('accounting_account_id',$accountingSettings->cash_account_id)===(string)$id)>{{ $name }}</option>@endforeach</select>@error('accounting_account_id')<small class="text-danger">{{ $message }}</small>@enderror@else<select name="account_id" class="form-control select2"><option value="">@lang('lang_v1.none')</option>@foreach($paymentAccounts as $id=>$name)@if($id!=='')<option value="{{ $id }}" @selected((string)old('account_id')===(string)$id)>{{ $name }}</option>@endif @endforeach</select>@endif</div><div class="col-md-12 form-group"><label>@lang('construction::lang.payment_reference')</label><input name="reference_no" value="{{ old('reference_no') }}" class="form-control" maxlength="120"></div><div class="col-md-12 form-group"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea></div></div><div class="ct-context-banner"><i class="fa fa-info-circle"></i><span>@lang('construction::lang.payment_stage_accounting_notice')</span></div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn ct-primary-action"><i class="fa fa-save"></i> @lang('construction::lang.record_payment')</button></div></form></div></div></div>
-    @endcan
-    @endif
-</section>
-
-<div class="modal fade" id="cancel-subcontract-payment"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4>@lang('construction::lang.cancel_posted_payment')</h4></div><div class="modal-body"><div class="form-group"><label>@lang('construction::lang.cancellation_reason') *</label><textarea name="cancellation_reason" class="form-control" rows="4" required minlength="5"></textarea></div><div class="form-group"><label>@lang('construction::lang.manager_password') *</label><input type="password" name="current_password" class="form-control" required></div><div class="alert alert-warning">@lang('construction::lang.cancellation_creates_reversal_notice')</div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn btn-danger">@lang('construction::lang.confirm_cancellation')</button></div></form></div></div></div>
-<div class="modal fade" id="cancel-subcontract-certificate"><div class="modal-dialog"><div class="modal-content ct-modern-modal"><form method="POST" action="{{ route('construction.subcontractors.certificates.cancel',[$contract->id,$certificate->id]) }}">@csrf<div class="modal-header"><button class="close" data-dismiss="modal">&times;</button><h4>@lang('construction::lang.cancel_posted_certificate')</h4></div><div class="modal-body"><div class="form-group"><label>@lang('construction::lang.cancellation_reason') *</label><textarea name="cancellation_reason" class="form-control" rows="4" required minlength="5"></textarea></div><div class="form-group"><label>@lang('construction::lang.manager_password') *</label><input type="password" name="current_password" class="form-control" required></div><div class="alert alert-warning">@lang('construction::lang.cancellation_creates_reversal_notice')</div></div><div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">@lang('messages.cancel')</button><button class="btn btn-danger">@lang('construction::lang.confirm_cancellation')</button></div></form></div></div></div>
+    @endforeach
+@endcan
 @endsection
 
 @push('ct_quick_js')
@@ -227,15 +660,20 @@ $(function () {
     function recalculateCertificate() {
         var gross = 0;
         $('.ct-subcert-table tbody tr').each(function () {
-            var $row = $(this), current = numberValue($row.find('.ct-subcert-qty'));
+            var $row = $(this), $input = $row.find('.ct-subcert-qty');
+            if (!$input.length) return;
+            var current = numberValue($input);
             var previous = parseFloat($row.data('previous')) || 0, contract = parseFloat($row.data('contract')) || 0;
             var rate = parseFloat($row.data('rate')) || 0;
             var value = $row.data('type') === 'percentage' ? rate * current / 100 : rate * current;
+            var overLimit = previous + current > contract + 0.0001;
             $row.find('.ct-subcert-cumulative').text(money(previous + current));
             $row.find('.ct-subcert-line-value').text(money(value));
-            $row.toggleClass('has-limit-error', previous + current > contract + 0.0001);
+            $row.toggleClass('has-limit-error', overLimit);
+            $input.closest('.rr-control').toggleClass('rr-control--invalid', overLimit);
             gross += value;
         });
+        if (!$('.ct-subcert-qty').length) return;
         var retention = gross * (parseFloat($('.ct-subcert-totals').data('retention')) || 0) / 100;
         var other = numberValue($('.ct-subcert-deduction'));
         var tax = gross * numberValue($('.ct-subcert-tax-percent')) / 100;
@@ -247,7 +685,7 @@ $(function () {
         $('.ct-subcert-advance-value').text(money(advance));
         $('.ct-subcert-net').text(money(Math.max(0, gross + tax - retention - other - advance)));
     }
-    $(document).on('input change', '.ct-subcert-qty,.ct-subcert-deduction,.ct-subcert-tax-percent,.ct-subcert-advance', recalculateCertificate);
+    $(document).on('input change', '.ct-subcert-qty, .ct-subcert-deduction, .ct-subcert-tax-percent, .ct-subcert-advance', recalculateCertificate);
     $('#subcontract-certificate-form').on('submit', function (event) {
         recalculateCertificate();
         if ($('.ct-subcert-table tbody tr.has-limit-error').length) {
@@ -261,9 +699,9 @@ $(function () {
 </script>
 @endpush
 
-@if($errors->hasAny(['amount','payment_date','method','account_id','reference_no']))
+@if($errors->hasAny(['amount', 'payment_date', 'method', 'account_id', 'reference_no']))
     @push('ct_quick_js')<script>$(function(){$('#record-subcontract-payment').modal('show')})</script>@endpush
 @endif
-@if($errors->hasAny(['retention_amount','release_date']))
+@if($errors->hasAny(['retention_amount', 'release_date']))
     @push('ct_quick_js')<script>$(function(){$('#record-retention-release').modal('show')})</script>@endpush
 @endif

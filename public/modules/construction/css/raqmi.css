@@ -1019,3 +1019,11 @@ nav.rr-tabs { overflow-y: hidden; }
 .rr-stat .rr-progress { margin-top: var(--rr-space-2); }
 /* قائمة بيانات تحت حقول نافذة */
 .rr-form-wrap > .rr-deflist.rr-card { margin-top: var(--rr-space-4); }
+
+/* ── 33. Subcontracts: three-column form grid, over-limit quantity row ── */
+/* شبكة حقول 3 أعمدة للنماذج العريضة: <div class="rr-form-grid rr-form-grid--3"> */
+.rr-form-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@container (max-width: 760px) { .rr-form-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 480px) { .rr-form-grid--3 { grid-template-columns: minmax(0, 1fr); } }
+/* صف كميته أكبر من كمية التعاقد (بيتغير من JS) */
+.rr-tr.has-limit-error .rr-td, .rr-tr.has-limit-error:hover .rr-td { background: var(--rr-danger-tint); }
