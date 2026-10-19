@@ -27,6 +27,11 @@
     @case('chevron-down')<path d="M6 9l6 6 6-6"></path>@break
     @case('chevron-back')<path d="M15 6l-6 6 6 6"></path>@break
     @case('more')<circle cx="5" cy="12" r="1.3" fill="currentColor"></circle><circle cx="12" cy="12" r="1.3" fill="currentColor"></circle><circle cx="19" cy="12" r="1.3" fill="currentColor"></circle>@break
+    @case('user')<circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path>@break
+    @case('users')<circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.2a6.5 6.5 0 0 1 3.5 5.8"></path>@break
+    @case('clock')<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>@break
+    @case('shield')<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6l8-3z"></path>@break
+    @case('map-pin')<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle>@break
     @case('close')<path d="M6 6l12 12M18 6L6 18"></path>@break
     @case('info')<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path>@break
     @case('filter')<path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z"></path>@break

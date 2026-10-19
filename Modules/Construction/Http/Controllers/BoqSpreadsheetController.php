@@ -3,9 +3,11 @@
 namespace Modules\Construction\Http\Controllers;
 
 use App\Unit;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Construction\Entities\ConstructionBoqImportBatch;
 use Modules\Construction\Entities\ConstructionBoqVersion;
@@ -40,14 +42,23 @@ class BoqSpreadsheetController extends BaseController
         $project = $this->findProject($project);
         $version = $this->findVersion($project, $version);
         $this->ensureEditable($project, $version);
-        $request->validate(['boq_file' => ['required', 'file', 'max:10240', 'mimes:xlsx,xls,csv']]);
+        $request->validate(['boq_file' => ['required', 'file', 'max:10240', 'mimes:xlsx,xls,csv']], [], ['boq_file' => __('construction::lang.import_boq_items')]);
 
-        $sheet = IOFactory::load($request->file('boq_file')->getRealPath())->getActiveSheet();
-        abort_if($sheet->getHighestDataRow() > 2001, 422, __('construction::lang.import_row_limit'));
+        // مشاكل الملف بترجع كخطأ تحقق على boq_file، فتظهر جوه نافذة الاستيراد بدل صفحة خطأ
+        try {
+            $sheet = IOFactory::load($request->file('boq_file')->getRealPath())->getActiveSheet();
+        } catch (\Throwable $exception) {
+            throw ValidationException::withMessages(['boq_file' => __('construction::lang.import_file_unreadable')]);
+        }
+        if ($sheet->getHighestDataRow() > 2001) {
+            throw ValidationException::withMessages(['boq_file' => __('construction::lang.import_row_limit')]);
+        }
         $rawRows = $sheet->rangeToArray('A2:J'.$sheet->getHighestDataRow(), null, true, true, false);
         $existing = $version->items()->get(['code', 'row_type'])->keyBy(fn ($item) => mb_strtolower(trim($item->code)));
         $rows = $this->normalizeRows($rawRows, $existing);
-        abort_if($rows->isEmpty(), 422, __('construction::lang.import_file_empty'));
+        if ($rows->isEmpty()) {
+            throw ValidationException::withMessages(['boq_file' => __('construction::lang.import_file_empty')]);
+        }
 
         $batch = ConstructionBoqImportBatch::create([
             'token' => (string) Str::uuid(),
@@ -230,7 +241,10 @@ class BoqSpreadsheetController extends BaseController
             ->where('user_id', auth()->id())
             ->where('status', 'preview')
             ->firstOrFail();
-        abort_if($batch->expires_at->isPast(), 410, __('construction::lang.import_preview_expired'));
+        if ($batch->expires_at->isPast()) {
+            throw new HttpResponseException(redirect()->route('construction.projects.boq.show', [$project->id, $version->id])
+                ->withErrors(['boq_file' => __('construction::lang.import_preview_expired')]));
+        }
 
         return $batch;
     }

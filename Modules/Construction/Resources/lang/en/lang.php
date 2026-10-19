@@ -1753,4 +1753,10 @@ return [
     'no_matching_projects' => 'No matching projects',
     'no_matching_projects_hint' => 'Change the search words or pick another status to see projects.',
     'project_unit' => 'projects',
+    'complete_missing_details' => 'Complete :count missing details',
+    'missing_details_count' => ':count details not set',
+    'view_full_log' => 'View full log',
+    'boq_section_count' => 'Sections',
+    'boq_current_version' => 'Current version',
+    'back_to_contract' => 'Back to contract',
 ];

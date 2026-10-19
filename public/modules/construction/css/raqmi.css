@@ -676,3 +676,316 @@ nav.rr-tabs .rr-tab:focus-visible { outline: 2px solid var(--rr-focus); outline-
 nav.rr-tabs .rr-tab[aria-current="page"] { color: var(--rr-brand); font-weight: var(--rr-fw-semibold); background: transparent; box-shadow: none; }
 nav.rr-tabs .rr-tab[aria-current="page"]::after { content: ""; position: absolute; inset-inline: var(--rr-space-3); bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--rr-brand); }
 @media (max-width: 767px) { nav.rr-tabs { margin-inline: 0; } }
+
+
+/* ==========================================================================
+   23. صف تحذير + مجموعة 6 مؤشرات + جدول DataTables داخل rr-table-wrap
+   <tr class="rr-tr rr-tr--warning"> — صف قرّب ميعاده
+   <div class="rr-statgroup rr-statgroup--6" style="--rr-stats: 6">
+   <table class="rr-table" data-rr-datatable> مع dom: 'rt<"rr-pager"<"rr-pager__sum"i><"rr-pager__pages"p>>'
+   ========================================================================== */
+
+.rr-tr--warning .rr-td { background: var(--rr-warning-tint); }
+.rr-tr--warning:hover .rr-td { background: var(--rr-warning-tint); }
+.rr-statgroup--6 { grid-auto-rows: 1fr; }
+@container (max-width: 1000px) { .rr-statgroup--6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container (max-width: 560px) { .rr-statgroup--6 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.rr-table-wrap .dataTables_wrapper { margin: 0; padding: 0; }
+.rr-table-wrap .dataTables_processing { top: 40px !important; margin: 0 !important; transform: translateX(-50%); padding: var(--rr-space-2) var(--rr-space-4) !important; border: 1px solid var(--rr-border) !important; border-radius: var(--rr-radius-md); background: var(--rr-surface) !important; color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; box-shadow: var(--rr-shadow-popover); }
+.rr-table-wrap table.rr-table.dataTable { margin: 0 !important; border: 0 !important; }
+.rr-table-wrap table.rr-table.dataTable thead .rr-th { border-bottom: 1px solid var(--rr-border) !important; }
+.rr-table-wrap table.rr-table.dataTable thead .sorting,
+.rr-table-wrap table.rr-table.dataTable thead .sorting_asc,
+.rr-table-wrap table.rr-table.dataTable thead .sorting_desc { background-image: none !important; cursor: pointer; }
+.rr-table-wrap table.rr-table.dataTable thead .sorting::before,
+.rr-table-wrap table.rr-table.dataTable thead .sorting::after,
+.rr-table-wrap table.rr-table.dataTable thead .sorting_asc::before,
+.rr-table-wrap table.rr-table.dataTable thead .sorting_asc::after,
+.rr-table-wrap table.rr-table.dataTable thead .sorting_desc::before,
+.rr-table-wrap table.rr-table.dataTable thead .sorting_desc::after { display: none !important; }
+.rr-table-wrap table.rr-table.dataTable thead .sorting_asc .rr-th__in::after { content: "↑"; color: var(--rr-brand); }
+.rr-table-wrap table.rr-table.dataTable thead .sorting_desc .rr-th__in::after { content: "↓"; color: var(--rr-brand); }
+.rr-table-wrap table.rr-table.dataTable tbody td.dataTables_empty { height: auto; padding: var(--rr-space-8) var(--rr-space-4); text-align: center; color: var(--rr-ink-muted); }
+.rr-table-wrap .rr-pager .dataTables_info { padding: 0 !important; color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; }
+.rr-table-wrap .rr-pager .dataTables_paginate { padding: 0 !important; margin: 0 !important; }
+.rr-table-wrap .rr-pager .pagination { display: inline-flex; gap: var(--rr-space-1); margin: 0 !important; }
+.rr-table-wrap .rr-pager .pagination > li > a,
+.rr-table-wrap .rr-pager .pagination > li > span { float: none; min-width: var(--rr-control-sm); height: var(--rr-control-sm); padding: 0 var(--rr-space-2); display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent !important; border-radius: var(--rr-radius-md) !important; background: transparent !important; color: var(--rr-ink) !important; font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); }
+.rr-table-wrap .rr-pager .pagination > li > a:hover { background: var(--rr-surface-hover) !important; }
+.rr-table-wrap .rr-pager .pagination > .active > a { background: var(--rr-brand-tint) !important; color: var(--rr-brand-tint-ink) !important; font-weight: var(--rr-fw-bold); }
+.rr-table-wrap .rr-pager .pagination > .disabled > a { color: var(--rr-ink-subtle) !important; opacity: .5; }
+/* العناصر المخفية بالخاصية hidden تفضل مخفية حتى لو عليها class بيعمل display */
+:is(.rr-page, .rr-scope) [hidden] { display: none !important; }
+/* التابات بتعمل scroll أفقي بس، من غير شريط رأسي */
+nav.rr-tabs { overflow-y: hidden; }
+
+
+/* ==========================================================================
+   24. مؤشرات ملوّنة (Stat tones)
+   <div class="rr-stat rr-stat--danger|warning|info|success|brand">
+     <div class="rr-stat__label"><span class="rr-stat__icon">icon</span>نص</div> …
+   خط علوي بلون الحالة + أيقونة في مربع ملوّن؛ rr-stat--brand بخلفية خفيفة للإجمالي
+   ========================================================================== */
+
+.rr-stat__icon { width: 30px; height: 30px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-md); background: var(--rr-neutral-tint); color: var(--rr-ink-muted); font-size: var(--rr-fs-xs) !important; }
+.rr-stat--danger, .rr-stat--warning, .rr-stat--info, .rr-stat--success, .rr-stat--brand, .rr-stat--neutral { box-shadow: inset 0 3px 0 var(--rr-tone, var(--rr-neutral-line)); }
+.rr-stat--danger { --rr-tone: var(--rr-danger); }
+.rr-stat--warning { --rr-tone: var(--rr-warning-line); }
+.rr-stat--info { --rr-tone: var(--rr-info); }
+.rr-stat--success { --rr-tone: var(--rr-success); }
+.rr-stat--brand { --rr-tone: var(--rr-brand); background: var(--rr-brand-tint); }
+.rr-stat--danger .rr-stat__icon { background: var(--rr-danger-tint); color: var(--rr-danger); }
+.rr-stat--warning .rr-stat__icon { background: var(--rr-warning-tint); color: var(--rr-warning); }
+.rr-stat--info .rr-stat__icon { background: var(--rr-info-tint); color: var(--rr-info); }
+.rr-stat--success .rr-stat__icon { background: var(--rr-success-tint); color: var(--rr-success); }
+.rr-stat--brand .rr-stat__icon { background: var(--rr-brand); color: var(--rr-on-brand); }
+.rr-stat--brand .rr-stat__value { color: var(--rr-brand-tint-ink); }
+.rr-stat--warning .rr-stat__value--warning { color: var(--rr-warning); }
+:is(.rr-page, .rr-scope) a.rr-stat.rr-stat--danger:hover { background: var(--rr-danger-tint); }
+/* جدول برأس وإجمالي بلون الهوية الخفيف: <table class="rr-table rr-table--tinted"> */
+.rr-table--tinted .rr-th { background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); }
+.rr-table--tinted .rr-tfoot .rr-td { background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); border-top-color: var(--rr-brand); }
+/* عرض متوسط للشاشات اللي محتواها مش محتاج العرض الكامل: <main class="content rr-page rr-page--md"> */
+.rr-page.rr-page--md { max-width: 1280px; padding-inline: var(--rr-space-6) !important; }
+
+
+/* ==========================================================================
+   23. أيقونة ملوّنة (Icon chip) — لمسة لون بسيطة تميّز كل نوع/مرحلة
+   <span class="rr-chip rr-chip--info">@include rr_icon</span>
+   الألوان: brand (افتراضي) | info | success | warning | danger | neutral
+   ========================================================================== */
+
+.rr-chip { width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-md); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); }
+.rr-chip--sm { width: 28px; height: 28px; }
+.rr-chip--lg { width: 44px; height: 44px; }
+.rr-chip--info { background: var(--rr-info-tint); color: var(--rr-info); }
+.rr-chip--success { background: var(--rr-success-tint); color: var(--rr-success); }
+.rr-chip--warning { background: var(--rr-warning-tint); color: var(--rr-warning); }
+.rr-chip--danger { background: var(--rr-danger-tint); color: var(--rr-danger); }
+.rr-chip--neutral { background: var(--rr-neutral-tint); color: var(--rr-ink-muted); }
+
+
+/* ==========================================================================
+   24. كروت المؤشرات المنفصلة (Stat grid) — لما عدد المؤشرات يتغير
+   <div class="rr-stat-grid"><div class="rr-stat rr-stat--card"><span class="rr-chip"></span>
+     <div class="rr-stat__body"><div class="rr-stat__label">…</div><div class="rr-stat__value">…</div></div></div></div>
+   ========================================================================== */
+
+.rr-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--rr-space-3); }
+.rr-stat--card { flex-direction: row; align-items: center; gap: var(--rr-space-3); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); box-shadow: var(--rr-shadow-card); }
+.rr-stat__body { display: flex; flex-direction: column; min-width: 0; }
+.rr-stat--card .rr-stat__value, .rr-stat--card .rr-money--lg { font-size: var(--rr-fs-xl) !important; line-height: var(--rr-lh-xl); }
+
+
+/* ==========================================================================
+   25. كروت إجراءات (Action cards) + شبكة عمودين + بيانات أفقية
+   <div class="rr-action-grid"><article class="rr-action rr-action--info">
+     <div class="rr-action__top"><span class="rr-chip …"></span><span class="rr-badge …"></span></div>
+     <h3 class="rr-action__title">…</h3><p class="rr-action__text">…</p>
+     <a class="rr-btn …">…</a> أو <span class="rr-action__lock">…</span>
+   </article></div>
+   ========================================================================== */
+
+.rr-action-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--rr-space-3); padding: var(--rr-space-4) var(--rr-space-5) var(--rr-space-5); }
+.rr-action { display: flex; flex-direction: column; gap: var(--rr-space-2); padding: var(--rr-space-4); background: var(--rr-surface); border: 1px solid var(--rr-border); border-top: 3px solid var(--rr-brand); border-radius: var(--rr-radius-lg); }
+.rr-action--info { border-top-color: var(--rr-info); }
+.rr-action--success { border-top-color: var(--rr-success); }
+.rr-action--warning { border-top-color: var(--rr-warning-line); }
+.rr-action--muted { border-top-color: var(--rr-border-control); background: var(--rr-surface-sunken); }
+.rr-action__top { display: flex; align-items: center; justify-content: space-between; gap: var(--rr-space-2); }
+:is(.rr-page, .rr-scope) .rr-action__title { font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-action__text { flex: 1; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+.rr-action > .rr-btn { align-self: flex-start; }
+.rr-action__lock { display: inline-flex; align-items: center; gap: 6px; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-subtle); }
+
+/* شبكة عمودين بتتكدّس في الشاشات الضيقة */
+.rr-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--rr-space-5); align-items: start; }
+
+/* بيانات بأيقونة: <dl class="rr-facts"><div class="rr-fact"><span class="rr-chip rr-chip--sm"></span><div><dt>…</dt><dd>…</dd></div></div></dl> */
+.rr-facts { margin: 0; }
+.rr-fact { display: flex; align-items: center; gap: var(--rr-space-3); padding: var(--rr-space-3) var(--rr-space-5); border-bottom: 1px solid var(--rr-border); min-width: 0; }
+.rr-fact:last-child { border-bottom: 0; }
+.rr-fact > div { min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-fact dt { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-fact dd { margin: 0; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); overflow-wrap: anywhere; }
+:is(.rr-page, .rr-scope) .rr-fact dd.is-empty { color: var(--rr-ink-subtle); font-weight: var(--rr-fw-regular); }
+
+
+/* ==========================================================================
+   26. قوائم صفوف داخل كارت (List rows) — مصروفات، نشاط، أشخاص
+   <ul class="rr-list"><li class="rr-list__row"><span class="rr-chip …"></span>
+     <div class="rr-list__main"><span class="rr-list__title">…</span><span class="rr-list__meta">…</span></div>
+     <div class="rr-list__end">…</div></li></ul>
+   ========================================================================== */
+
+:is(.rr-page, .rr-scope) .rr-list { margin: 0; padding: 0; list-style: none; }
+.rr-list__row { display: flex; align-items: center; gap: var(--rr-space-3); padding: var(--rr-space-3) var(--rr-space-5); border-bottom: 1px solid var(--rr-border); min-width: 0; }
+.rr-list__row:last-child { border-bottom: 0; }
+.rr-list__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rr-list__title { font-weight: var(--rr-fw-semibold); color: var(--rr-ink); overflow-wrap: anywhere; }
+:is(.rr-page, .rr-scope) a.rr-list__title { color: var(--rr-link); }
+:is(.rr-page, .rr-scope) a.rr-list__title:hover { text-decoration: underline; }
+.rr-list__meta { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); overflow-wrap: anywhere; }
+.rr-list__end { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: end; }
+.rr-avatar { width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-full); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); font-weight: var(--rr-fw-bold); }
+.rr-money--pos { color: var(--rr-success); }
+.rr-card__foot-note { padding: var(--rr-space-3) var(--rr-space-5); border-top: 1px solid var(--rr-border); background: var(--rr-surface-sunken); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); border-end-start-radius: var(--rr-radius-lg); border-end-end-radius: var(--rr-radius-lg); }
+
+
+/* ==========================================================================
+   27. مراحل قابلة للضغط + كارت ملوّن + قسم قابل للطي
+   ========================================================================== */
+
+/* نفس شكل rr-steps على قائمة لازم تحتفظ بـ class خاص (زي ct-project-steps):
+   <div class="rr-steps-scroll rr-steps-wrap"><ol class="…">…</ol></div> */
+:is(.rr-page, .rr-scope) .rr-steps-wrap > ol { display: flex; min-width: 640px; margin: 0; padding: 0; list-style: none; }
+.rr-step__link { display: flex; flex-direction: column; align-items: center; gap: var(--rr-space-2); width: 100%; padding: var(--rr-space-1); border-radius: var(--rr-radius-md); color: inherit; }
+:is(.rr-page, .rr-scope) a.rr-step__link:hover { background: var(--rr-surface-hover); color: inherit; }
+:is(.rr-page, .rr-scope) a.rr-step__link:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: 2px; }
+.rr-step--locked .rr-step__dot { border-style: dashed; color: var(--rr-ink-subtle); }
+.rr-step--locked .rr-step__label { color: var(--rr-ink-muted); font-weight: var(--rr-fw-medium); }
+.rr-step--done .rr-step__note { color: var(--rr-success); font-weight: var(--rr-fw-semibold); }
+
+/* كارت بخلفية لون الهوية الفاتح: <section class="rr-card rr-card--tint"> */
+.rr-card--tint { background: var(--rr-brand-tint); border-color: var(--rr-surface-selected); }
+.rr-card--tint .rr-next__icon { background: var(--rr-surface); }
+
+/* قسم قابل للطي: <details class="rr-card rr-collapse"><summary class="rr-card__head">…</summary>…</details> */
+.rr-collapse > summary { cursor: pointer; list-style: none; }
+.rr-collapse > summary::-webkit-details-marker { display: none; }
+.rr-collapse:not([open]) > summary { border-bottom: 0; }
+.rr-collapse__chev { color: var(--rr-ink-muted); transition: transform .15s; }
+.rr-collapse[open] .rr-collapse__chev { transform: rotate(180deg); }
+.rr-collapse > summary:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: -2px; border-radius: var(--rr-radius-lg); }
+
+.rr-progress__fill--brand { background: var(--rr-brand); }
+
+/* رأس قسم فيه عنوان على جنب وزرار على الجنب التاني */
+.rr-section__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--rr-space-3); }
+.rr-collapse__title { display: block; }
+
+
+/* ==========================================================================
+   28. كروت المراحل (Stages) — مراحل + حالة + إجراء في مكان واحد
+   <div class="rr-stages-wrap"><ol class="…">
+     <li class="rr-stage rr-stage--done|current|upcoming|locked rr-stage--info">
+       <div class="rr-stage__head"><span class="rr-step__dot">…</span><span class="rr-stage__label">…</span><span class="rr-badge">…</span></div>
+       <span class="rr-stage__meta">…</span> <p class="rr-stage__text">…</p> <a class="rr-btn …">…</a>
+     </li>
+   </ol></div>
+   المرحلة الحالية بتاخد عمودين وخلفية لون الهوية الفاتح وفيها زرار الخطوة التالية.
+   ========================================================================== */
+
+:is(.rr-page, .rr-scope) .rr-stages-wrap > ol { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--rr-space-3); margin: 0; padding: 0; list-style: none; }
+.rr-stage { display: flex; flex-direction: column; gap: var(--rr-space-2); min-width: 0; padding: var(--rr-space-4); background: var(--rr-surface); border: 1px solid var(--rr-border); border-top: 3px solid var(--rr-border-control); border-radius: var(--rr-radius-lg); }
+.rr-stage--info { border-top-color: var(--rr-info); }
+.rr-stage--brand { border-top-color: var(--rr-brand); }
+.rr-stage--warning { border-top-color: var(--rr-warning-line); }
+.rr-stage--success { border-top-color: var(--rr-success); }
+.rr-stage--locked { background: var(--rr-surface-sunken); border-top-color: var(--rr-border); }
+.rr-stage--current { grid-column: span 2; background: var(--rr-brand-tint); border-color: var(--rr-surface-selected); border-top-color: var(--rr-brand); }
+@container (max-width: 520px) { .rr-stage--current { grid-column: auto; } }
+.rr-stages-wrap { container-type: inline-size; }
+.rr-stage__head { display: flex; align-items: center; gap: var(--rr-space-2); min-width: 0; }
+.rr-stage__head .rr-badge { margin-inline-start: auto; }
+.rr-stage .rr-step__dot { width: 28px; height: 28px; flex: none; font-size: var(--rr-fs-xs) !important; }
+.rr-stage--done .rr-step__dot { background: var(--rr-success); border-color: var(--rr-success); color: #FFFFFF; }
+.rr-stage--current .rr-step__dot { border-color: var(--rr-brand); color: var(--rr-brand); background: var(--rr-surface); }
+.rr-stage--locked .rr-step__dot { border-style: dashed; color: var(--rr-ink-subtle); }
+:is(.rr-page, .rr-scope) .rr-stage__label { font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-stage--locked .rr-stage__label { color: var(--rr-ink-muted); }
+.rr-stage__meta { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-stage__title { font-size: var(--rr-fs-lg) !important; line-height: var(--rr-lh-lg); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-stage__text { flex: 1; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink-muted); }
+.rr-stage__body { flex: 1; display: flex; flex-direction: column; gap: var(--rr-space-2); min-width: 0; }
+.rr-stage__body > .rr-btn { align-self: flex-start; margin-top: auto; }
+.rr-stage__lock { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-subtle); }
+
+/* رابط نصي صغير داخل كارت (أكمل البيانات، عرض السجل) */
+:is(.rr-page, .rr-scope) .rr-card__link { display: inline-flex; align-items: center; gap: var(--rr-space-1); padding: var(--rr-space-3) var(--rr-space-5); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-semibold); color: var(--rr-link); }
+:is(.rr-page, .rr-scope) .rr-card__link:hover { color: var(--rr-link); text-decoration: underline; }
+/* سطر فاضي صغير بدل كارت فاضي كامل */
+.rr-empty-line { display: flex; align-items: center; gap: var(--rr-space-2); padding: var(--rr-space-3) var(--rr-space-5); font-size: var(--rr-fs-sm) !important; color: var(--rr-ink-muted); }
+/* سجل كامل جوه كارت (details مفتوح/مقفول) */
+.rr-card__details { border-top: 1px solid var(--rr-border); }
+.rr-card__details > summary { cursor: pointer; list-style: none; }
+.rr-card__details > summary::-webkit-details-marker { display: none; }
+.rr-card__details[open] .rr-collapse__chev { transform: rotate(180deg); }
+.rr-card__details .rr-table { min-width: 0; }
+/* قسم فرعي جوه كارت بعنوان صغير */
+:is(.rr-page, .rr-scope) .rr-card__subhead { padding: var(--rr-space-3) var(--rr-space-5) var(--rr-space-1); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-semibold); color: var(--rr-ink-muted); border-top: 1px solid var(--rr-border); }
+
+/* المراحل في صف واحد على الشاشات العريضة: 5 مراحل، والحالية بتاخد عمودين لو موجودة */
+@container (min-width: 960px) {
+    :is(.rr-page, .rr-scope) .rr-stages-wrap--5 > ol { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    :is(.rr-page, .rr-scope) .rr-stages-wrap--6 > ol { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+
+/* ==========================================================================
+   29. صفحات الفورم (Form page) — أقسام مرقّمة + شريط حفظ ثابت
+   <main class="content rr-page rr-page--form">
+     <form class="rr-form">
+       <section class="rr-card rr-form-section"><header class="rr-card__head"><span class="rr-step-num">1</span>
+         <div class="rr-card__titles">…</div></header><div class="rr-card__body"><div class="rr-form-wrap"><div class="rr-form-grid">…</div></div></div></section>
+       <footer class="rr-form-actions">…</footer>
+     </form>
+   </main>
+   ========================================================================== */
+
+.rr-page--form { max-width: 920px; }
+.rr-form { display: flex; flex-direction: column; gap: var(--rr-space-4); margin: 0; }
+.rr-step-num { width: 28px; height: 28px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-full); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-bold); font-variant-numeric: tabular-nums; }
+.rr-form-actions { position: sticky; bottom: 0; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-2); padding: var(--rr-space-3) var(--rr-space-4); background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); box-shadow: 0 -6px 16px rgba(17,20,27,0.06); }
+.rr-form-actions__note { margin-inline-start: auto; display: inline-flex; align-items: center; gap: var(--rr-space-2); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+@media (max-width: 767px) { .rr-form-actions__note { margin-inline-start: 0; flex-basis: 100%; } }
+
+/* حقل قيمته ثابتة (محسوبة أو مش قابلة للتعديل هنا) */
+.rr-locked { display: flex; align-items: center; gap: var(--rr-space-2); min-height: var(--rr-control-md); padding-inline: var(--rr-space-3); background: var(--rr-surface-sunken); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-md); color: var(--rr-ink); font-weight: var(--rr-fw-medium); }
+.rr-locked .rr-icon { color: var(--rr-ink-muted); }
+
+/* حقل لازم يسمح للقائمة اللي بتطلع منه تبان (زي datetimepicker) */
+.rr-control--visible { overflow: visible; }
+:is(.rr-page, .rr-scope) .rr-control--visible .bootstrap-datetimepicker-widget { z-index: 30; }
+
+/* select2 جوه نظام التصميم: نفس شكل rr-control */
+:is(.rr-page, .rr-scope) .rr-field .select2-container { width: 100% !important; }
+:is(.rr-page, .rr-scope) .rr-field .select2-container--default .select2-selection--single,
+:is(.rr-page, .rr-scope) .rr-field .select2-container--default .select2-selection--multiple { min-height: var(--rr-control-md); border: 1px solid var(--rr-border-control); border-radius: var(--rr-radius-md); background: var(--rr-surface); }
+:is(.rr-page, .rr-scope) .rr-field .select2-container--default .select2-selection--single { height: var(--rr-control-md); }
+:is(.rr-page, .rr-scope) .rr-field .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 38px; padding-inline: var(--rr-space-3) 36px; color: var(--rr-ink); font-size: var(--rr-fs-md) !important; }
+:is(.rr-page, .rr-scope) .rr-field .select2-container--default .select2-selection--single .select2-selection__arrow { height: 38px; inset-inline-start: auto; left: 8px; right: auto; }
+:is(.rr-page, .rr-scope) .rr-field .select2-container--default.select2-container--focus .select2-selection--multiple,
+:is(.rr-page, .rr-scope) .rr-field .select2-container--default.select2-container--open .select2-selection--single,
+:is(.rr-page, .rr-scope) .rr-field .select2-container--default.select2-container--focus .select2-selection--single { border-color: var(--rr-focus); box-shadow: 0 0 0 1px var(--rr-focus); }
+:is(.rr-page, .rr-scope) .rr-field .select2-container--default .select2-selection--multiple .select2-selection__choice { margin-top: 6px; border: 1px solid var(--rr-border); border-radius: var(--rr-radius-sm); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); font-size: var(--rr-fs-sm) !important; }
+
+/* محتوى مركّب جوه التنبيه (عنوان + قائمة) بيرجع لتنسيق المسافات العادي */
+.rr-alert > div { white-space: normal; }
+
+/* حقول التاريخ readonly بتفتح منتقي التاريخ: نفس شكل الحقل العادي (بنلغي الرمادي اللي في refinement.css) */
+:is(.rr-page, .rr-scope) .rr-control__input[readonly] { background: transparent; }
+:is(.rr-page, .rr-scope) .rr-control__input.ct-date-picker { cursor: pointer; }
+
+/* صف باب (عنوان مجموعة) داخل جدول: <tr class="rr-tr rr-tr--section"><td><span class="rr-section-row">…</span></td></tr> */
+.rr-tr--section .rr-td { height: auto; padding-block: var(--rr-space-2); background: var(--rr-info-tint); color: var(--rr-info); font-weight: var(--rr-fw-semibold); }
+.rr-tr--section:hover .rr-td { background: var(--rr-info-tint); }
+.rr-section-row { display: inline-flex; align-items: center; gap: var(--rr-space-2); }
+.rr-section-row .rr-code { color: inherit; opacity: .8; }
+/* العنصر الحالي في قائمة (الإصدار المفتوح مثلًا) */
+.rr-list__row--current { background: var(--rr-brand-tint); }
+/* رقم صف مكتوب بالسكريبت: يلغي العدّاد التلقائي */
+.rr-entry-row__num:not(:empty)::before { content: none; }
+
+/* ── 30. Contracts: help disclosure, success menu item, input inside rr-locked ── */
+:is(.rr-page, .rr-scope) .rr-menu__item--success { color: var(--rr-success); }
+:is(.rr-page, .rr-scope) .rr-menu__item--success:hover { background: var(--rr-success-tint); color: var(--rr-success); }
+:is(.rr-page, .rr-scope) .rr-locked .rr-control__input { flex: 1; min-width: 0; height: 38px; padding-inline: 0; border: 0; background: transparent; color: inherit; font-weight: inherit; box-shadow: none; }
+:is(.rr-page, .rr-scope) .rr-help { margin-top: var(--rr-space-2); color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; }
+:is(.rr-page, .rr-scope) .rr-help > summary { display: inline-flex; align-items: center; gap: var(--rr-space-1); cursor: pointer; color: var(--rr-brand); font-weight: var(--rr-fw-medium); list-style: none; }
+:is(.rr-page, .rr-scope) .rr-help > summary::-webkit-details-marker { display: none; }
+:is(.rr-page, .rr-scope) .rr-help > summary:focus-visible { outline: 2px solid var(--rr-brand); outline-offset: 2px; border-radius: var(--rr-radius-sm); }
+:is(.rr-page, .rr-scope) .rr-help dl { margin: var(--rr-space-2) 0 0; padding: var(--rr-space-3); background: var(--rr-surface-sunken); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-md); display: grid; gap: var(--rr-space-2); }
+:is(.rr-page, .rr-scope) .rr-help dt { color: var(--rr-ink); font-weight: var(--rr-fw-semibold); }
+:is(.rr-page, .rr-scope) .rr-help dd { margin: 0; line-height: var(--rr-lh-sm); }

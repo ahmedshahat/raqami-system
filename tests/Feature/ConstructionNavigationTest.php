@@ -130,9 +130,11 @@ class ConstructionNavigationTest extends TestCase
         $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
         $_SERVER['HTTP_USER_AGENT'] = 'PHPUnit';
 
+        // النظرة العامة ليها هيدر نظام التصميم (rr) بدل الهيدر الكبير القديم
         $this->get(route('construction.overview.index'))
             ->assertOk()
-            ->assertSee('ct-hero ct-hero--compact', false);
+            ->assertSee('id="rr-overview-title"', false)
+            ->assertDontSee('ct-hero ct-hero--compact', false);
 
         foreach ([
             route('construction.quotes.index'),
