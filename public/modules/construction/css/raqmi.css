@@ -989,3 +989,33 @@ nav.rr-tabs { overflow-y: hidden; }
 :is(.rr-page, .rr-scope) .rr-help dl { margin: var(--rr-space-2) 0 0; padding: var(--rr-space-3); background: var(--rr-surface-sunken); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-md); display: grid; gap: var(--rr-space-2); }
 :is(.rr-page, .rr-scope) .rr-help dt { color: var(--rr-ink); font-weight: var(--rr-fw-semibold); }
 :is(.rr-page, .rr-scope) .rr-help dd { margin: 0; line-height: var(--rr-lh-sm); }
+
+/* ── 31. Measurements: info alert, focus column, quantity row states, toolbar hint ── */
+.rr-alert--info { background: var(--rr-info-tint); border-color: var(--rr-info-line); }
+/* عمود الإدخال الأساسي في جدول: <th class="rr-th rr-th--focus"> / <td class="rr-td rr-td--focus"> */
+.rr-th--focus { background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); }
+.rr-td--focus { min-width: 128px; }
+/* حالات صف الإدخال (بتتغير من JS): has-quantity = فيه كمية، has-error = كمية غلط */
+.rr-tr.has-quantity .rr-td--focus { background: var(--rr-success-tint); }
+.rr-tr.has-error .rr-td, .rr-tr.has-error:hover .rr-td { background: var(--rr-danger-tint); }
+:is(.rr-page, .rr-scope) .rr-td .rr-field__error { margin-top: 4px; justify-content: flex-end; text-align: end; }
+.rr-field__error:empty { display: none; }
+/* تلميح جوه شريط الأدوات: <span class="rr-toolbar__hint">icon نص</span> */
+:is(.rr-page, .rr-scope) .rr-toolbar__hint { display: inline-flex; align-items: center; gap: var(--rr-space-2); font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-toolbar__hint.text-danger { color: var(--rr-danger); }
+/* عرض ثابت لحقول الإدخال جوه الجدول عشان الجدول ما يعملش سكرول عرضي */
+.rr-td--input .rr-control__input { width: 100%; min-width: 0; }
+.rr-td--focus .rr-control { width: 120px; margin-inline-start: auto; }
+.rr-td--note .rr-control { width: 170px; }
+
+/* ── 32. Certificates: net-due row, flat stat strip & filter inside a table card ── */
+/* سطر الإجمالي في قائمة البيانات: <div class="rr-deflist__item rr-deflist__item--total"> */
+.rr-deflist__item--total { background: var(--rr-success-tint); }
+:is(.rr-page, .rr-scope) .rr-deflist__item--total dt,
+:is(.rr-page, .rr-scope) .rr-deflist__item--total dd { color: var(--rr-success); font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); font-weight: var(--rr-fw-bold); }
+/* مؤشرات أو شريط إدخال جوه rr-table-wrap من غير إطار خاص بيهم */
+.rr-statgroup--flat { border-radius: 0; border-inline: 0; border-top: 0; box-shadow: none; }
+.rr-filter--flat { border: 0; border-bottom: 1px solid var(--rr-border); border-radius: 0; }
+.rr-stat .rr-progress { margin-top: var(--rr-space-2); }
+/* قائمة بيانات تحت حقول نافذة */
+.rr-form-wrap > .rr-deflist.rr-card { margin-top: var(--rr-space-4); }
