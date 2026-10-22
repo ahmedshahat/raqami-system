@@ -243,6 +243,14 @@
                                 <span class="rr-list__meta"><span class="rr-num">{{ $historyVersion->items_count }}</span> @lang('construction::lang.items_count_label')</span>
                             </div>
                             <span class="rr-badge rr-badge--{{ $versionTones[$historyVersion->status] ?? 'neutral' }}">@lang('construction::lang.' . $historyVersion->status)</span>
+                            @if($historyVersion->status === 'draft' && $versions->count() > 1)
+                                @can('construction.boq.manage')
+                                    <form class="rr-inline-form" method="POST" action="{{ route('construction.projects.boq.destroy', [$project->id, $historyVersion->id]) }}" onsubmit="return confirm(@js(__('construction::lang.delete_boq_version_confirmation')))">
+                                        @csrf @method('DELETE')
+                                        <button class="rr-btn rr-btn--danger-ghost rr-btn--sm rr-btn--icon ct-boq-version-delete" type="submit" aria-label="@lang('construction::lang.delete_boq_version'): {{ $historyVersion->name }}" title="@lang('construction::lang.delete_boq_version')">@include('construction::partials.rr_icon', ['name' => 'trash', 'size' => 16])</button>
+                                    </form>
+                                @endcan
+                            @endif
                         </li>
                     @endforeach
                 </ul>

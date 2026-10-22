@@ -26,6 +26,17 @@
                 format: moment_date_format,
                 ignoreReadonly: true
             });
+            // التقويم جوه نافذة rr-modal: يطلع برّه النافذة بدل ما يعمل سكرول جوّاها
+            // (لو جسم النافذة نفسه محتاج سكرول على شاشة صغيرة بنسيبه زي ما هو)
+            $(document).on('dp.show', '.rr-modal .ct-date-picker', function () {
+                var body = $(this).closest('.rr-modal__body')[0];
+                var pickerHeight = $(body).find('.bootstrap-datetimepicker-widget').outerHeight(true) || 0;
+                if (body && body.scrollHeight - pickerHeight <= body.clientHeight + 1) {
+                    $(this).closest('.rr-modal').addClass('rr-modal--picker-open');
+                }
+            }).on('dp.hide', '.rr-modal .ct-date-picker', function () {
+                $(this).closest('.rr-modal').removeClass('rr-modal--picker-open');
+            });
         });
     </script>
     @yield('module_javascript')

@@ -1,113 +1,209 @@
 @extends('construction::layouts.module')
 @section('title', $measurement->number)
 
-@section('module_content')
 @php
     $canEditMeasurement = $measurement->status === 'draft' && auth()->user()->can('construction.measurement.manage');
     $hasMeasuredItems = $measurementSummary['measured_items_count'] > 0;
+    $isApproved = $measurement->status === 'approved';
+    $measurementTones = ['draft' => 'warning', 'approved' => 'success'];
 @endphp
-<section class="content ct-measurement-page">
-    <div class="ct-measurement-heading">
-        <div>
-            <span><a href="{{ route('construction.projects.show', $project->id) }}">{{ $project->name }}</a> / <a href="{{ route('construction.projects.measurements.index', $project->id) }}">@lang('construction::lang.measurements')</a> / {{ $measurement->number }}</span>
-            <h2>@lang('construction::lang.measurement_number'): {{ $measurement->number }}</h2>
-            <p>@lang('construction::lang.measurement_workspace_hint')</p>
+
+@section('module_content')
+<main class="content rr-page ct-measurement-page" aria-labelledby="rr-measurement-title">
+
+    {{-- ═══ رأس الصفحة ═══ --}}
+    <header class="rr-head">
+        <span class="rr-chip rr-chip--lg rr-chip--info" aria-hidden="true">@include('construction::partials.rr_icon', ['name' => 'ruler', 'size' => 24])</span>
+        <div class="rr-head__titles">
+            <nav aria-label="@lang('construction::lang.breadcrumb_nav')">
+                <ol class="rr-crumbs">
+                    <li><a href="{{ route('construction.measurements.index') }}">@lang('construction::lang.measurements')</a></li>
+                    <li><a href="{{ route('construction.projects.measurements.index', $project->id) }}" class="rr-num">{{ $project->code }}</a></li>
+                    <li><span aria-current="page" class="rr-num">{{ $measurement->number }}</span></li>
+                </ol>
+            </nav>
+            <h1 id="rr-measurement-title" class="rr-head__title">@lang('construction::lang.measurement_number'): <span class="rr-num">{{ $measurement->number }}</span></h1>
+            <div class="rr-head__meta">
+                <span class="rr-badge rr-badge--{{ $measurementTones[$measurement->status] ?? 'neutral' }}"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.' . $measurement->status)</span>
+                <span class="rr-head__meta-item">@include('construction::partials.rr_icon', ['name' => 'building', 'size' => 18]){{ $project->name }}</span>
+                <span class="rr-head__meta-item">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])<span class="rr-num">{{ @format_date($measurement->measurement_date) }}</span></span>
+                @if($measurement->period_from || $measurement->period_to)
+                    <span class="rr-head__meta-item">@include('construction::partials.rr_icon', ['name' => 'clock', 'size' => 18])<span class="rr-num">{{ $measurement->period_from ? @format_date($measurement->period_from) : '—' }}</span> ← <span class="rr-num">{{ $measurement->period_to ? @format_date($measurement->period_to) : '—' }}</span></span>
+                @endif
+            </div>
         </div>
-        <div class="ct-measurement-heading__actions">
-            <a href="{{ route('construction.projects.measurements.index', $project->id) }}" class="ct-measurement-button ct-measurement-button--soft"><i class="fa fa-arrow-right"></i> @lang('construction::lang.back_to_measurements')</a>
-            <a href="{{ route('construction.projects.show', $project->id) }}" class="ct-measurement-button ct-measurement-button--soft"><i class="fa fa-building"></i> @lang('construction::lang.back_to_project')</a>
+        <div class="rr-head__actions">
+            <a href="{{ route('construction.projects.measurements.index', $project->id) }}" class="rr-btn rr-btn--secondary">@include('construction::partials.rr_icon', ['name' => 'arrow-back'])@lang('construction::lang.back_to_measurements')</a>
+            <a href="{{ route('construction.projects.show', $project->id) }}" class="rr-btn rr-btn--ghost">@include('construction::partials.rr_icon', ['name' => 'building'])@lang('construction::lang.back_to_project')</a>
         </div>
-    </div>
+    </header>
 
     @if($errors->any())
-        <div class="alert alert-danger ct-measurement-errors"><strong>@lang('construction::lang.fix_measurement_errors')</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
+        <div class="rr-alert rr-alert--danger ct-measurement-errors" role="alert">
+            <div>
+                <strong>@lang('construction::lang.fix_measurement_errors')</strong>
+                <ul class="rr-error-list">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+            </div>
+        </div>
     @endif
 
-    <article class="ct-measurement-card">
-        <header class="ct-measurement-card__header">
-            <span class="ct-measurement-card__icon"><i class="fa fa-clipboard-list"></i></span>
-            <div><h3>@lang('construction::lang.measurement_information')</h3><p>@lang('construction::lang.measurement_information_hint')</p></div>
-            <span class="ct-measurement-status ct-measurement-status--{{ $measurement->status }}">@lang('construction::lang.'.$measurement->status)</span>
-        </header>
-        <div class="ct-measurement-info-grid">
-            <div><small>@lang('construction::lang.measurement_number')</small><strong>{{ $measurement->number }}</strong></div>
-            <div><small>@lang('construction::lang.measurement_date')</small><strong>{{ @format_date($measurement->measurement_date) }}</strong></div>
-            <div><small>@lang('construction::lang.period_from')</small><strong>{{ $measurement->period_from ? @format_date($measurement->period_from) : '—' }}</strong></div>
-            <div><small>@lang('construction::lang.period_to')</small><strong>{{ $measurement->period_to ? @format_date($measurement->period_to) : '—' }}</strong></div>
-            <div><small>@lang('construction::lang.status')</small><strong>@lang('construction::lang.'.$measurement->status)</strong></div>
-            <div class="ct-measurement-info-grid__notes"><small>@lang('construction::lang.measurement_notes')</small><strong>{{ $measurement->notes ?: '—' }}</strong></div>
-        </div>
-    </article>
+    {{-- ═══ الحالة + الخطوة التالية ═══ --}}
+    @if($isApproved)
+        <section class="rr-card rr-card--tint rr-card__body" aria-labelledby="rr-measurement-next-title">
+            <div class="rr-next">
+                <span class="rr-next__icon">@include('construction::partials.rr_icon', ['name' => 'lock', 'size' => 22])</span>
+                <div class="rr-next__copy">
+                    <h2 id="rr-measurement-next-title" class="rr-next__title">@lang('construction::lang.approved_measurement_is_locked')</h2>
+                    <p class="rr-next__text">@lang('construction::lang.ready_for_certificate')</p>
+                </div>
+                @if($linkedCertificateId)
+                    @can('construction.certificate.view')
+                        <a href="{{ route('construction.projects.certificates.show', [$project->id, $linkedCertificateId]) }}" class="rr-btn rr-btn--primary rr-btn--lg">@include('construction::partials.rr_icon', ['name' => 'file'])@lang('construction::lang.open_certificate')</a>
+                    @endcan
+                @else
+                    @can('construction.certificate.manage')
+                        <a data-ct-certificate-create href="{{ route('construction.projects.certificates.index', ['project' => $project->id, 'measurement_id' => $measurement->id]) }}" class="rr-btn rr-btn--primary rr-btn--lg">@include('construction::partials.rr_icon', ['name' => 'file'])@lang('construction::lang.create_certificate_from_measurement')</a>
+                    @endcan
+                @endif
+            </div>
+        </section>
+    @elseif($measurement->status === 'draft')
+        @can('construction.measurement.approve')
+            <section class="rr-card rr-card--tint rr-card__body" aria-labelledby="rr-measurement-next-title">
+                <div class="rr-next">
+                    <span class="rr-next__icon">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 22])</span>
+                    <div class="rr-next__copy">
+                        <h2 id="rr-measurement-next-title" class="rr-next__title">@lang('construction::lang.approve_measurement')</h2>
+                        <p class="rr-next__text">@lang('construction::lang.approve_measurement_hint') @lang('construction::lang.save_before_approval')</p>
+                    </div>
+                    <form class="rr-inline-form" method="POST" action="{{ route('construction.projects.measurements.approve', [$project->id, $measurement->id]) }}">
+                        @csrf
+                        <button class="rr-btn rr-btn--primary rr-btn--lg" type="submit" id="approve-measurement-button" {{ !$hasMeasuredItems ? 'disabled' : '' }}>@include('construction::partials.rr_icon', ['name' => 'check'])@lang('construction::lang.approve_measurement')</button>
+                    </form>
+                </div>
+            </section>
+        @endcan
+    @endif
 
-    <div class="ct-measurement-summary">
-        <div><span><i class="fa fa-list"></i></span><small>@lang('construction::lang.measurement_items_count')</small><strong>{{ $measurementSummary['items_count'] }}</strong></div>
-        <div><span><i class="fa fa-check-circle"></i></span><small>@lang('construction::lang.measured_items_count')</small><strong id="summary-measured-count">{{ $measurementSummary['measured_items_count'] }}</strong></div>
-        <div><span><i class="fa fa-coins"></i></span><small>@lang('construction::lang.current_executed_value')</small><strong id="summary-current-value">@include('construction::partials.money', ['value' => $measurementSummary['current_value']])</strong></div>
-        <div><span><i class="fa fa-history"></i></span><small>@lang('construction::lang.previous_approved_value')</small><strong>@include('construction::partials.money', ['value' => $measurementSummary['previous_value']])</strong></div>
-        <div><span><i class="fa fa-chart-line"></i></span><small>@lang('construction::lang.cumulative_executed_value')</small><strong id="summary-cumulative-value">@include('construction::partials.money', ['value' => $measurementSummary['cumulative_value']])</strong></div>
+    {{-- ═══ أرقام الحصر ═══ --}}
+    <div class="rr-statgroup-wrap">
+        <div class="rr-statgroup rr-statgroup--5" style="--rr-stats: 5">
+            <div class="rr-stat">
+                <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'list', 'size' => 18])@lang('construction::lang.measurement_items_count')</div>
+                <div class="rr-stat__value"><span class="rr-num">{{ $measurementSummary['items_count'] }}</span></div>
+            </div>
+            <div class="rr-stat">
+                <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'check-circle', 'size' => 18])@lang('construction::lang.measured_items_count')</div>
+                <div class="rr-stat__value"><span class="rr-num" id="summary-measured-count">{{ $measurementSummary['measured_items_count'] }}</span></div>
+            </div>
+            <div class="rr-stat">
+                <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'ruler', 'size' => 18])@lang('construction::lang.current_executed_value')</div>
+                <div class="rr-stat__value"><span class="rr-money rr-money--lg" id="summary-current-value">@include('construction::partials.money', ['value' => $measurementSummary['current_value']])</span></div>
+            </div>
+            <div class="rr-stat">
+                <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'clock', 'size' => 18])@lang('construction::lang.previous_approved_value')</div>
+                <div class="rr-stat__value"><span class="rr-money rr-money--lg">@include('construction::partials.money', ['value' => $measurementSummary['previous_value']])</span></div>
+            </div>
+            <div class="rr-stat">
+                <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'pie', 'size' => 18])@lang('construction::lang.cumulative_executed_value')</div>
+                <div class="rr-stat__value"><span class="rr-money rr-money--lg" id="summary-cumulative-value">@include('construction::partials.money', ['value' => $measurementSummary['cumulative_value']])</span></div>
+            </div>
+        </div>
     </div>
 
-    @if($measurement->status === 'approved')
-        <div class="ct-measurement-state ct-measurement-state--approved">
-            <i class="fa fa-lock"></i><div><strong>@lang('construction::lang.approved_measurement_is_locked')</strong><span>@lang('construction::lang.ready_for_certificate')</span></div>
-            @if($linkedCertificateId)
-                @can('construction.certificate.view')<a href="{{ route('construction.projects.certificates.show', [$project->id, $linkedCertificateId]) }}" class="ct-measurement-button ct-measurement-button--primary"><i class="fa fa-file-invoice-dollar"></i> @lang('construction::lang.open_certificate')</a>@endcan
-            @else
-                @can('construction.certificate.manage')<a data-ct-certificate-create href="{{ route('construction.projects.certificates.index', ['project' => $project->id, 'measurement_id' => $measurement->id]) }}" class="ct-measurement-button ct-measurement-button--success"><i class="fa fa-file-invoice-dollar"></i> @lang('construction::lang.create_certificate_from_measurement')</a>@endcan
-            @endif
-        </div>
+    @if($measurement->notes)
+        <div class="rr-alert rr-alert--info"><div><strong>@lang('construction::lang.measurement_notes'):</strong> {{ $measurement->notes }}</div></div>
     @endif
 
+    {{-- ═══ كميات الأعمال المنفذة ═══ --}}
     @if(!$approvedBoq)
-        <div class="ct-measurement-state ct-measurement-state--warning"><i class="fa fa-exclamation-triangle"></i><div><strong>@lang('construction::lang.no_active_contract_for_measurement')</strong><span>@lang('construction::lang.measurement_requires_contract_hint')</span></div></div>
+        <div class="rr-callout rr-callout--danger">
+            <span class="rr-callout__icon">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 22])</span>
+            <div class="rr-callout__copy"><strong>@lang('construction::lang.no_active_contract_for_measurement')</strong><p>@lang('construction::lang.measurement_requires_contract_hint')</p></div>
+        </div>
     @else
-        <article class="ct-measurement-card ct-measurement-card--table">
-            <header class="ct-measurement-card__header"><span class="ct-measurement-card__icon"><i class="fa fa-list-ol"></i></span><div><h3>@lang('construction::lang.measurement_items')</h3><p>@lang('construction::lang.measurement_inline_hint')</p></div></header>
+        <section class="rr-table-wrap" aria-labelledby="rr-measurement-items-title">
             @if($canEditMeasurement)<form method="POST" action="{{ route('construction.projects.measurements.items.store', [$project->id, $measurement->id]) }}" id="measurement-items-form">@csrf @endif
-            <div class="ct-measurement-table-wrap">
-                <table class="ct-measurement-table">
-                    <thead><tr><th>@lang('construction::lang.boq_code')</th><th>@lang('construction::lang.boq_description')</th><th>@lang('construction::lang.unit')</th><th>@lang('construction::lang.contract_quantity')</th><th>@lang('construction::lang.previously_executed')</th><th>@lang('construction::lang.currently_executed')</th><th>@lang('construction::lang.total_executed')</th><th>@lang('construction::lang.remaining_quantity')</th>@if($canEditMeasurement)<th>@lang('construction::lang.notes')</th><th>@lang('construction::lang.actions')</th>@endif</tr></thead>
-                    <tbody>
+            <div class="rr-table-head">
+                <div>
+                    <h2 id="rr-measurement-items-title" class="rr-table-head__title">@lang('construction::lang.measurement_items')</h2>
+                    <p class="rr-table-head__sub">@lang('construction::lang.measurement_inline_hint')</p>
+                </div>
+            </div>
+            <div class="rr-table-scroll">
+                <table class="rr-table">
+                    <caption class="rr-sr">@lang('construction::lang.measurement_items')</caption>
+                    <thead>
+                        <tr>
+                            <th class="rr-th" scope="col">@lang('construction::lang.boq_code')</th>
+                            <th class="rr-th rr-col--text" scope="col">@lang('construction::lang.boq_description')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.unit')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.contract_quantity')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.previously_executed')</th>
+                            <th class="rr-th rr-th--num rr-th--focus" scope="col">@lang('construction::lang.currently_executed')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.total_executed')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.remaining_quantity')</th>
+                            @if($canEditMeasurement)
+                                <th class="rr-th" scope="col">@lang('construction::lang.notes')</th>
+                                <th class="rr-th" scope="col"><span class="rr-sr">@lang('construction::lang.actions')</span></th>
+                            @endif
+                        </tr>
+                    </thead>
+                    <tbody class="rr-tbody">
                     @forelse($measurementRows as $index => $row)
                         @php
                             $item = $row->boq_item;
                             $inputValue = old("items.$index.executed_quantity", app(\App\Utils\Util::class)->num_f($row->current_quantity, false, null, true));
                             $noteValue = old("items.$index.notes", optional($row->measurement_item)->notes);
                         @endphp
-                        <tr class="ct-measurement-row {{ $row->current_quantity > 0 ? 'has-quantity' : '' }}" data-contract="{{ (float) $item->contract_quantity }}" data-previous="{{ $row->previous_quantity }}" data-price="{{ (float) $item->sales_unit_price }}">
-                            <td><strong class="ct-measurement-code">{{ $item->code }}</strong>@if($item->item_kind === 'variation')<small class="label label-info">@lang('construction::lang.additional_work')</small>@endif</td><td><strong class="ct-measurement-description">{{ $item->description }}</strong></td><td><span class="ct-measurement-unit">{{ $item->unit ?: '—' }}</span></td>
-                            <td class="ct-number">{{ @format_quantity((float) $item->contract_quantity) }}</td><td class="ct-number">{{ @format_quantity($row->previous_quantity) }}</td>
-                            <td class="ct-measurement-current-cell">
+                        <tr class="rr-tr ct-measurement-row {{ $row->current_quantity > 0 ? 'has-quantity' : '' }}" data-contract="{{ (float) $item->contract_quantity }}" data-previous="{{ $row->previous_quantity }}" data-price="{{ (float) $item->sales_unit_price }}">
+                            <td class="rr-td">
+                                <span class="rr-code">{{ $item->code }}</span>
+                                @if($item->item_kind === 'variation')<div><span class="rr-badge rr-badge--info">@lang('construction::lang.additional_work')</span></div>@endif
+                            </td>
+                            <td class="rr-td rr-td--wrap"><span class="rr-entity__name">{{ $item->description }}</span></td>
+                            <td class="rr-td rr-td--muted">{{ $item->unit ?: '—' }}</td>
+                            <td class="rr-td rr-td--num"><span class="rr-num">{{ @format_quantity((float) $item->contract_quantity) }}</span></td>
+                            <td class="rr-td rr-td--num"><span class="rr-num">{{ @format_quantity($row->previous_quantity) }}</span></td>
+                            <td class="rr-td rr-td--num rr-td--focus {{ $canEditMeasurement ? 'rr-td--input' : '' }}">
                                 @if($canEditMeasurement)
                                     <input type="hidden" name="items[{{ $index }}][boq_item_id]" value="{{ $item->id }}">
-                                    <input type="text" name="items[{{ $index }}][executed_quantity]" class="form-control input_number input_quantity ct-measurement-current" value="{{ $inputValue }}" inputmode="decimal" autocomplete="off">
-                                    <small class="ct-measurement-row-error"></small>
-                                @else<strong>{{ @format_quantity($row->current_quantity) }}</strong>@endif
+                                    <div class="rr-control rr-control--sm"><input type="text" name="items[{{ $index }}][executed_quantity]" class="rr-control__input rr-control__input--num input_number input_quantity ct-measurement-current" value="{{ $inputValue }}" inputmode="decimal" autocomplete="off" aria-label="@lang('construction::lang.currently_executed'): {{ $item->code }}"></div>
+                                    <small class="rr-field__error ct-measurement-row-error" aria-live="polite"></small>
+                                @else
+                                    <strong class="rr-num">{{ @format_quantity($row->current_quantity) }}</strong>
+                                @endif
                             </td>
-                            <td class="ct-number"><strong class="ct-measurement-total">{{ @format_quantity($row->total_quantity) }}</strong></td><td class="ct-number"><strong class="ct-measurement-remaining">{{ @format_quantity($row->remaining_quantity) }}</strong></td>
-                            @if($canEditMeasurement)<td><input type="text" name="items[{{ $index }}][notes]" class="form-control ct-measurement-note" value="{{ $noteValue }}" maxlength="2000" placeholder="@lang('construction::lang.optional_note')"></td>
-                            <td class="ct-measurement-actions"><button type="button" class="ct-measurement-clear" title="@lang('construction::lang.clear_row')"><i class="fa fa-eraser"></i></button></td>@endif
+                            <td class="rr-td rr-td--num"><strong class="rr-num ct-measurement-total">{{ @format_quantity($row->total_quantity) }}</strong></td>
+                            <td class="rr-td rr-td--num"><span class="rr-num ct-measurement-remaining">{{ @format_quantity($row->remaining_quantity) }}</span></td>
+                            @if($canEditMeasurement)
+                                <td class="rr-td rr-td--input rr-td--note"><div class="rr-control rr-control--sm"><input type="text" name="items[{{ $index }}][notes]" class="rr-control__input ct-measurement-note" value="{{ $noteValue }}" maxlength="2000" placeholder="@lang('construction::lang.optional_note')" aria-label="@lang('construction::lang.notes'): {{ $item->code }}"></div></td>
+                                <td class="rr-td rr-td--actions"><button type="button" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon ct-measurement-clear" title="@lang('construction::lang.clear_row')" aria-label="@lang('construction::lang.clear_row')">@include('construction::partials.rr_icon', ['name' => 'close', 'size' => 16])</button></td>
+                            @endif
                         </tr>
                     @empty
-                        <tr><td colspan="{{ $canEditMeasurement ? 10 : 8 }}"><div class="ct-measurement-empty"><i class="fa fa-inbox"></i><strong>@lang('construction::lang.no_contract_boq_items')</strong></div></td></tr>
+                        <tr><td class="rr-td" colspan="{{ $canEditMeasurement ? 10 : 8 }}">
+                            <div class="rr-empty">
+                                <span class="rr-empty__icon">@include('construction::partials.rr_icon', ['name' => 'folder-open', 'size' => 22])</span>
+                                <h3 class="rr-empty__title">@lang('construction::lang.no_contract_boq_items')</h3>
+                            </div>
+                        </td></tr>
                     @endforelse
                     </tbody>
                 </table>
             </div>
             @if($canEditMeasurement)
-                <footer class="ct-measurement-footer"><span id="measurement-validation-message"><i class="fa fa-info-circle"></i> @lang('construction::lang.save_before_approval')</span><button type="submit" class="ct-measurement-button ct-measurement-button--primary" id="save-measurement-items"><i class="fa fa-save"></i> @lang('construction::lang.save_measurement_quantities')</button></footer>
+                <div class="rr-toolbar">
+                    <span class="rr-toolbar__hint" id="measurement-validation-message">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 16])@lang('construction::lang.save_before_approval')</span>
+                    <div class="rr-toolbar__end">
+                        <button type="submit" class="rr-btn rr-btn--primary" id="save-measurement-items">@include('construction::partials.rr_icon', ['name' => 'check'])@lang('construction::lang.save_measurement_quantities')</button>
+                    </div>
+                </div>
                 </form>
             @endif
-        </article>
+        </section>
     @endif
-
-    @if($measurement->status === 'draft')
-        @can('construction.measurement.approve')
-            <div class="ct-measurement-approve"><div><strong>@lang('construction::lang.approve_measurement')</strong><span>@lang('construction::lang.approve_measurement_hint')</span></div><form method="POST" action="{{ route('construction.projects.measurements.approve', [$project->id, $measurement->id]) }}">@csrf<button class="ct-measurement-button ct-measurement-button--success" id="approve-measurement-button" {{ !$hasMeasuredItems ? 'disabled' : '' }}><i class="fa fa-check"></i> @lang('construction::lang.approve_measurement')</button></form></div>
-        @endcan
-    @endif
-</section>
-<div id="ct-quick-workspace"></div>
+</main>
 @endsection
 @include('construction::partials.quick_create')
 
@@ -133,6 +229,8 @@ $(function () {
             if (current < 0) error = negativeMessage;
             if (previous + current > contract + 0.0001) error = limitMessage;
             $row.toggleClass('has-quantity', current > 0).toggleClass('has-error', !!error);
+            $input.closest('.rr-control').toggleClass('rr-control--invalid', !!error);
+            $input.attr('aria-invalid', error ? 'true' : null);
             $row.find('.ct-measurement-row-error').text(error);
             $row.find('.ct-measurement-total').text(quantityFormat(previous + current));
             $row.find('.ct-measurement-remaining').text(quantityFormat(Math.max(0, contract - previous - current)));
@@ -159,7 +257,7 @@ $(function () {
 
         var $submitBtn = $('#save-measurement-items');
         var originalHtml = $submitBtn.html();
-        $submitBtn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> @lang("messages.saving")');
+        $submitBtn.prop('disabled', true).text(@json(__('messages.saving')));
 
         $.ajax({
             method: 'POST',

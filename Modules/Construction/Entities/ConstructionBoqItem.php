@@ -44,11 +44,6 @@ class ConstructionBoqItem extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
-    public function allocations()
-    {
-        return $this->hasMany(ConstructionBoqCostAllocation::class, 'boq_item_id');
-    }
-
     public function measurementItems()
     {
         return $this->hasMany(ConstructionMeasurementItem::class, 'boq_item_id');
@@ -76,15 +71,5 @@ class ConstructionBoqItem extends Model
     public function getAuthorizedQuantityAttribute(): float
     {
         return (float) $this->contract_quantity + (float) $this->approvedAdjustments()->sum('quantity');
-    }
-
-    public function getEstimatedCostAttribute(): float
-    {
-        return (float) $this->allocations->sum('estimated_cost');
-    }
-
-    public function getEstimatedMarginAttribute(): float
-    {
-        return (float) $this->sales_total - $this->estimated_cost;
     }
 }

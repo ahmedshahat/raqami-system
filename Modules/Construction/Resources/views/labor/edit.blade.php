@@ -1,5 +1,58 @@
 @extends('construction::layouts.module')
 @section('title', __('construction::lang.edit_sheet'))
+
+@php
+    $req = '<span class="rr-field__req" aria-hidden="true">*</span>';
+    $fieldError = fn ($field) => $errors->has($field) ? 'rr-control--invalid' : '';
+@endphp
+
 @section('module_content')
-<section class="content ct-materials-page"><div class="ct-form-shell ct-labor-form-shell"><div class="ct-form-shell__aside"><a href="{{ route('construction.labor.show', $sheet->id) }}" class="ct-back-link"><i class="fa fa-arrow-right"></i> {{ $sheet->number }}</a><span class="ct-form-icon is-amber"><i class="fas fa-pencil-alt"></i></span><h1>@lang('construction::lang.edit_sheet')</h1><p>@lang('construction::lang.edit_labor_sheet_hint')</p><div class="ct-locked-context"><small>@lang('construction::lang.project')</small><strong>{{ $sheet->project->code }} — {{ $sheet->project->name }}</strong></div></div><div class="ct-form-shell__main"><div class="ct-form-heading"><span>@lang('construction::lang.draft')</span><h2>@lang('construction::lang.sheet_identity')</h2></div><form method="POST" action="{{ route('construction.labor.update', $sheet->id) }}">@csrf @method('PUT')<input type="hidden" name="project_id" value="{{ $sheet->project_id }}"><div class="ct-form-grid"><div class="form-group"><label>@lang('construction::lang.sheet_number') *</label><input name="number" value="{{ old('number', $sheet->number) }}" class="form-control" required></div><div class="form-group"><label>@lang('construction::lang.work_site')</label><input name="work_site" value="{{ old('work_site', $sheet->work_site) }}" class="form-control"></div><div class="form-group"><label>@lang('construction::lang.period_start') *</label><input name="period_start" value="{{ old('period_start', @format_date($sheet->period_start)) }}" class="form-control ct-date-picker" readonly required></div><div class="form-group"><label>@lang('construction::lang.period_end') *</label><input name="period_end" value="{{ old('period_end', @format_date($sheet->period_end)) }}" class="form-control ct-date-picker" readonly required></div><div class="form-group ct-form-grid__full"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="5">{{ old('notes', $sheet->notes) }}</textarea></div></div><div class="ct-form-footer"><a href="{{ route('construction.labor.show', $sheet->id) }}" class="btn btn-default">@lang('messages.cancel')</a><button class="btn ct-primary-action"><i class="fa fa-save"></i> @lang('construction::lang.save_changes')</button></div></form></div></div></section>
+<main class="content rr-page rr-page--form" aria-labelledby="rr-labor-form-title">
+    <header class="rr-head">
+        <span class="rr-chip rr-chip--lg rr-chip--warning" aria-hidden="true">@include('construction::partials.rr_icon', ['name' => 'edit', 'size' => 24])</span>
+        <div class="rr-head__titles">
+            <nav aria-label="@lang('construction::lang.breadcrumb_nav')">
+                <ol class="rr-crumbs">
+                    <li><a href="{{ route('construction.labor.index') }}">@lang('construction::lang.labor_sheets')</a></li>
+                    <li><a href="{{ route('construction.labor.show', $sheet->id) }}" class="rr-num">{{ $sheet->number }}</a></li>
+                    <li><span aria-current="page">@lang('construction::lang.edit')</span></li>
+                </ol>
+            </nav>
+            <h1 id="rr-labor-form-title" class="rr-head__title">@lang('construction::lang.edit_sheet')</h1>
+            <p class="rr-head__sub">@lang('construction::lang.edit_labor_sheet_hint')</p>
+        </div>
+    </header>
+
+    <form method="POST" class="rr-form" action="{{ route('construction.labor.update', $sheet->id) }}">
+        @csrf
+        @method('PUT')
+        <input type="hidden" name="project_id" value="{{ $sheet->project_id }}">
+        @include('construction::labor.partials.form_errors')
+
+        <section class="rr-card" aria-labelledby="rr-labor-identity">
+            <header class="rr-card__head">
+                <div class="rr-card__titles">
+                    <h2 id="rr-labor-identity" class="rr-card__title">@lang('construction::lang.sheet_identity')</h2>
+                </div>
+                <span class="rr-badge rr-badge--warning"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.draft')</span>
+            </header>
+            <div class="rr-card__body">
+                <div class="rr-form-wrap">
+                    <div class="rr-form-grid">
+                        <div class="rr-field rr-field--full">
+                            <span class="rr-field__label">@lang('construction::lang.project')</span>
+                            <div class="rr-locked">@include('construction::partials.rr_icon', ['name' => 'lock', 'size' => 16])<span><span class="rr-code">{{ $sheet->project->code }}</span> — {{ $sheet->project->name }}</span></div>
+                        </div>
+                        @include('construction::labor.partials.identity_fields', ['defaultNumber' => $sheet->number])
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="rr-form-actions">
+            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'check'])<span>@lang('construction::lang.save_changes')</span></button>
+            <a href="{{ route('construction.labor.show', $sheet->id) }}" class="rr-btn rr-btn--secondary">@lang('messages.cancel')</a>
+        </footer>
+    </form>
+</main>
 @endsection

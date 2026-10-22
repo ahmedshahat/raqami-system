@@ -9,10 +9,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('transactions', function (Blueprint $table) {
-            $table->unsignedInteger('construction_material_document_id')->nullable()->after('construction_boq_item_id');
-            $table->index('construction_material_document_id', 'transactions_construction_material_document_index');
-        });
+        if (! Schema::hasColumn('transactions', 'construction_material_document_id')) {
+            Schema::table('transactions', function (Blueprint $table) {
+                $table->unsignedInteger('construction_material_document_id')->nullable()->after('construction_boq_item_id');
+                $table->index('construction_material_document_id', 'transactions_construction_material_document_index');
+            });
+        }
 
         DB::table('construction_material_documents')
             ->whereNotNull('stock_adjustment_transaction_id')

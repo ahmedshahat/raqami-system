@@ -16,7 +16,6 @@ class ConstructionBoqVersion extends Model
     protected $casts = [
         'approved_at' => 'datetime',
         'sales_total' => 'decimal:4',
-        'estimated_cost_total' => 'decimal:4',
     ];
 
     public function project()
@@ -27,11 +26,6 @@ class ConstructionBoqVersion extends Model
     public function items()
     {
         return $this->hasMany(ConstructionBoqItem::class, 'boq_version_id');
-    }
-
-    public function allocations()
-    {
-        return $this->hasMany(ConstructionBoqCostAllocation::class, 'boq_version_id');
     }
 
     public function approvedBy()
@@ -53,7 +47,6 @@ class ConstructionBoqVersion extends Model
     {
         $this->forceFill([
             'sales_total' => $this->items()->where('row_type', 'item')->sum('sales_total'),
-            'estimated_cost_total' => $this->allocations()->sum('estimated_cost'),
         ])->save();
     }
 }

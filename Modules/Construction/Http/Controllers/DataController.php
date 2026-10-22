@@ -66,7 +66,7 @@ class DataController extends Controller
                     $sub->url(
                         route('construction.costs.index'),
                         __('construction::lang.nav_costs'),
-                        ['icon' => '', 'active' => request()->routeIs('construction.costs.*') || request()->routeIs('construction.materials.*') || request()->routeIs('construction.labor.*') || request()->routeIs('construction.cost-codes.*')]
+                        ['icon' => '', 'active' => request()->routeIs('construction.costs.*') || request()->routeIs('construction.materials.*') || request()->routeIs('construction.labor.*')]
                     );
                     $sub->url(
                         route('construction.subcontractors.index'),
@@ -96,6 +96,13 @@ class DataController extends Controller
 
     public function user_permissions(): array
     {
+        // صلاحيات المقاولات تظهر في شاشة الأدوار للنشاط المشترك في الموديول بس (زي القائمة الجانبية)
+        $businessId = (int) session('user.business_id');
+        if ($businessId && ! app()->environment('local')
+            && ! (new ModuleUtil())->hasThePermissionInSubscription($businessId, 'construction_module')) {
+            return [];
+        }
+
         return [
             [
                 'value' => 'construction.access',

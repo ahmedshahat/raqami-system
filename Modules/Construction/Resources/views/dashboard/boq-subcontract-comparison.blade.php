@@ -2,47 +2,145 @@
 
 @section('title', __('construction::lang.boq_subcontract_comparison'))
 
+@php
+    $marginTones = ['healthy' => 'success', 'low' => 'warning', 'loss' => 'danger'];
+    $amount = fn ($value) => \Modules\Construction\Support\CurrencyFormatter::parts($value)['amount'];
+    $meta = $report ? [
+        ['building', $selectedProject->code . ' — ' . $selectedProject->name],
+        ['user', $selectedProject->customer?->name ?: '—'],
+        ['calendar', __('construction::lang.as_of_date') . ' ' . app(\App\Utils\Util::class)->format_date($toDate)],
+    ] : [];
+@endphp
+
 @section('module_content')
-<section class="content ct-financial-report-page ct-comparison-page">
-    <nav class="ct-report-switcher" aria-label="@lang('construction::lang.construction_reports')">
-        <a href="{{ route('construction.reports.index') }}"><i class="fa fa-chart-line"></i> @lang('construction::lang.financial_position_report')</a>
-        <a href="{{ route('construction.reports.subcontractor-statement.index') }}"><i class="fa fa-file-invoice-dollar"></i> @lang('construction::lang.subcontractor_statement')</a>
-        <a class="is-active" href="{{ route('construction.reports.boq-subcontract-comparison.index') }}"><i class="fa fa-balance-scale"></i> @lang('construction::lang.boq_subcontract_comparison')</a>
-        <a href="{{ route('construction.reports.boq-cost-profitability.index') }}"><i class="fa fa-coins"></i> @lang('construction::lang.boq_cost_profitability')</a>
-        <a href="{{ route('construction.reports.customer-certificates-collection.index') }}"><i class="fa fa-hand-holding-usd"></i> @lang('construction::lang.customer_collection_report')</a>
-        <a href="{{ route('construction.reports.retention-guarantees.index') }}"><i class="fa fa-shield-alt"></i> @lang('construction::lang.retention_guarantees_report')</a>
-    </nav>
+<main class="content rr-page" aria-labelledby="rr-report-title">
+    @include('construction::dashboard.partials.rr_report_switcher', ['active' => 'comparison'])
 
-    <header class="ct-financial-report-heading ct-comparison-heading">
-        <div><span><i class="fa fa-search-dollar"></i> @lang('construction::lang.owner_profitability_report')</span><h1>@lang('construction::lang.boq_subcontract_comparison')</h1><p>@lang('construction::lang.boq_subcontract_comparison_description')</p></div>
-        @if($report)<a class="btn ct-primary-action" target="_blank" href="{{ route('construction.reports.boq-subcontract-comparison.print',['project_id'=>$selectedProject->id,'to_date'=>$toDate]) }}"><i class="fa fa-print"></i> @lang('construction::lang.print_comparison_report')</a>@endif
-    </header>
+    @include('construction::dashboard.partials.rr_report_head', [
+        'icon' => 'building',
+        'eyebrow' => __('construction::lang.owner_profitability_report'),
+        'title' => __('construction::lang.boq_subcontract_comparison'),
+        'description' => __('construction::lang.boq_subcontract_comparison_description'),
+        'printUrl' => $report ? route('construction.reports.boq-subcontract-comparison.print', ['project_id' => $selectedProject->id, 'to_date' => $toDate]) : null,
+        'printLabel' => __('construction::lang.print_comparison_report'),
+        'meta' => $meta,
+    ])
 
-    <form method="GET" action="{{ route('construction.reports.boq-subcontract-comparison.index') }}" class="ct-financial-report-filter ct-comparison-filter">
-        <div class="form-group"><label>@lang('construction::lang.project') *</label><select name="project_id" class="form-control select2" required><option value="">@lang('construction::lang.select_project')</option>@foreach($projects as $project)<option value="{{ $project->id }}" @selected($selectedProject?->id === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach</select></div>
-        <div class="form-group"><label>@lang('construction::lang.as_of_date')</label><input name="to_date" value="{{ @format_date($toDate) }}" class="form-control ct-date-picker" readonly></div>
-        <button class="btn btn-primary"><i class="fa fa-chart-bar"></i> @lang('construction::lang.show_report')</button>
+    <form method="GET" action="{{ route('construction.reports.boq-subcontract-comparison.index') }}" class="rr-filter">
+        <div class="rr-filter__fields">
+            <div class="rr-field rr-filter__grow">
+                <label class="rr-field__label" for="ct-report-project">@lang('construction::lang.project')<span class="rr-field__req" aria-hidden="true">*</span></label>
+                <select id="ct-report-project" name="project_id" class="form-control select2" required>
+                    <option value="">@lang('construction::lang.select_project')</option>
+                    @foreach($projects as $project)<option value="{{ $project->id }}" @selected($selectedProject?->id === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach
+                </select>
+            </div>
+            <div class="rr-field">
+                <label class="rr-field__label" for="ct-report-as-of">@lang('construction::lang.as_of_date')</label>
+                <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input id="ct-report-as-of" name="to_date" value="{{ @format_date($toDate) }}" class="rr-control__input ct-date-picker" readonly></div>
+            </div>
+        </div>
+        <div class="rr-filter__actions">
+            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'pie', 'size' => 16])@lang('construction::lang.show_report')</button>
+        </div>
     </form>
 
-    @if(!$report)
-        <div class="ct-financial-report-empty"><span><i class="fa fa-balance-scale"></i></span><h2>@lang('construction::lang.comparison_select_project')</h2><p>@lang('construction::lang.comparison_select_project_hint')</p></div>
+    @if(! $report)
+        <div class="rr-card">
+            <div class="rr-empty">
+                <span class="rr-empty__icon">@include('construction::partials.rr_icon', ['name' => 'building', 'size' => 22])</span>
+                <h2 class="rr-empty__title">@lang('construction::lang.comparison_select_project')</h2>
+                <p class="rr-empty__text">@lang('construction::lang.comparison_select_project_hint')</p>
+            </div>
+        </div>
     @else
-        <div class="ct-financial-project-strip"><div><small>@lang('construction::lang.project')</small><strong>{{ $selectedProject->code }} — {{ $selectedProject->name }}</strong></div><div><small>@lang('construction::lang.customer')</small><strong>{{ $selectedProject->customer?->name ?: '—' }}</strong></div><div><small>@lang('construction::lang.as_of_date')</small><strong>{{ @format_date($toDate) }}</strong></div></div>
-        @if($report['warnings']->isNotEmpty())<div class="ct-financial-warnings">@foreach($report['warnings'] as $warning)<div><i class="fa fa-exclamation-triangle"></i><span>{{ $warning }}</span></div>@endforeach</div>@endif
+        @include('construction::dashboard.partials.rr_report_warnings', ['warnings' => $report['warnings']])
 
-        <div class="ct-comparison-summary">
-            <section><header><span>@lang('construction::lang.contractual_expected')</span><strong>{{ @num_format($report['contract']['margin_percent']) }}%</strong></header><div><article><small>@lang('construction::lang.customer_sale_value')</small><strong>@include('construction::partials.money',['value'=>$report['contract']['sales']])</strong></article><article><small>@lang('construction::lang.subcontract_assignment_value')</small><strong>@include('construction::partials.money',['value'=>$report['contract']['assignment']])</strong></article><article class="{{ $report['contract']['margin'] < 0 ? 'is-loss' : 'is-profit' }}"><small>@lang('construction::lang.expected_margin')</small><strong>@include('construction::partials.money',['value'=>$report['contract']['margin']])</strong></article></div><footer>{{ $report['contract']['loss_items'] }} @lang('construction::lang.loss_making_items')</footer></section>
-            <section><header><span>@lang('construction::lang.actual_to_date')</span><strong>{{ @num_format($report['actual']['margin_percent']) }}%</strong></header><div><article><small>@lang('construction::lang.customer_certified_value')</small><strong>@include('construction::partials.money',['value'=>$report['actual']['sales']])</strong></article><article><small>@lang('construction::lang.subcontract_certified_value')</small><strong>@include('construction::partials.money',['value'=>$report['actual']['assignment']])</strong></article><article class="{{ $report['actual']['margin'] < 0 ? 'is-loss' : 'is-profit' }}"><small>@lang('construction::lang.actual_margin')</small><strong>@include('construction::partials.money',['value'=>$report['actual']['margin']])</strong></article></div><footer>{{ $report['actual']['loss_items'] }} @lang('construction::lang.loss_making_items')</footer></section>
+        {{-- المتوقع تعاقديًا مقابل الفعلي حتى تاريخه --}}
+        <div class="rr-report-grid">
+            @foreach([
+                'contract' => ['contractual_expected', 'customer_sale_value', 'subcontract_assignment_value', 'expected_margin'],
+                'actual' => ['actual_to_date', 'customer_certified_value', 'subcontract_certified_value', 'actual_margin'],
+            ] as $side => [$title, $salesLabel, $assignmentLabel, $marginLabel])
+                @php $block = $report[$side]; @endphp
+                <section class="rr-card" aria-labelledby="rr-compare-{{ $side }}">
+                    <header class="rr-card__head">
+                        <div class="rr-card__titles">
+                            <h2 id="rr-compare-{{ $side }}" class="rr-card__title">@lang('construction::lang.' . $title)</h2>
+                            <p class="rr-card__desc"><span class="rr-num">{{ $block['loss_items'] }}</span> @lang('construction::lang.loss_making_items')</p>
+                        </div>
+                        <span class="rr-badge rr-badge--{{ $block['margin'] < 0 ? 'danger' : ($block['margin_percent'] < 10 ? 'warning' : 'success') }}"><span class="rr-num">{{ @num_format($block['margin_percent']) }}%</span></span>
+                    </header>
+                    <dl class="rr-deflist">
+                        <div class="rr-deflist__item"><dt>@lang('construction::lang.' . $salesLabel)</dt><dd><span class="rr-money rr-money--sm">@include('construction::partials.money', ['value' => $block['sales']])</span></dd></div>
+                        <div class="rr-deflist__item"><dt>@lang('construction::lang.' . $assignmentLabel)</dt><dd><span class="rr-money rr-money--sm">@include('construction::partials.money', ['value' => $block['assignment']])</span></dd></div>
+                        <div class="rr-deflist__item"><dt>@lang('construction::lang.' . $marginLabel)</dt><dd><span class="rr-money rr-money--sm {{ $block['margin'] < 0 ? 'rr-text--danger' : 'rr-text--success' }}">@include('construction::partials.money', ['value' => $block['margin']])</span></dd></div>
+                    </dl>
+                </section>
+            @endforeach
         </div>
 
-        <section class="ct-financial-table-panel ct-comparison-table-panel"><header><div><span>@lang('construction::lang.item_level_analysis')</span><h2>@lang('construction::lang.sale_assignment_margin_by_item')</h2></div><div class="ct-comparison-legend"><span class="is-healthy">@lang('construction::lang.margin_healthy')</span><span class="is-low">@lang('construction::lang.margin_low')</span><span class="is-loss">@lang('construction::lang.margin_loss')</span></div></header><div class="table-responsive"><table class="table ct-financial-table ct-comparison-table"><thead><tr><th rowspan="2">@lang('construction::lang.boq_item')</th><th rowspan="2">@lang('construction::lang.subcontractor')</th><th colspan="3">@lang('construction::lang.contractual_expected')</th><th colspan="3">@lang('construction::lang.actual_to_date')</th></tr><tr><th>@lang('construction::lang.customer_sale')</th><th>@lang('construction::lang.subcontract_assignment')</th><th>@lang('construction::lang.margin')</th><th>@lang('construction::lang.customer_certified')</th><th>@lang('construction::lang.subcontract_certified')</th><th>@lang('construction::lang.margin')</th></tr></thead><tbody>@forelse($report['rows'] as $row)<tr><td><strong dir="ltr">{{ $row['code'] }}</strong><span>{{ $row['description'] }}</span><small>{{ @num_format($row['contract_quantity']) }} {{ $row['unit'] }}</small></td><td>{{ $row['subcontractors'] }}</td><td>@include('construction::partials.money',['value'=>$row['contract']['sales']])</td><td>@include('construction::partials.money',['value'=>$row['contract']['assignment']])</td><td><span class="ct-margin-pill is-{{ $row['contract']['status'] }}">@include('construction::partials.money',['value'=>$row['contract']['margin']])<small>{{ @num_format($row['contract']['margin_percent']) }}%</small></span></td><td>@include('construction::partials.money',['value'=>$row['actual']['sales']])</td><td>@include('construction::partials.money',['value'=>$row['actual']['assignment']])</td><td><span class="ct-margin-pill is-{{ $row['actual']['status'] }}">@include('construction::partials.money',['value'=>$row['actual']['margin']])<small>{{ @num_format($row['actual']['margin_percent']) }}%</small></span></td></tr>@empty<tr><td colspan="8" class="text-center text-muted">@lang('construction::lang.no_comparison_items')</td></tr>@endforelse</tbody><tfoot><tr><th colspan="2">@lang('construction::lang.total')</th><th>@include('construction::partials.money',['value'=>$report['contract']['sales']])</th><th>@include('construction::partials.money',['value'=>$report['contract']['assignment']])</th><th>@include('construction::partials.money',['value'=>$report['contract']['margin']])</th><th>@include('construction::partials.money',['value'=>$report['actual']['sales']])</th><th>@include('construction::partials.money',['value'=>$report['actual']['assignment']])</th><th>@include('construction::partials.money',['value'=>$report['actual']['margin']])</th></tr></tfoot></table></div></section>
+        <section class="rr-table-wrap" aria-labelledby="rr-compare-items-title">
+            <div class="rr-table-head rr-table-head--toolbar">
+                <div class="rr-table-head__titles">
+                    <div class="rr-eyebrow">@lang('construction::lang.item_level_analysis')</div>
+                    <h2 id="rr-compare-items-title" class="rr-table-head__title">@lang('construction::lang.sale_assignment_margin_by_item')</h2>
+                </div>
+                <ul class="rr-legend rr-legend--inline">
+                    <li class="rr-legend__item"><span class="rr-badge rr-badge--success">@lang('construction::lang.margin_healthy')</span></li>
+                    <li class="rr-legend__item"><span class="rr-badge rr-badge--warning">@lang('construction::lang.margin_low')</span></li>
+                    <li class="rr-legend__item"><span class="rr-badge rr-badge--danger">@lang('construction::lang.margin_loss')</span></li>
+                </ul>
+            </div>
+            @if($report['rows']->isEmpty())
+                <div class="rr-empty"><h3 class="rr-empty__title">@lang('construction::lang.no_comparison_items')</h3></div>
+            @else
+                <div class="rr-table-scroll">
+                    <table class="rr-table">
+                        <caption class="rr-sr">@lang('construction::lang.sale_assignment_margin_by_item')</caption>
+                        <thead>
+                            <tr>
+                                <th class="rr-th rr-col--text" scope="col" rowspan="2">@lang('construction::lang.boq_item')</th>
+                                <th class="rr-th" scope="col" rowspan="2">@lang('construction::lang.subcontractor')</th>
+                                <th class="rr-th rr-th--group" scope="colgroup" colspan="3">@lang('construction::lang.contractual_expected')</th>
+                                <th class="rr-th rr-th--group" scope="colgroup" colspan="3">@lang('construction::lang.actual_to_date')</th>
+                            </tr>
+                            <tr>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.customer_sale')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.subcontract_assignment')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.margin')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.customer_certified')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.subcontract_certified')</th>
+                                <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.margin')</th>
+                            </tr>
+                        </thead>
+                        <tbody class="rr-tbody">
+                            @foreach($report['rows'] as $row)
+                                <tr class="rr-tr">
+                                    <td class="rr-td rr-td--wrap"><span class="rr-code">{{ $row['code'] }}</span> <span class="rr-entity__name">{{ $row['description'] }}</span><div class="rr-td__sub"><span class="rr-num">{{ @num_format($row['contract_quantity']) }}</span> {{ $row['unit'] }}</div></td>
+                                    <td class="rr-td rr-td--wrap rr-td--muted">{{ $row['subcontractors'] ?: '—' }}</td>
+                                    @foreach(['contract', 'actual'] as $side)
+                                        <td class="rr-td rr-td--num"><span class="rr-num">{{ $amount($row[$side]['sales']) }}</span></td>
+                                        <td class="rr-td rr-td--num"><span class="rr-num">{{ $amount($row[$side]['assignment']) }}</span></td>
+                                        <td class="rr-td rr-td--num"><span class="rr-badge rr-badge--{{ $marginTones[$row[$side]['status']] ?? 'neutral' }}"><span class="rr-num">{{ $amount($row[$side]['margin']) }}</span></span><div class="rr-td__sub"><span class="rr-num">{{ @num_format($row[$side]['margin_percent']) }}%</span></div></td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot class="rr-tfoot">
+                            <tr>
+                                <td class="rr-td" colspan="2">@lang('construction::lang.total')</td>
+                                @foreach(['contract', 'actual'] as $side)
+                                    @foreach(['sales', 'assignment', 'margin'] as $key)
+                                        <td class="rr-td rr-td--num"><span class="rr-num">{{ $amount($report[$side][$key]) }}</span></td>
+                                    @endforeach
+                                @endforeach
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
+        </section>
     @endif
-</section>
+</main>
 @endsection
-
-@push('ct_quick_css')
-<style>
-.ct-financial-report-filter.ct-comparison-filter{grid-template-columns:2fr 1fr auto}
-@media(max-width:700px){.ct-financial-report-filter.ct-comparison-filter{grid-template-columns:1fr}}
-</style>
-@endpush

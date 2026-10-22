@@ -3,6 +3,7 @@
 namespace Modules\Construction\Http\Controllers;
 
 use App\Transaction;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Modules\Construction\Entities\ConstructionContract;
 use Modules\Construction\Entities\ConstructionProject;
@@ -10,6 +11,7 @@ use Modules\Construction\Entities\ConstructionQuote;
 use Modules\Construction\Entities\ConstructionMaterialDocument;
 use Modules\Construction\Entities\ConstructionLaborSheet;
 use Modules\Construction\Entities\ConstructionSubcontractCertificate;
+use Modules\Construction\Support\CostAnalytics;
 
 class DashboardController extends BaseController
 {
@@ -106,21 +108,28 @@ class DashboardController extends BaseController
             abort(404);
         }
 
+        // الفترة: من/إلى بتنسيق النشاط أو Y-m-d؛ لو التاريخين معكوسين نبدّلهم
+        $this->normalizeBusinessDates($request, ['from', 'to']);
+        $request->validate(['from' => ['nullable', 'date'], 'to' => ['nullable', 'date']]);
+        $fromDate = $request->filled('from') ? Carbon::parse($request->input('from'))->toDateString() : null;
+        $toDate = $request->filled('to') ? Carbon::parse($request->input('to'))->toDateString() : null;
+        if ($fromDate && $toDate && $fromDate > $toDate) {
+            [$fromDate, $toDate] = [$toDate, $fromDate];
+        }
+
         $expenseQuery = Transaction::query()
             ->where('business_id', $businessId)
             ->whereNotNull('construction_project_id')
             ->whereIn('type', ['expense', 'expense_refund'])
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('construction_expense_cancellations as expense_cancellations')
-                ->whereColumn('expense_cancellations.expense_transaction_id', 'transactions.id'));
-
-        if ($selectedProjectId) {
-            $expenseQuery->where('construction_project_id', $selectedProjectId);
-        }
+                ->whereColumn('expense_cancellations.expense_transaction_id', 'transactions.id'))
+            ->when($selectedProjectId, fn ($query) => $query->where('construction_project_id', $selectedProjectId))
+            ->when($fromDate, fn ($query) => $query->whereDate('transaction_date', '>=', $fromDate))
+            ->when($toDate, fn ($query) => $query->whereDate('transaction_date', '<=', $toDate));
 
         $expenseStats = (clone $expenseQuery)
             ->selectRaw('COUNT(*) as records_count')
             ->selectRaw('COUNT(DISTINCT construction_project_id) as projects_count')
-            ->selectRaw("COALESCE(SUM(CASE WHEN type = 'expense_refund' THEN -final_total ELSE final_total END), 0) as net_total")
             ->first();
 
         $recentExpenses = (clone $expenseQuery)
@@ -134,53 +143,57 @@ class DashboardController extends BaseController
             ->limit(10)
             ->get();
 
-        $materialQuery = ConstructionMaterialDocument::query()
+        $materialCounts = ConstructionMaterialDocument::query()
+            ->join('construction_material_document_lines as material_lines', 'material_lines.document_id', '=', 'construction_material_documents.id')
             ->where('construction_material_documents.business_id', $businessId)
             ->where('construction_material_documents.status', 'approved')
-            ->when($selectedProjectId, fn ($query) => $query->where('construction_material_documents.project_id', $selectedProjectId));
-        $materialStats = (clone $materialQuery)
-            ->join('construction_material_document_lines as material_lines', 'material_lines.document_id', '=', 'construction_material_documents.id')
-            ->selectRaw("COALESCE(SUM(CASE WHEN construction_material_documents.type = 'return' THEN -material_lines.total_cost ELSE material_lines.total_cost END), 0) as net_total")
+            ->when($selectedProjectId, fn ($query) => $query->where('construction_material_documents.project_id', $selectedProjectId))
+            ->when($fromDate, fn ($query) => $query->whereDate('construction_material_documents.document_date', '>=', $fromDate))
+            ->when($toDate, fn ($query) => $query->whereDate('construction_material_documents.document_date', '<=', $toDate))
             ->selectRaw("SUM(CASE WHEN construction_material_documents.type = 'issue' THEN 1 ELSE 0 END) as issue_lines")
             ->selectRaw("SUM(CASE WHEN construction_material_documents.type = 'return' THEN 1 ELSE 0 END) as return_lines")
             ->first();
 
-        $laborStats = ConstructionLaborSheet::query()
+        $laborLines = ConstructionLaborSheet::query()
+            ->join('construction_labor_sheet_lines as labor_lines', 'labor_lines.sheet_id', '=', 'construction_labor_sheets.id')
             ->where('construction_labor_sheets.business_id', $businessId)
             ->where('construction_labor_sheets.status', 'approved')
             ->when($selectedProjectId, fn ($query) => $query->where('construction_labor_sheets.project_id', $selectedProjectId))
-            ->join('construction_labor_sheet_lines as labor_lines', 'labor_lines.sheet_id', '=', 'construction_labor_sheets.id')
-            ->selectRaw('COALESCE(SUM(labor_lines.total_cost), 0) as total')
-            ->selectRaw('COUNT(labor_lines.id) as lines_count')
-            ->first();
+            ->when($fromDate, fn ($query) => $query->whereDate('construction_labor_sheets.period_end', '>=', $fromDate))
+            ->when($toDate, fn ($query) => $query->whereDate('construction_labor_sheets.period_end', '<=', $toDate))
+            ->count('labor_lines.id');
 
-        $subcontractStats = ConstructionSubcontractCertificate::query()
+        $subcontractCertificates = ConstructionSubcontractCertificate::query()
             ->where('business_id', $businessId)
             ->where('status', 'approved')
             ->when($selectedProjectId, fn ($query) => $query->where('project_id', $selectedProjectId))
-            ->selectRaw('COALESCE(SUM(gross_value), 0) as total')
-            ->selectRaw('COUNT(*) as certificates_count')
-            ->first();
+            ->when($fromDate, fn ($query) => $query->whereDate('certificate_date', '>=', $fromDate))
+            ->when($toDate, fn ($query) => $query->whereDate('certificate_date', '<=', $toDate))
+            ->count();
+
+        $analytics = (new CostAnalytics())->build($businessId, $selectedProjectId, $fromDate, $toDate);
 
         $summary = [
-            'total' => (float) $expenseStats->net_total + (float) $materialStats->net_total
-                + (float) $laborStats->total + (float) $subcontractStats->total,
-            'expenses' => (float) $expenseStats->net_total,
-            'materials' => (float) $materialStats->net_total,
-            'labor' => (float) $laborStats->total,
-            'labor_lines' => (int) $laborStats->lines_count,
-            'subcontracts' => (float) $subcontractStats->total,
-            'subcontract_certificates' => (int) $subcontractStats->certificates_count,
+            'total' => $analytics['total'],
+            'expenses' => $analytics['sources']['expenses'],
+            'materials' => $analytics['sources']['materials'],
+            'labor' => $analytics['sources']['labor'],
+            'labor_lines' => (int) $laborLines,
+            'subcontracts' => $analytics['sources']['subcontracts'],
+            'subcontract_certificates' => (int) $subcontractCertificates,
             'records_count' => (int) $expenseStats->records_count,
             'projects_count' => (int) $expenseStats->projects_count,
-            'material_issue_lines' => (int) $materialStats->issue_lines,
-            'material_return_lines' => (int) $materialStats->return_lines,
+            'material_issue_lines' => (int) $materialCounts->issue_lines,
+            'material_return_lines' => (int) $materialCounts->return_lines,
         ];
 
         return view('construction::dashboard.costs', compact(
             'projects',
             'selectedProjectId',
+            'fromDate',
+            'toDate',
             'summary',
+            'analytics',
             'recentExpenses'
         ));
     }

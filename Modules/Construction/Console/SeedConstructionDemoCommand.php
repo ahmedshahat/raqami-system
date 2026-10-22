@@ -8,10 +8,8 @@ use App\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Modules\Construction\Entities\ConstructionProject;
-use Modules\Construction\Entities\ConstructionBoqCostAllocation;
 use Modules\Construction\Entities\ConstructionBoqItem;
 use Modules\Construction\Entities\ConstructionBoqVersion;
-use Modules\Construction\Entities\ConstructionCostCode;
 use Modules\Construction\Entities\ConstructionMeasurement;
 use Modules\Construction\Entities\ConstructionCustomerCertificate;
 
@@ -135,24 +133,6 @@ class SeedConstructionDemoCommand extends Command
                 ],
             ]);
 
-            $costCodes = collect([
-                ['MAT-CON', 'خرسانة وحديد تسليح', 'material', 10],
-                ['LAB-CON', 'عمالة أعمال الخرسانة', 'labor', 20],
-                ['EQ-CON', 'معدات أعمال الخرسانة', 'equipment', 30],
-                ['MAT-BRK', 'طوب ومونة المباني', 'material', 40],
-                ['SUB-BRK', 'مقاول باطن أعمال المباني', 'subcontract', 50],
-                ['MAT-ELC', 'خامات الأعمال الكهربائية', 'material', 60],
-                ['LAB-ELC', 'عمالة الأعمال الكهربائية', 'labor', 70],
-                ['OH-SITE', 'مصروفات الموقع غير المباشرة', 'overhead', 80],
-            ])->mapWithKeys(function (array $row) use ($businessId) {
-                $code = ConstructionCostCode::query()->updateOrCreate(
-                    ['business_id' => $businessId, 'code' => $row[0]],
-                    ['name' => $row[1], 'category' => $row[2], 'sort_order' => $row[3], 'is_active' => true]
-                );
-
-                return [$row[0] => $code];
-            });
-
             $boq = ConstructionBoqVersion::query()->firstOrCreate(
                 ['business_id' => $businessId, 'project_id' => $project->id, 'version_number' => 1],
                 ['name' => 'بنود المشروع الأساسية - مشروع المدرسة', 'status' => 'draft', 'created_by' => $user->id]
@@ -160,24 +140,12 @@ class SeedConstructionDemoCommand extends Command
 
             if ($boq->isEditable()) {
                 $concreteSection = $this->boqItem($boq, $project, null, 'section', '01', 'الأعمال الخرسانية', null, 0, 0, 10);
-                $foundations = $this->boqItem($boq, $project, $concreteSection->id, 'item', '01.001', 'خرسانة مسلحة للأساسات', 'م3', 450, 4200, 20);
-                $frame = $this->boqItem($boq, $project, $concreteSection->id, 'item', '01.002', 'خرسانة مسلحة للأعمدة والأسقف', 'م3', 780, 4800, 30);
+                $this->boqItem($boq, $project, $concreteSection->id, 'item', '01.001', 'خرسانة مسلحة للأساسات', 'م3', 450, 4200, 20);
+                $this->boqItem($boq, $project, $concreteSection->id, 'item', '01.002', 'خرسانة مسلحة للأعمدة والأسقف', 'م3', 780, 4800, 30);
                 $masonrySection = $this->boqItem($boq, $project, null, 'section', '02', 'الأعمال المعمارية', null, 0, 0, 40);
-                $masonry = $this->boqItem($boq, $project, $masonrySection->id, 'item', '02.001', 'مباني طوب أسمنتي شامل المونة', 'م2', 5200, 520, 50);
+                $this->boqItem($boq, $project, $masonrySection->id, 'item', '02.001', 'مباني طوب أسمنتي شامل المونة', 'م2', 5200, 520, 50);
                 $electricalSection = $this->boqItem($boq, $project, null, 'section', '03', 'الأعمال الكهربائية', null, 0, 0, 60);
-                $electrical = $this->boqItem($boq, $project, $electricalSection->id, 'item', '03.001', 'توريد وتركيب شبكة الكهرباء الداخلية', 'مقطوعية', 1, 1900000, 70);
-
-                $this->allocation($boq, $foundations, $costCodes['MAT-CON'], 1120000);
-                $this->allocation($boq, $foundations, $costCodes['LAB-CON'], 260000);
-                $this->allocation($boq, $foundations, $costCodes['EQ-CON'], 85000);
-                $this->allocation($boq, $frame, $costCodes['MAT-CON'], 2180000);
-                $this->allocation($boq, $frame, $costCodes['LAB-CON'], 520000);
-                $this->allocation($boq, $frame, $costCodes['EQ-CON'], 160000);
-                $this->allocation($boq, $masonry, $costCodes['MAT-BRK'], 1040000);
-                $this->allocation($boq, $masonry, $costCodes['SUB-BRK'], 620000);
-                $this->allocation($boq, $electrical, $costCodes['MAT-ELC'], 980000);
-                $this->allocation($boq, $electrical, $costCodes['LAB-ELC'], 310000);
-                $this->allocation($boq, $electrical, $costCodes['OH-SITE'], 145000);
+                $this->boqItem($boq, $project, $electricalSection->id, 'item', '03.001', 'توريد وتركيب شبكة الكهرباء الداخلية', 'مقطوعية', 1, 1900000, 70);
                 $boq->refreshTotals();
                 $boq->update(['status' => 'approved', 'approved_by' => $user->id, 'approved_at' => now()]);
             }
@@ -294,23 +262,6 @@ class SeedConstructionDemoCommand extends Command
                 'sales_total' => round($quantity * $unitPrice, 4),
                 'item_kind' => 'standard',
                 'sort_order' => $sortOrder,
-            ]
-        );
-    }
-
-    private function allocation(
-        ConstructionBoqVersion $boq,
-        ConstructionBoqItem $item,
-        ConstructionCostCode $costCode,
-        float $estimatedCost
-    ): void {
-        ConstructionBoqCostAllocation::query()->updateOrCreate(
-            ['boq_item_id' => $item->id, 'cost_code_id' => $costCode->id],
-            [
-                'business_id' => $boq->business_id,
-                'project_id' => $boq->project_id,
-                'boq_version_id' => $boq->id,
-                'estimated_cost' => $estimatedCost,
             ]
         );
     }

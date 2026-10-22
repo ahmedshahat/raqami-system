@@ -365,6 +365,11 @@ class ConstructionAccountingPoster
         $this->createAccountingLine($mapping->id, $receivableAccountId, $amount, 'credit', 'construction_customer_collection_receivable', $operationDate, $note, $userId);
 
         if ($posting) {
+            // تعديل الدفعة بيعيد إنشاء السطور، فلازم ترجع تتربط بالمشروع (الربط التلقائي بيحصل عند إنشاء الترحيل بس)
+            if ($mapping->construction_project_id) {
+                AccountingAccountsTransaction::where('acc_trans_mapping_id', $mapping->id)
+                    ->update(['construction_project_id' => $mapping->construction_project_id]);
+            }
             $posting->update(['posted_by' => $userId, 'posted_at' => now()]);
             return $posting->fresh();
         }

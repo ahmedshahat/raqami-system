@@ -2,57 +2,165 @@
 
 @section('title', __('construction::lang.subcontractor_statement'))
 
+@php
+    $movementTones = ['certificate' => 'info', 'payment' => 'success', 'retention_release' => 'warning', 'advance' => 'brand'];
+    $amount = fn ($value) => \Modules\Construction\Support\CurrencyFormatter::parts($value)['amount'];
+    $util = app(\App\Utils\Util::class);
+    $meta = $statement ? [
+        ['users', $selectedSubcontractor->supplier_business_name ?: $selectedSubcontractor->name],
+        ['building', $selectedProject ? $selectedProject->code . ' — ' . $selectedProject->name : __('construction::lang.statement_all_projects')],
+        ['calendar', ($fromDate ? $util->format_date($fromDate) : __('construction::lang.account_inception')) . ' — ' . $util->format_date($toDate)],
+    ] : [];
+@endphp
+
 @section('module_content')
-<section class="content ct-financial-report-page ct-statement-page">
-    <nav class="ct-report-switcher" aria-label="@lang('construction::lang.construction_reports')">
-        <a href="{{ route('construction.reports.index') }}"><i class="fa fa-chart-line"></i> @lang('construction::lang.financial_position_report')</a>
-        <a class="is-active" href="{{ route('construction.reports.subcontractor-statement.index') }}"><i class="fa fa-file-invoice-dollar"></i> @lang('construction::lang.subcontractor_statement')</a>
-        <a href="{{ route('construction.reports.boq-subcontract-comparison.index') }}"><i class="fa fa-balance-scale"></i> @lang('construction::lang.boq_subcontract_comparison')</a>
-        <a href="{{ route('construction.reports.boq-cost-profitability.index') }}"><i class="fa fa-coins"></i> @lang('construction::lang.boq_cost_profitability')</a>
-        <a href="{{ route('construction.reports.customer-certificates-collection.index') }}"><i class="fa fa-hand-holding-usd"></i> @lang('construction::lang.customer_collection_report')</a>
-        <a href="{{ route('construction.reports.retention-guarantees.index') }}"><i class="fa fa-shield-alt"></i> @lang('construction::lang.retention_guarantees_report')</a>
-    </nav>
+<main class="content rr-page" aria-labelledby="rr-report-title">
+    @include('construction::dashboard.partials.rr_report_switcher', ['active' => 'statement'])
 
-    <header class="ct-financial-report-heading">
-        <div><span><i class="fa fa-calculator"></i> @lang('construction::lang.accountant_report')</span><h1>@lang('construction::lang.subcontractor_statement')</h1><p>@lang('construction::lang.subcontractor_statement_description')</p></div>
-        @if($statement)<a class="btn ct-primary-action" target="_blank" href="{{ route('construction.reports.subcontractor-statement.print', array_filter(['subcontractor_id'=>$selectedSubcontractor->id,'project_id'=>$projectId,'date_range'=>$dateRange,'from_date'=>$fromDate,'to_date'=>$toDate])) }}"><i class="fa fa-print"></i> @lang('construction::lang.print_statement')</a>@endif
-    </header>
+    @include('construction::dashboard.partials.rr_report_head', [
+        'icon' => 'users',
+        'eyebrow' => __('construction::lang.accountant_report'),
+        'title' => __('construction::lang.subcontractor_statement'),
+        'description' => __('construction::lang.subcontractor_statement_description'),
+        'printUrl' => $statement ? route('construction.reports.subcontractor-statement.print', array_filter(['subcontractor_id' => $selectedSubcontractor->id, 'project_id' => $projectId, 'date_range' => $dateRange, 'from_date' => $fromDate, 'to_date' => $toDate])) : null,
+        'printLabel' => __('construction::lang.print_statement'),
+        'meta' => $meta,
+    ])
 
-    <form method="GET" action="{{ route('construction.reports.subcontractor-statement.index') }}" class="ct-financial-report-filter ct-statement-filter ct-date-range-filter {{ $dateRange === 'custom' ? 'is-custom-range' : 'is-preset-range' }}">
-        <div class="form-group"><label>@lang('construction::lang.subcontractor') *</label><select name="subcontractor_id" class="form-control select2" required><option value="">@lang('construction::lang.select_subcontractor')</option>@foreach($subcontractors as $subcontractor)<option value="{{ $subcontractor->id }}" @selected($selectedSubcontractor?->id === $subcontractor->id)>{{ $subcontractor->supplier_business_name ?: $subcontractor->name }}</option>@endforeach</select></div>
-        <div class="form-group"><label>@lang('construction::lang.project')</label><select name="project_id" class="form-control select2"><option value="">@lang('construction::lang.statement_all_projects')</option>@foreach($projects as $project)<option value="{{ $project->id }}" @selected($projectId === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach</select></div>
-        @include('construction::dashboard.partials.date-range-filter')
-        <button class="btn btn-primary"><i class="fa fa-search"></i> @lang('construction::lang.show_statement')</button>
+    <form method="GET" action="{{ route('construction.reports.subcontractor-statement.index') }}" class="rr-filter ct-date-range-filter {{ $dateRange === 'custom' ? 'is-custom-range' : 'is-preset-range' }}">
+        <div class="rr-filter__fields">
+            <div class="rr-field rr-filter__grow">
+                <label class="rr-field__label" for="ct-report-subcontractor">@lang('construction::lang.subcontractor')<span class="rr-field__req" aria-hidden="true">*</span></label>
+                <select id="ct-report-subcontractor" name="subcontractor_id" class="form-control select2" required>
+                    <option value="">@lang('construction::lang.select_subcontractor')</option>
+                    @foreach($subcontractors as $subcontractor)<option value="{{ $subcontractor->id }}" @selected($selectedSubcontractor?->id === $subcontractor->id)>{{ $subcontractor->supplier_business_name ?: $subcontractor->name }}</option>@endforeach
+                </select>
+            </div>
+            <div class="rr-field rr-filter__grow">
+                <label class="rr-field__label" for="ct-report-project">@lang('construction::lang.project')</label>
+                <select id="ct-report-project" name="project_id" class="form-control select2">
+                    <option value="">@lang('construction::lang.statement_all_projects')</option>
+                    @foreach($projects as $project)<option value="{{ $project->id }}" @selected($projectId === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach
+                </select>
+            </div>
+            @include('construction::dashboard.partials.date-range-filter')
+        </div>
+        <div class="rr-filter__actions">
+            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'search', 'size' => 16])@lang('construction::lang.show_statement')</button>
+        </div>
     </form>
 
-    @if(!$statement)
-        <div class="ct-financial-report-empty"><span><i class="fa fa-file-invoice-dollar"></i></span><h2>@lang('construction::lang.statement_select_subcontractor')</h2><p>@lang('construction::lang.statement_select_subcontractor_hint')</p></div>
+    @if(! $statement)
+        <div class="rr-card">
+            <div class="rr-empty">
+                <span class="rr-empty__icon">@include('construction::partials.rr_icon', ['name' => 'users', 'size' => 22])</span>
+                <h2 class="rr-empty__title">@lang('construction::lang.statement_select_subcontractor')</h2>
+                <p class="rr-empty__text">@lang('construction::lang.statement_select_subcontractor_hint')</p>
+            </div>
+        </div>
     @else
-        <div class="ct-financial-project-strip"><div><small>@lang('construction::lang.subcontractor')</small><strong>{{ $selectedSubcontractor->supplier_business_name ?: $selectedSubcontractor->name }}</strong></div><div><small>@lang('construction::lang.project')</small><strong>{{ $selectedProject ? $selectedProject->code.' — '.$selectedProject->name : __('construction::lang.statement_all_projects') }}</strong></div><div><small>@lang('construction::lang.report_period')</small><strong>{{ $fromDate ? @format_date($fromDate) : __('construction::lang.account_inception') }} — {{ @format_date($toDate) }}</strong></div></div>
-
-        <div class="ct-financial-kpis ct-statement-kpis">
-            <article><span class="is-blue"><i class="fa fa-file-signature"></i></span><small>@lang('construction::lang.contracts_value')</small><strong>@include('construction::partials.money',['value'=>$statement['summary']['contracts_value']])</strong><p>{{ $statement['agreements_count'] }} @lang('construction::lang.agreements')</p></article>
-            <article><span class="is-green"><i class="fa fa-check-double"></i></span><small>@lang('construction::lang.total_payable')</small><strong>@include('construction::partials.money',['value'=>$statement['summary']['payable']])</strong><p>{{ $statement['summary']['certificates_count'] }} @lang('construction::lang.approved_certificates')</p></article>
-            <article><span class="is-amber"><i class="fa fa-hand-holding-usd"></i></span><small>@lang('construction::lang.paid_amount')</small><strong>@include('construction::partials.money',['value'=>$statement['summary']['paid']])</strong><p>@lang('construction::lang.recorded_payments_only')</p></article>
-            <article class="{{ $statement['summary']['balance'] > 0 ? 'is-negative' : 'is-positive' }}"><span><i class="fa fa-wallet"></i></span><small>@lang('construction::lang.current_balance')</small><strong>@include('construction::partials.money',['value'=>$statement['summary']['balance']])</strong><p>@lang('construction::lang.due_to_subcontractor')</p></article>
+        @php $summary = $statement['summary']; @endphp
+        <div class="rr-statgroup-wrap">
+            <div class="rr-statgroup rr-statgroup--4" style="--rr-stats: 4">
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'file', 'size' => 18])@lang('construction::lang.contracts_value')</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg">@include('construction::partials.money', ['value' => $summary['contracts_value']])</span></div>
+                    <div class="rr-stat__sub"><span class="rr-num">{{ $statement['agreements_count'] }}</span> @lang('construction::lang.agreements')</div>
+                </div>
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'check-circle', 'size' => 18])@lang('construction::lang.total_payable')</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg">@include('construction::partials.money', ['value' => $summary['payable']])</span></div>
+                    <div class="rr-stat__sub"><span class="rr-num">{{ $summary['certificates_count'] }}</span> @lang('construction::lang.approved_certificates')</div>
+                </div>
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'download', 'size' => 18])@lang('construction::lang.paid_amount')</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg rr-text--success">@include('construction::partials.money', ['value' => $summary['paid']])</span></div>
+                    <div class="rr-stat__sub">@lang('construction::lang.recorded_payments_only')</div>
+                </div>
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => 'clock', 'size' => 18])@lang('construction::lang.current_balance')</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg {{ $summary['balance'] > 0 ? 'rr-text--danger' : 'rr-text--success' }}">@include('construction::partials.money', ['value' => $summary['balance']])</span></div>
+                    <div class="rr-stat__sub">@lang('construction::lang.due_to_subcontractor')</div>
+                </div>
+            </div>
         </div>
 
-        <section class="ct-financial-panel ct-statement-summary"><header><div><span>@lang('construction::lang.account_summary')</span><h2>@lang('construction::lang.certificate_retention_payment_summary')</h2></div></header><div class="ct-statement-summary-grid">
-            @foreach(['gross'=>'approved_subcontract_work','tax'=>'input_vat','deductions'=>'other_deductions','retention_original'=>'original_retention','retention_released'=>'released_retention','retention_remaining'=>'remaining_retention','advances'=>'advances_paid','advance_recovered'=>'advances_recovered','advance_remaining'=>'advance_available','paid'=>'paid_amount'] as $key=>$label)<div><span>@lang('construction::lang.'.$label)</span><strong>@include('construction::partials.money',['value'=>$statement['summary'][$key]])</strong></div>@endforeach
-        </div></section>
+        {{-- ملخص الحساب --}}
+        <section class="rr-card" aria-labelledby="rr-statement-summary-title">
+            <header class="rr-card__head">
+                <div class="rr-card__titles">
+                    <div class="rr-eyebrow">@lang('construction::lang.account_summary')</div>
+                    <h2 id="rr-statement-summary-title" class="rr-card__title">@lang('construction::lang.certificate_retention_payment_summary')</h2>
+                </div>
+            </header>
+            <dl class="rr-deflist rr-deflist--cols">
+                @foreach(['gross' => 'approved_subcontract_work', 'tax' => 'input_vat', 'deductions' => 'other_deductions', 'retention_original' => 'original_retention', 'retention_released' => 'released_retention', 'retention_remaining' => 'remaining_retention', 'advances' => 'advances_paid', 'advance_recovered' => 'advances_recovered', 'advance_remaining' => 'advance_available', 'paid' => 'paid_amount'] as $key => $label)
+                    <div class="rr-deflist__item"><dt>@lang('construction::lang.' . $label)</dt><dd><span class="rr-money rr-money--sm {{ $summary[$key] == 0 ? 'rr-money--zero' : '' }}">@include('construction::partials.money', ['value' => $summary[$key]])</span></dd></div>
+                @endforeach
+            </dl>
+        </section>
 
-        <section class="ct-financial-table-panel ct-statement-ledger"><header><div><span>@lang('construction::lang.accountant_details')</span><h2>@lang('construction::lang.statement_movements')</h2></div><div class="ct-statement-totals"><span>@lang('construction::lang.opening_balance'): <strong>@include('construction::partials.money',['value'=>$statement['summary']['opening_balance']])</strong></span><span>@lang('construction::lang.closing_balance'): <strong>@include('construction::partials.money',['value'=>$statement['summary']['closing_balance']])</strong></span></div></header><div class="table-responsive"><table class="table ct-financial-table"><thead><tr><th>@lang('construction::lang.date')</th><th>@lang('construction::lang.movement_type')</th><th>@lang('construction::lang.document_number')</th><th>@lang('construction::lang.project')</th><th>@lang('construction::lang.description')</th><th>@lang('construction::lang.debit_paid')</th><th>@lang('construction::lang.credit_due')</th><th>@lang('construction::lang.running_balance')</th></tr></thead><tbody>
-            @if($fromDate)<tr class="ct-opening-row"><td>{{ @format_date($fromDate) }}</td><td colspan="6">@lang('construction::lang.opening_balance')</td><td><strong>@include('construction::partials.money',['value'=>$statement['summary']['opening_balance']])</strong></td></tr>@endif
-            @forelse($statement['movements'] as $movement)<tr><td>{{ @format_date($movement['date']) }}</td><td><span class="ct-movement-badge is-{{ $movement['type'] }}">@lang('construction::lang.statement_type_'.$movement['type'])</span></td><td dir="ltr">{{ $movement['number'] }}</td><td>{{ $movement['project'] ?: '—' }}</td><td><strong>{{ $movement['description'] }}</strong><small>{{ $movement['agreement'] }}</small></td><td>@include('construction::partials.money',['value'=>$movement['debit']])</td><td>@include('construction::partials.money',['value'=>$movement['credit']])</td><td><strong>@include('construction::partials.money',['value'=>$movement['balance']])</strong></td></tr>@empty<tr><td colspan="8" class="text-center text-muted">@lang('construction::lang.no_statement_movements')</td></tr>@endforelse
-        </tbody><tfoot><tr><th colspan="5">@lang('construction::lang.period_totals')</th><th>@include('construction::partials.money',['value'=>$statement['summary']['period_debit']])</th><th>@include('construction::partials.money',['value'=>$statement['summary']['period_credit']])</th><th>@include('construction::partials.money',['value'=>$statement['summary']['closing_balance']])</th></tr></tfoot></table></div></section>
+        {{-- حركات الحساب --}}
+        <section class="rr-table-wrap" aria-labelledby="rr-statement-movements-title">
+            <div class="rr-table-head rr-table-head--toolbar">
+                <div class="rr-table-head__titles">
+                    <div class="rr-eyebrow">@lang('construction::lang.accountant_details')</div>
+                    <h2 id="rr-statement-movements-title" class="rr-table-head__title">@lang('construction::lang.statement_movements')</h2>
+                </div>
+                <dl class="rr-inline-facts">
+                    <div><dt>@lang('construction::lang.opening_balance')</dt><dd><span class="rr-num">{{ $amount($summary['opening_balance']) }}</span></dd></div>
+                    <div><dt>@lang('construction::lang.closing_balance')</dt><dd><span class="rr-num">{{ $amount($summary['closing_balance']) }}</span></dd></div>
+                </dl>
+            </div>
+            <div class="rr-table-scroll">
+                <table class="rr-table">
+                    <caption class="rr-sr">@lang('construction::lang.statement_movements')</caption>
+                    <thead>
+                        <tr>
+                            <th class="rr-th" scope="col">@lang('construction::lang.date')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.movement_type')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.document_number')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.project')</th>
+                            <th class="rr-th rr-col--text" scope="col">@lang('construction::lang.description')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.debit_paid')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.credit_due')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.running_balance')</th>
+                        </tr>
+                    </thead>
+                    <tbody class="rr-tbody">
+                        @if($fromDate)
+                            <tr class="rr-tr rr-tr--section">
+                                <td class="rr-td"><span class="rr-num">{{ @format_date($fromDate) }}</span></td>
+                                <td class="rr-td" colspan="6">@lang('construction::lang.opening_balance')</td>
+                                <td class="rr-td rr-td--num"><strong class="rr-num">{{ $amount($summary['opening_balance']) }}</strong></td>
+                            </tr>
+                        @endif
+                        @forelse($statement['movements'] as $movement)
+                            <tr class="rr-tr">
+                                <td class="rr-td"><span class="rr-num">{{ @format_date($movement['date']) }}</span></td>
+                                <td class="rr-td"><span class="rr-badge rr-badge--{{ $movementTones[$movement['type']] ?? 'neutral' }}">@lang('construction::lang.statement_type_' . $movement['type'])</span></td>
+                                <td class="rr-td"><span class="rr-code">{{ $movement['number'] }}</span></td>
+                                <td class="rr-td rr-td--muted">{{ $movement['project'] ?: '—' }}</td>
+                                <td class="rr-td rr-td--wrap"><span class="rr-entity__name">{{ $movement['description'] }}</span><div class="rr-td__sub"><span class="rr-code">{{ $movement['agreement'] }}</span></div></td>
+                                <td class="rr-td rr-td--num"><span class="rr-num {{ $movement['debit'] == 0 ? 'rr-td--muted' : '' }}">{{ $movement['debit'] == 0 ? '—' : $amount($movement['debit']) }}</span></td>
+                                <td class="rr-td rr-td--num"><span class="rr-num {{ $movement['credit'] == 0 ? 'rr-td--muted' : '' }}">{{ $movement['credit'] == 0 ? '—' : $amount($movement['credit']) }}</span></td>
+                                <td class="rr-td rr-td--num"><strong class="rr-num">{{ $amount($movement['balance']) }}</strong></td>
+                            </tr>
+                        @empty
+                            <tr><td class="rr-td" colspan="8"><div class="rr-empty"><h3 class="rr-empty__title">@lang('construction::lang.no_statement_movements')</h3></div></td></tr>
+                        @endforelse
+                    </tbody>
+                    <tfoot class="rr-tfoot">
+                        <tr>
+                            <td class="rr-td" colspan="5">@lang('construction::lang.period_totals')</td>
+                            <td class="rr-td rr-td--num"><span class="rr-num">{{ $amount($summary['period_debit']) }}</span></td>
+                            <td class="rr-td rr-td--num"><span class="rr-num">{{ $amount($summary['period_credit']) }}</span></td>
+                            <td class="rr-td rr-td--num"><span class="rr-num">{{ $amount($summary['closing_balance']) }}</span></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
     @endif
-</section>
+</main>
 @endsection
-
-@push('ct_quick_css')
-<style>
-.ct-financial-report-filter.ct-statement-filter{grid-template-columns:1.4fr 1.4fr .8fr .8fr auto}
-@media(max-width:1100px){.ct-financial-report-filter.ct-statement-filter{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:700px){.ct-financial-report-filter.ct-statement-filter{grid-template-columns:1fr}}
-</style>
-@endpush

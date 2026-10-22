@@ -31,7 +31,8 @@ class ConstructionQuickCreateTest extends TestCase
         $this->assertSame(1, substr_count($projectsPage->getContent(), 'data-target="#ct-project-create"'));
         $this->assertSame(0, preg_match_all('/<a\b[^>]*\bdata-ct-workspace\b/i', $projectsPage->getContent()));
         $this->get(route('construction.overview.index'))->assertOk()
-            ->assertSee(route('construction.quotes.index', ['open_create' => 1]))
+            ->assertSee(route('construction.projects.index', ['open_create' => 1]))
+            ->assertSee(route('construction.quotes.index'))
             ->assertDontSee(route('construction.projects.create'));
 
         $projectResponse = $this->postJson(route('construction.projects.store'), [
@@ -63,17 +64,12 @@ class ConstructionQuickCreateTest extends TestCase
             ->assertSee('ct-measurement-create');
         $this->get(route('construction.projects.certificates.index', $projectId))->assertOk()
             ->assertSee('ct-certificate-create');
-        $this->get(route('construction.cost-codes.index'))->assertOk()
-            ->assertSee('ct-cost-code-create');
 
         $versionResponse = $this->postJson(route('construction.projects.boq.store', $projectId), [
             'name' => 'Quick version',
         ])->assertCreated()->assertJsonStructure(['id', 'url', 'message']);
         $this->get(route('construction.projects.boq.show', [$projectId, $versionResponse->json('id')]))
             ->assertOk()->assertSee('ct-boq-version-create');
-        $this->postJson(route('construction.cost-codes.store'), [
-            'code' => 'TEST-QUICK-COST', 'name' => 'Quick cost code', 'category' => 'material',
-        ])->assertCreated()->assertJsonStructure(['id', 'message']);
 
         $initialBoq->update(['status' => 'approved', 'sales_total' => 2357000]);
         $contractCreate = $this->get(route('construction.projects.contracts.create', [

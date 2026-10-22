@@ -5,7 +5,6 @@ namespace Modules\Construction\Support;
 use App\Transaction;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Modules\Construction\Entities\ConstructionBoqCostAllocation;
 use Modules\Construction\Entities\ConstructionProject;
 
 class BoqCostProfitabilityReport
@@ -20,8 +19,6 @@ class BoqCostProfitabilityReport
 
         $items = $boq->items()->where('row_type', 'item')->orderBy('sort_order')->orderBy('id')->get();
         $itemIds = $items->pluck('id');
-        $estimated = ConstructionBoqCostAllocation::query()->where('boq_version_id', $boq->id)
-            ->with('costCode:id,category')->get()->groupBy('boq_item_id');
 
         $materials = DB::table('construction_material_document_lines as lines')
             ->join('construction_material_documents as documents', 'documents.id', '=', 'lines.document_id')
@@ -53,11 +50,7 @@ class BoqCostProfitabilityReport
         $subcontractByItem = $this->groupCosts($subcontracts);
         $expenseByItem = $this->groupCosts($expenses);
 
-        $rows = $items->map(function ($item) use ($estimated, $materialByItem, $laborByItem, $subcontractByItem, $expenseByItem) {
-            $allocations = $estimated->get($item->id, collect());
-            $estimatedByCategory = $allocations->groupBy(fn ($allocation) => $allocation->costCode?->category ?: 'overhead')
-                ->map(fn ($group) => (float) $group->sum('estimated_cost'));
-            $estimatedTotal = (float) $allocations->sum('estimated_cost');
+        $rows = $items->map(function ($item) use ($materialByItem, $laborByItem, $subcontractByItem, $expenseByItem) {
             $actual = [
                 'materials' => (float) ($materialByItem[$item->id] ?? 0),
                 'labor' => (float) ($laborByItem[$item->id] ?? 0),
@@ -65,20 +58,15 @@ class BoqCostProfitabilityReport
                 'expenses' => (float) ($expenseByItem[$item->id] ?? 0),
             ];
             $actualTotal = array_sum($actual);
-            $variance = $estimatedTotal - $actualTotal;
-            $usage = $estimatedTotal > 0 ? ($actualTotal / $estimatedTotal) * 100 : ($actualTotal > 0 ? 100 : 0);
-            $status = $actualTotal > $estimatedTotal + 0.0001 ? 'over' : ($estimatedTotal > 0 && $usage >= 90 ? 'near' : ($actualTotal > 0 ? 'healthy' : 'no_cost'));
+            $sales = (float) $item->sales_total;
+            $status = $actualTotal > $sales + 0.0001 ? 'over' : ($actualTotal > 0 ? 'healthy' : 'no_cost');
 
             return [
                 'id' => $item->id, 'code' => $item->code, 'description' => $item->description, 'unit' => $item->unit,
-                'sales' => round((float) $item->sales_total, 4),
-                'estimated' => ['total' => round($estimatedTotal, 4), 'materials' => round((float) ($estimatedByCategory['material'] ?? 0), 4),
-                    'labor' => round((float) ($estimatedByCategory['labor'] ?? 0), 4), 'subcontracts' => round((float) ($estimatedByCategory['subcontract'] ?? 0), 4),
-                    'equipment' => round((float) ($estimatedByCategory['equipment'] ?? 0), 4), 'overhead' => round((float) ($estimatedByCategory['overhead'] ?? 0), 4)],
+                'sales' => round($sales, 4),
                 'actual' => array_map(fn ($value) => round($value, 4), $actual) + ['total' => round($actualTotal, 4)],
-                'variance' => round($variance, 4), 'usage_percent' => round($usage, 2), 'status' => $status,
-                'budget_margin' => round((float) $item->sales_total - $estimatedTotal, 4),
-                'sale_less_actual' => round((float) $item->sales_total - $actualTotal, 4),
+                'cost_percent' => $sales > 0 ? round(($actualTotal / $sales) * 100, 2) : 0, 'status' => $status,
+                'sale_less_actual' => round($sales - $actualTotal, 4),
             ];
         })->values();
 
@@ -88,20 +76,17 @@ class BoqCostProfitabilityReport
         ];
         $unlinked['total'] = round(array_sum($unlinked), 4);
         $sales = (float) $rows->sum('sales');
-        $estimatedTotal = (float) $rows->sum('estimated.total');
         $linkedActual = (float) $rows->sum('actual.total');
         $actualTotal = $linkedActual + $unlinked['total'];
 
         return [
             'period' => ['to' => $toDate], 'boq' => $boq, 'rows' => $rows, 'unlinked' => $unlinked,
-            'summary' => ['sales' => round($sales, 4), 'estimated' => round($estimatedTotal, 4), 'actual' => round($actualTotal, 4),
-                'linked_actual' => round($linkedActual, 4), 'remaining_budget' => round($estimatedTotal - $actualTotal, 4),
-                'budget_margin' => round($sales - $estimatedTotal, 4), 'sale_less_actual' => round($sales - $actualTotal, 4),
-                'usage_percent' => $estimatedTotal > 0 ? round(($actualTotal / $estimatedTotal) * 100, 2) : 0,
-                'over_budget_items' => $rows->where('status', 'over')->count()],
+            'summary' => ['sales' => round($sales, 4), 'actual' => round($actualTotal, 4),
+                'linked_actual' => round($linkedActual, 4), 'sale_less_actual' => round($sales - $actualTotal, 4),
+                'cost_percent' => $sales > 0 ? round(($actualTotal / $sales) * 100, 2) : 0,
+                'loss_items' => $rows->where('status', 'over')->count()],
             'warnings' => collect([
                 $unlinked['total'] > 0 ? __('construction::lang.cost_profitability_warning_unlinked', ['amount' => CurrencyFormatter::format($unlinked['total'])]) : null,
-                $estimatedTotal <= 0 ? __('construction::lang.cost_profitability_warning_no_budget') : null,
             ])->filter()->values(),
         ];
     }
@@ -120,8 +105,7 @@ class BoqCostProfitabilityReport
     {
         return ['period' => ['to' => $toDate], 'boq' => null, 'rows' => collect(),
             'unlinked' => ['materials' => 0.0, 'labor' => 0.0, 'subcontracts' => 0.0, 'expenses' => 0.0, 'total' => 0.0],
-            'summary' => ['sales' => 0.0, 'estimated' => 0.0, 'actual' => 0.0, 'linked_actual' => 0.0, 'remaining_budget' => 0.0,
-                'budget_margin' => 0.0, 'sale_less_actual' => 0.0, 'usage_percent' => 0.0, 'over_budget_items' => 0],
+            'summary' => ['sales' => 0.0, 'actual' => 0.0, 'linked_actual' => 0.0, 'sale_less_actual' => 0.0, 'cost_percent' => 0.0, 'loss_items' => 0],
             'warnings' => collect([__('construction::lang.comparison_warning_no_boq')])];
     }
 }

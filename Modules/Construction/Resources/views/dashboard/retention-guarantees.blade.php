@@ -2,47 +2,209 @@
 
 @section('title', __('construction::lang.retention_guarantees_report'))
 
+@php
+    $dueTones = ['due' => 'danger', 'upcoming' => 'warning', 'not_due' => 'info', 'no_date' => 'neutral', 'closed' => 'success'];
+    $releaseTones = ['released' => 'success', 'partial' => 'warning', 'held' => 'neutral'];
+    $amount = fn ($value) => \Modules\Construction\Support\CurrencyFormatter::parts($value)['amount'];
+    $summary = $report['summary'];
+    $meta = [
+        ['building', $selectedProject ? $selectedProject->code . ' — ' . $selectedProject->name : __('construction::lang.statement_all_projects')],
+        ['calendar', __('construction::lang.as_of_date') . ' ' . app(\App\Utils\Util::class)->format_date($toDate)],
+        ['clock', __('construction::lang.retentions_without_dates') . ': ' . $summary['no_date_count']],
+    ];
+@endphp
+
 @section('module_content')
-<section class="content ct-financial-report-page ct-retention-report-page">
-    <nav class="ct-report-switcher" aria-label="@lang('construction::lang.construction_reports')">
-        <a href="{{ route('construction.reports.index') }}"><i class="fa fa-chart-line"></i> @lang('construction::lang.financial_position_report')</a>
-        <a href="{{ route('construction.reports.subcontractor-statement.index') }}"><i class="fa fa-file-invoice-dollar"></i> @lang('construction::lang.subcontractor_statement')</a>
-        <a href="{{ route('construction.reports.boq-subcontract-comparison.index') }}"><i class="fa fa-balance-scale"></i> @lang('construction::lang.boq_subcontract_comparison')</a>
-        <a href="{{ route('construction.reports.boq-cost-profitability.index') }}"><i class="fa fa-coins"></i> @lang('construction::lang.boq_cost_profitability')</a>
-        <a href="{{ route('construction.reports.customer-certificates-collection.index') }}"><i class="fa fa-hand-holding-usd"></i> @lang('construction::lang.customer_collection_report')</a>
-        <a class="is-active" href="{{ route('construction.reports.retention-guarantees.index') }}"><i class="fa fa-shield-alt"></i> @lang('construction::lang.retention_guarantees_report')</a>
-    </nav>
+<main class="content rr-page" aria-labelledby="rr-report-title">
+    @include('construction::dashboard.partials.rr_report_switcher', ['active' => 'retention'])
 
-    <header class="ct-financial-report-heading"><div><span><i class="fa fa-calendar-check"></i> @lang('construction::lang.retention_control')</span><h1>@lang('construction::lang.retention_guarantees_report')</h1><p>@lang('construction::lang.retention_guarantees_description')</p></div><a class="btn ct-primary-action" target="_blank" href="{{ route('construction.reports.retention-guarantees.print',array_filter(['project_id'=>$projectId,'to_date'=>$toDate,'party_type'=>$partyType,'due_status'=>$dueStatus])) }}"><i class="fa fa-print"></i> @lang('construction::lang.print_retention_report')</a></header>
+    @include('construction::dashboard.partials.rr_report_head', [
+        'icon' => 'shield',
+        'eyebrow' => __('construction::lang.retention_control'),
+        'title' => __('construction::lang.retention_guarantees_report'),
+        'description' => __('construction::lang.retention_guarantees_description'),
+        'printUrl' => route('construction.reports.retention-guarantees.print', array_filter(['project_id' => $projectId, 'to_date' => $toDate, 'party_type' => $partyType, 'due_status' => $dueStatus])),
+        'printLabel' => __('construction::lang.print_retention_report'),
+        'meta' => $meta,
+    ])
 
-    <form method="GET" action="{{ route('construction.reports.retention-guarantees.index') }}" class="ct-financial-report-filter ct-retention-filter">
-        <div class="form-group"><label>@lang('construction::lang.project')</label><select name="project_id" class="form-control select2"><option value="">@lang('construction::lang.statement_all_projects')</option>@foreach($projects as $project)<option value="{{ $project->id }}" @selected($projectId === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach</select></div>
-        <div class="form-group"><label>@lang('construction::lang.party_type')</label><select name="party_type" class="form-control"><option value="">@lang('construction::lang.all_parties')</option><option value="customer" @selected($partyType==='customer')>@lang('construction::lang.customer_retentions')</option><option value="subcontractor" @selected($partyType==='subcontractor')>@lang('construction::lang.subcontractor_retentions')</option></select></div>
-        <div class="form-group"><label>@lang('construction::lang.due_status')</label><select name="due_status" class="form-control"><option value="">@lang('construction::lang.all_statuses')</option>@foreach(['due','upcoming','not_due','no_date','closed'] as $status)<option value="{{ $status }}" @selected($dueStatus===$status)>@lang('construction::lang.due_status_'.$status)</option>@endforeach</select></div>
-        <div class="form-group"><label>@lang('construction::lang.as_of_date')</label><input name="to_date" value="{{ @format_date($toDate) }}" class="form-control ct-date-picker" readonly></div>
-        <button class="btn btn-primary"><i class="fa fa-filter"></i> @lang('construction::lang.show_report')</button>
+    <form method="GET" action="{{ route('construction.reports.retention-guarantees.index') }}" class="rr-filter">
+        <div class="rr-filter__fields">
+            <div class="rr-field rr-filter__grow">
+                <label class="rr-field__label" for="ct-report-project">@lang('construction::lang.project')</label>
+                <select id="ct-report-project" name="project_id" class="form-control select2">
+                    <option value="">@lang('construction::lang.statement_all_projects')</option>
+                    @foreach($projects as $project)<option value="{{ $project->id }}" @selected($projectId === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach
+                </select>
+            </div>
+            <div class="rr-field">
+                <label class="rr-field__label" for="ct-report-party">@lang('construction::lang.party_type')</label>
+                <div class="rr-control">
+                    <select id="ct-report-party" name="party_type" class="rr-control__input rr-control__select">
+                        <option value="">@lang('construction::lang.all_parties')</option>
+                        <option value="customer" @selected($partyType === 'customer')>@lang('construction::lang.customer_retentions')</option>
+                        <option value="subcontractor" @selected($partyType === 'subcontractor')>@lang('construction::lang.subcontractor_retentions')</option>
+                    </select>
+                    <span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span>
+                </div>
+            </div>
+            <div class="rr-field">
+                <label class="rr-field__label" for="ct-report-due">@lang('construction::lang.due_status')</label>
+                <div class="rr-control">
+                    <select id="ct-report-due" name="due_status" class="rr-control__input rr-control__select">
+                        <option value="">@lang('construction::lang.all_statuses')</option>
+                        @foreach(array_keys($dueTones) as $status)<option value="{{ $status }}" @selected($dueStatus === $status)>@lang('construction::lang.due_status_' . $status)</option>@endforeach
+                    </select>
+                    <span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span>
+                </div>
+            </div>
+            <div class="rr-field">
+                <label class="rr-field__label" for="ct-report-as-of">@lang('construction::lang.as_of_date')</label>
+                <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input id="ct-report-as-of" name="to_date" value="{{ @format_date($toDate) }}" class="rr-control__input ct-date-picker" readonly></div>
+            </div>
+        </div>
+        <div class="rr-filter__actions">
+            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'filter', 'size' => 16])@lang('construction::lang.show_report')</button>
+        </div>
     </form>
 
-    <div class="ct-retention-context"><span><small>@lang('construction::lang.project')</small><strong>{{ $selectedProject ? $selectedProject->code.' — '.$selectedProject->name : __('construction::lang.statement_all_projects') }}</strong></span><span><small>@lang('construction::lang.as_of_date')</small><strong>{{ @format_date($toDate) }}</strong></span><span><small>@lang('construction::lang.retentions_without_dates')</small><strong>{{ $report['summary']['no_date_count'] }}</strong></span></div>
-
-    <div class="ct-retention-kpis">
-        <article class="is-right"><small>@lang('construction::lang.customer_retentions')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['customer_retention']])</strong><span>@lang('construction::lang.rights_held_by_customers')</span></article>
-        <article><small>@lang('construction::lang.subcontract_original_retention')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['subcontract_original']])</strong><span>@lang('construction::lang.original_retention')</span></article>
-        <article class="is-released"><small>@lang('construction::lang.released_retention')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['subcontract_released']])</strong><span>@lang('construction::lang.paid_to_subcontractors')</span></article>
-        <article class="is-liability"><small>@lang('construction::lang.remaining_retention')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['subcontract_remaining']])</strong><span>@lang('construction::lang.liabilities_to_subcontractors')</span></article>
-        <article class="{{ $report['summary']['net_position'] >= 0 ? 'is-right' : 'is-liability' }}"><small>@lang('construction::lang.net_retention_position')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['net_position']])</strong><span>@lang('construction::lang.rights_less_liabilities')</span></article>
+    {{-- ═══ المؤشرات ═══ --}}
+    <div class="rr-statgroup-wrap">
+        <div class="rr-statgroup rr-statgroup--5" style="--rr-stats: 5">
+            @foreach([
+                ['customer_retention', 'customer_retentions', 'download', 'rights_held_by_customers', 'rr-text--success'],
+                ['subcontract_original', 'subcontract_original_retention', 'lock', 'original_retention', ''],
+                ['subcontract_released', 'released_retention', 'check-circle', 'paid_to_subcontractors', ''],
+                ['subcontract_remaining', 'remaining_retention', 'clock', 'liabilities_to_subcontractors', 'rr-text--danger'],
+                ['net_position', 'net_retention_position', 'shield', 'rights_less_liabilities', $summary['net_position'] >= 0 ? 'rr-text--success' : 'rr-text--danger'],
+            ] as [$key, $label, $icon, $sub, $tone])
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => $icon, 'size' => 18])@lang('construction::lang.' . $label)</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg {{ $summary[$key] == 0 ? 'rr-money--zero' : $tone }}">@include('construction::partials.money', ['value' => $summary[$key]])</span></div>
+                    <div class="rr-stat__sub">@lang('construction::lang.' . $sub)</div>
+                </div>
+            @endforeach
+        </div>
     </div>
 
-    <section class="ct-retention-outlook"><header><span>@lang('construction::lang.retention_cash_outlook')</span><small>@lang('construction::lang.next_thirty_days')</small></header><div><article><small>@lang('construction::lang.customer_due_now')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['due_customer']])</strong></article><article><small>@lang('construction::lang.subcontract_due_now')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['due_subcontractor']])</strong></article><article><small>@lang('construction::lang.customer_due_30')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['upcoming_customer']])</strong></article><article><small>@lang('construction::lang.subcontract_due_30')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['upcoming_subcontractor']])</strong></article></div></section>
+    {{-- ═══ التدفق المتوقع ═══ --}}
+    <section class="rr-card rr-card--tint" aria-labelledby="rr-retention-outlook-title">
+        <header class="rr-card__head">
+            <div class="rr-card__titles">
+                <h2 id="rr-retention-outlook-title" class="rr-card__title">@lang('construction::lang.retention_cash_outlook')</h2>
+                <p class="rr-card__desc">@lang('construction::lang.next_thirty_days')</p>
+            </div>
+        </header>
+        <div class="rr-aging">
+            @foreach([
+                ['due_customer', 'customer_due_now', 'success'],
+                ['due_subcontractor', 'subcontract_due_now', 'danger'],
+                ['upcoming_customer', 'customer_due_30', 'success'],
+                ['upcoming_subcontractor', 'subcontract_due_30', 'danger'],
+            ] as [$key, $label, $tone])
+                <div class="rr-aging__bucket">
+                    <span class="rr-aging__label">@lang('construction::lang.' . $label)</span>
+                    <span class="rr-money rr-money--sm {{ $summary[$key] == 0 ? 'rr-money--zero' : 'rr-text--' . $tone }}">@include('construction::partials.money', ['value' => $summary[$key]])</span>
+                </div>
+            @endforeach
+        </div>
+        <p class="rr-card__note">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 16])@lang('construction::lang.customer_retention_no_release_notice')</p>
+    </section>
 
-    <div class="ct-retention-note"><i class="fa fa-info-circle"></i> @lang('construction::lang.customer_retention_no_release_notice')</div>
+    {{-- ═══ محتجزات عند المالك ═══ --}}
+    <section class="rr-table-wrap" aria-labelledby="rr-customer-retentions-title">
+        <div class="rr-table-head">
+            <div>
+                <div class="rr-eyebrow">@lang('construction::lang.rights_held_by_customers')</div>
+                <h2 id="rr-customer-retentions-title" class="rr-table-head__title">@lang('construction::lang.customer_retentions')</h2>
+            </div>
+            <span class="rr-money">@include('construction::partials.money', ['value' => $summary['customer_retention']])</span>
+        </div>
+        @if(count($report['customer_rows']) === 0)
+            <div class="rr-empty"><h3 class="rr-empty__title">@lang('construction::lang.no_customer_retentions')</h3></div>
+        @else
+            <div class="rr-table-scroll">
+                <table class="rr-table">
+                    <caption class="rr-sr">@lang('construction::lang.customer_retentions')</caption>
+                    <thead>
+                        <tr>
+                            <th class="rr-th rr-col--title" scope="col">@lang('construction::lang.project')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.customer')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.certificate')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.original_retention')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.expected_release_date')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.due_status')</th>
+                        </tr>
+                    </thead>
+                    <tbody class="rr-tbody">
+                        @foreach($report['customer_rows'] as $row)
+                            <tr class="rr-tr">
+                                <td class="rr-td rr-td--wrap"><span class="rr-entity__name">{{ $row['project']?->name }}</span><div class="rr-td__sub"><span class="rr-code">{{ $row['project']?->code }}</span></div></td>
+                                <td class="rr-td rr-td--wrap">{{ $row['party_name'] }}</td>
+                                <td class="rr-td"><span class="rr-code">{{ $row['certificate']->number }}</span><div class="rr-td__sub"><span class="rr-num">{{ @format_date($row['certificate']->certificate_date) }}</span></div></td>
+                                <td class="rr-td rr-td--num"><strong class="rr-num">{{ $amount($row['remaining']) }}</strong></td>
+                                <td class="rr-td">@if($row['retention_due_date'])<span class="rr-num">{{ @format_date($row['retention_due_date']) }}</span>@else<span class="rr-td--muted">@lang('construction::lang.no_due_date')</span>@endif</td>
+                                <td class="rr-td">
+                                    <span class="rr-badge rr-badge--{{ $dueTones[$row['due_status']] ?? 'neutral' }}"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.due_status_' . $row['due_status'])</span>
+                                    @if($row['days_until_due'] !== null)<div class="rr-td__sub"><span class="rr-num">{{ abs($row['days_until_due']) }}</span> @lang($row['days_until_due'] <= 0 ? 'construction::lang.overdue_days' : 'construction::lang.days_remaining')</div>@endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </section>
 
-    <section class="ct-financial-table-panel ct-retention-table-panel"><header><div><span>@lang('construction::lang.rights_held_by_customers')</span><h2>@lang('construction::lang.customer_retentions')</h2></div><strong>@include('construction::partials.money',['value'=>$report['summary']['customer_retention']])</strong></header><div class="table-responsive"><table class="table ct-financial-table"><thead><tr><th>@lang('construction::lang.project')</th><th>@lang('construction::lang.customer')</th><th>@lang('construction::lang.certificate')</th><th>@lang('construction::lang.original_retention')</th><th>@lang('construction::lang.expected_release_date')</th><th>@lang('construction::lang.due_status')</th></tr></thead><tbody>@forelse($report['customer_rows'] as $row)<tr><td><strong>{{ $row['project']?->code }} — {{ $row['project']?->name }}</strong></td><td>{{ $row['party_name'] }}</td><td><strong dir="ltr">{{ $row['certificate']->number }}</strong><small>{{ @format_date($row['certificate']->certificate_date) }}</small></td><td><strong>@include('construction::partials.money',['value'=>$row['remaining']])</strong></td><td>{{ $row['retention_due_date'] ? @format_date($row['retention_due_date']) : __('construction::lang.no_due_date') }}</td><td><span class="ct-due-status is-{{ $row['due_status'] }}">@lang('construction::lang.due_status_'.$row['due_status'])</span>@if($row['days_until_due'] !== null)<small>{{ abs($row['days_until_due']) }} @lang($row['days_until_due'] <= 0 ? 'construction::lang.overdue_days' : 'construction::lang.days_remaining')</small>@endif</td></tr>@empty<tr><td colspan="6" class="text-center text-muted">@lang('construction::lang.no_customer_retentions')</td></tr>@endforelse</tbody></table></div></section>
-
-    <section class="ct-financial-table-panel ct-retention-table-panel"><header><div><span>@lang('construction::lang.liabilities_to_subcontractors')</span><h2>@lang('construction::lang.subcontractor_retentions')</h2></div><strong>@include('construction::partials.money',['value'=>$report['summary']['subcontract_remaining']])</strong></header><div class="table-responsive"><table class="table ct-financial-table"><thead><tr><th>@lang('construction::lang.project')</th><th>@lang('construction::lang.subcontractor')</th><th>@lang('construction::lang.certificate')</th><th>@lang('construction::lang.original_retention')</th><th>@lang('construction::lang.released_retention')</th><th>@lang('construction::lang.remaining_retention')</th><th>@lang('construction::lang.expected_release_date')</th><th>@lang('construction::lang.release_status')</th><th>@lang('construction::lang.due_status')</th></tr></thead><tbody>@forelse($report['subcontractor_rows'] as $row)<tr><td><strong>{{ $row['project']?->code }} — {{ $row['project']?->name }}</strong></td><td><strong>{{ $row['party_name'] }}</strong><small dir="ltr">{{ $row['agreement_number'] }}</small></td><td><strong dir="ltr">{{ $row['certificate']->number }}</strong><small>{{ @format_date($row['certificate']->certificate_date) }}</small></td><td>@include('construction::partials.money',['value'=>$row['original']])</td><td>@include('construction::partials.money',['value'=>$row['released']])</td><td><strong>@include('construction::partials.money',['value'=>$row['remaining']])</strong></td><td>{{ $row['retention_due_date'] ? @format_date($row['retention_due_date']) : __('construction::lang.no_due_date') }}</td><td><span class="ct-release-status is-{{ $row['release_status'] }}">@lang('construction::lang.release_status_'.$row['release_status'])</span></td><td><span class="ct-due-status is-{{ $row['due_status'] }}">@lang('construction::lang.due_status_'.$row['due_status'])</span>@if($row['days_until_due'] !== null)<small>{{ abs($row['days_until_due']) }} @lang($row['days_until_due'] <= 0 ? 'construction::lang.overdue_days' : 'construction::lang.days_remaining')</small>@endif</td></tr>@empty<tr><td colspan="9" class="text-center text-muted">@lang('construction::lang.no_subcontract_retentions')</td></tr>@endforelse</tbody></table></div></section>
-</section>
+    {{-- ═══ محتجزات مقاولي الباطن ═══ --}}
+    <section class="rr-table-wrap" aria-labelledby="rr-subcontract-retentions-title">
+        <div class="rr-table-head">
+            <div>
+                <div class="rr-eyebrow">@lang('construction::lang.liabilities_to_subcontractors')</div>
+                <h2 id="rr-subcontract-retentions-title" class="rr-table-head__title">@lang('construction::lang.subcontractor_retentions')</h2>
+            </div>
+            <span class="rr-money">@include('construction::partials.money', ['value' => $summary['subcontract_remaining']])</span>
+        </div>
+        @if(count($report['subcontractor_rows']) === 0)
+            <div class="rr-empty"><h3 class="rr-empty__title">@lang('construction::lang.no_subcontract_retentions')</h3></div>
+        @else
+            <div class="rr-table-scroll">
+                <table class="rr-table">
+                    <caption class="rr-sr">@lang('construction::lang.subcontractor_retentions')</caption>
+                    <thead>
+                        <tr>
+                            <th class="rr-th rr-col--title" scope="col">@lang('construction::lang.project')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.subcontractor')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.certificate')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.original_retention')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.released_retention')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.remaining_retention')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.expected_release_date')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.release_status')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.due_status')</th>
+                        </tr>
+                    </thead>
+                    <tbody class="rr-tbody">
+                        @foreach($report['subcontractor_rows'] as $row)
+                            <tr class="rr-tr">
+                                <td class="rr-td rr-td--wrap"><span class="rr-entity__name">{{ $row['project']?->name }}</span><div class="rr-td__sub"><span class="rr-code">{{ $row['project']?->code }}</span></div></td>
+                                <td class="rr-td rr-td--wrap"><span class="rr-entity__name">{{ $row['party_name'] }}</span><div class="rr-td__sub"><span class="rr-code">{{ $row['agreement_number'] }}</span></div></td>
+                                <td class="rr-td"><span class="rr-code">{{ $row['certificate']->number }}</span><div class="rr-td__sub"><span class="rr-num">{{ @format_date($row['certificate']->certificate_date) }}</span></div></td>
+                                <td class="rr-td rr-td--num"><span class="rr-num">{{ $amount($row['original']) }}</span></td>
+                                <td class="rr-td rr-td--num"><span class="rr-num {{ $row['released'] == 0 ? 'rr-td--muted' : '' }}">{{ $amount($row['released']) }}</span></td>
+                                <td class="rr-td rr-td--num"><strong class="rr-num">{{ $amount($row['remaining']) }}</strong></td>
+                                <td class="rr-td">@if($row['retention_due_date'])<span class="rr-num">{{ @format_date($row['retention_due_date']) }}</span>@else<span class="rr-td--muted">@lang('construction::lang.no_due_date')</span>@endif</td>
+                                <td class="rr-td"><span class="rr-badge rr-badge--{{ $releaseTones[$row['release_status']] ?? 'neutral' }}">@lang('construction::lang.release_status_' . $row['release_status'])</span></td>
+                                <td class="rr-td">
+                                    <span class="rr-badge rr-badge--{{ $dueTones[$row['due_status']] ?? 'neutral' }}"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.due_status_' . $row['due_status'])</span>
+                                    @if($row['days_until_due'] !== null)<div class="rr-td__sub"><span class="rr-num">{{ abs($row['days_until_due']) }}</span> @lang($row['days_until_due'] <= 0 ? 'construction::lang.overdue_days' : 'construction::lang.days_remaining')</div>@endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </section>
+</main>
 @endsection
-
-@push('ct_quick_css')
-<style>.ct-financial-report-filter.ct-retention-filter{grid-template-columns:1.5fr 1fr 1fr .8fr auto}.ct-report-switcher{max-width:100%;overflow-x:auto}.ct-retention-context{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin:14px 0}.ct-retention-context span,.ct-retention-note{padding:12px 15px;border:1px solid #dce6f0;border-radius:10px;background:#fff}.ct-retention-context small,.ct-retention-context strong{display:block}.ct-retention-context small{color:#77879a}.ct-retention-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.ct-retention-kpis article{padding:15px;border:1px solid #dce6f0;border-top:4px solid #50739a;border-radius:12px;background:#fff}.ct-retention-kpis article.is-right{border-top-color:#13986f}.ct-retention-kpis article.is-liability{border-top-color:#cf4555}.ct-retention-kpis article.is-released{border-top-color:#2382c9}.ct-retention-kpis small,.ct-retention-kpis strong,.ct-retention-kpis span{display:block}.ct-retention-kpis strong{margin:8px 0;font-size:20px;color:#173d70}.ct-retention-kpis span{font-size:14px;color:#77879a}.ct-retention-outlook{margin:15px 0;padding:15px;border-radius:12px;background:#173d70;color:#fff}.ct-retention-outlook header{display:flex;justify-content:space-between}.ct-retention-outlook>div{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}.ct-retention-outlook article{padding:11px;border-radius:9px;background:rgba(255,255,255,.1)}.ct-retention-outlook small,.ct-retention-outlook strong{display:block}.ct-retention-outlook strong{margin-top:5px;font-size:17px}.ct-retention-note{margin-bottom:15px;background:#edf7ff;color:#245779}.ct-retention-table-panel{margin-top:15px}.ct-retention-table-panel header>strong{font-size:18px;color:#173d70}.ct-due-status,.ct-release-status{display:inline-block;padding:4px 8px;border-radius:12px;font-size:14px;font-weight:700}.ct-due-status.is-due{background:#ffe5e8;color:#ad2639}.ct-due-status.is-upcoming{background:#fff1ce;color:#8a5c00}.ct-due-status.is-not_due{background:#e4f1ff;color:#236ba5}.ct-due-status.is-no_date{background:#eeeef1;color:#5f6470}.ct-due-status.is-closed,.ct-release-status.is-released{background:#dcf6ea;color:#087653}.ct-release-status.is-partial{background:#fff1ce;color:#8a5c00}.ct-release-status.is-held{background:#e9eef5;color:#445b73}.ct-retention-table-panel td small{display:block;margin-top:3px;color:#7a899a}@media(max-width:1200px){.ct-retention-kpis{grid-template-columns:repeat(3,1fr)}.ct-financial-report-filter.ct-retention-filter{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.ct-retention-kpis,.ct-retention-outlook>div,.ct-retention-context,.ct-financial-report-filter.ct-retention-filter{grid-template-columns:1fr}}</style>
-@endpush

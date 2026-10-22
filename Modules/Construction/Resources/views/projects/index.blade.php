@@ -90,9 +90,6 @@
                     <a class="rr-btn rr-btn--secondary" href="{{ route('construction.projects.index') }}">@lang('construction::lang.clear_filter')</a>
                 @else
                     <h3 class="rr-empty__title">@lang('construction::lang.no_projects_yet')</h3>
-                    @can('construction.project.create')
-                        <button type="button" class="rr-btn rr-btn--primary" data-toggle="modal" data-target="#ct-project-create">@include('construction::partials.rr_icon', ['name' => 'plus'])@lang('construction::lang.new_project')</button>
-                    @endcan
                 @endif
             </div>
         @else

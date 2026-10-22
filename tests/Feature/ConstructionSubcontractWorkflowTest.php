@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Business;
 use App\Contact;
 use App\User;
+use App\Utils\ModuleUtil;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -26,8 +28,17 @@ class ConstructionSubcontractWorkflowTest extends TestCase
 
     public function test_subcontract_is_created_calculated_approved_and_locked(): void
     {
-        $supplier = Contact::whereIn('type', ['supplier', 'both'])->where('contact_status', 'active')->firstOrFail();
-        $business = $supplier->business;
+        // Use a business whose subscription covers the construction module (the controllers return 403
+        // otherwise outside the local environment) and that has a supplier and a customer of its own.
+        $moduleUtil = new ModuleUtil();
+        $business = Business::whereIn('id', Contact::whereIn('type', ['supplier', 'both'])->where('contact_status', 'active')->select('business_id'))
+            ->whereIn('id', Contact::whereIn('type', ['customer', 'both'])->select('business_id'))
+            ->whereHas('owner')
+            ->orderBy('id')
+            ->get()
+            ->first(fn ($candidate) => (bool) $moduleUtil->hasThePermissionInSubscription($candidate->id, 'construction_module'));
+        $this->assertNotNull($business, 'No business with the construction module, a supplier and a customer was found.');
+        $supplier = Contact::where('business_id', $business->id)->whereIn('type', ['supplier', 'both'])->where('contact_status', 'active')->firstOrFail();
         $user = User::findOrFail($business->owner_id);
         $customer = Contact::where('business_id', $business->id)->whereIn('type', ['customer', 'both'])->firstOrFail();
         $this->actingAs($user);

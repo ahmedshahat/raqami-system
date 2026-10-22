@@ -152,7 +152,7 @@
 
 @can('construction.subcontract.manage')
 <div class="modal fade rr-scope" id="create-subcontract" tabindex="-1" role="dialog" aria-labelledby="rr-subcontract-create-title">
-    <div class="modal-dialog rr-modal-dialog" role="document">
+    <div class="modal-dialog rr-modal-dialog rr-modal-dialog--lg rr-modal-dialog--compact" role="document">
         <div class="modal-content rr-modal">
             <form method="POST" action="{{ route('construction.subcontractors.store') }}">
                 @csrf
@@ -168,7 +168,7 @@
                         <div class="rr-alert rr-alert--danger" role="alert"><ul class="rr-error-list">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
                     @endif
                     <div class="rr-form-wrap">
-                        <div class="rr-form-grid">
+                        <div class="rr-form-grid rr-form-grid--3">
                             <div class="rr-field">
                                 <label class="rr-field__label" for="ct-subcontract-new-project">@lang('construction::lang.project'){!! $req !!}</label>
                                 <select id="ct-subcontract-new-project" name="project_id" class="form-control select2" required>
@@ -177,14 +177,21 @@
                                 </select>
                             </div>
                             <div class="rr-field">
-                                <label class="rr-field__label" for="subcontractor_id">@lang('construction::lang.subcontractor'){!! $req !!}</label>
+                                <div class="rr-field__head">
+                                    <label class="rr-field__label" for="subcontractor_id">@lang('construction::lang.subcontractor'){!! $req !!}</label>
+                                    @can('supplier.create')
+                                        <button type="button" class="rr-link-btn ct-add-supplier-link btn-modal" data-href="{{ action([\App\Http\Controllers\ContactController::class, 'create'], ['type' => 'supplier']) }}" data-container=".ct-subcontract-contact-modal">@include('construction::partials.rr_icon', ['name' => 'plus', 'size' => 14])@lang('construction::lang.create_supplier_first')</button>
+                                    @endcan
+                                </div>
                                 <select id="subcontractor_id" name="subcontractor_id" class="form-control select2" required>
                                     <option value="">@lang('construction::lang.select_subcontractor')</option>
                                     @foreach($suppliers as $supplier)<option value="{{ $supplier->id }}" @selected(old('subcontractor_id') == $supplier->id)>{{ $supplier->supplier_business_name ?: $supplier->name }}</option>@endforeach
                                 </select>
-                                @can('supplier.create')
-                                    <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm ct-add-supplier-link btn-modal" data-href="{{ action([\App\Http\Controllers\ContactController::class, 'create'], ['type' => 'supplier']) }}" data-container=".ct-subcontract-contact-modal">@include('construction::partials.rr_icon', ['name' => 'plus', 'size' => 16])@lang('construction::lang.create_supplier_first')</button>
-                                @endcan
+                            </div>
+                            <div class="rr-field">
+                                <label class="rr-field__label" for="ct-subcontract-retention">@lang('construction::lang.retention_percent'){!! $req !!}</label>
+                                <div class="rr-control"><input id="ct-subcontract-retention" name="retention_percent" value="{{ old('retention_percent', 5) }}" class="rr-control__input rr-control__input--num input_number" inputmode="decimal" required aria-describedby="ct-subcontract-retention-hint" title="@lang('construction::lang.retention_simple_hint')"><span class="rr-control__affix">%</span></div>
+                                <p class="rr-sr" id="ct-subcontract-retention-hint">@lang('construction::lang.retention_simple_hint')</p>
                             </div>
                             <div class="rr-field rr-field--full">
                                 <label class="rr-field__label" for="ct-subcontract-title">@lang('construction::lang.agreement_title'){!! $req !!}</label>
@@ -199,21 +206,16 @@
                                 <div class="rr-control rr-control--visible"><span class="rr-control__lead">@include('construction::partials.rr_icon', ['name' => 'calendar', 'size' => 18])</span><input type="text" id="ct-subcontract-end" name="end_date" value="{{ old('end_date') }}" class="rr-control__input ct-date-picker" readonly placeholder="@lang('construction::lang.select_date')"></div>
                             </div>
                             <div class="rr-field">
-                                <label class="rr-field__label" for="ct-subcontract-retention">@lang('construction::lang.retention_percent'){!! $req !!}</label>
-                                <div class="rr-control"><input id="ct-subcontract-retention" name="retention_percent" value="{{ old('retention_percent', 5) }}" class="rr-control__input rr-control__input--num input_number" inputmode="decimal" required><span class="rr-control__affix">%</span></div>
-                                <p class="rr-field__hint">@lang('construction::lang.retention_simple_hint')</p>
-                            </div>
-                            <div class="rr-field rr-field--full">
                                 <label class="rr-field__label" for="ct-subcontract-notes">@lang('construction::lang.notes') <span class="rr-field__opt">@lang('construction::lang.optional')</span></label>
-                                <div class="rr-control rr-control--area"><textarea id="ct-subcontract-notes" name="notes" class="rr-control__input rr-control__input--short" rows="3" placeholder="@lang('construction::lang.subcontract_notes_placeholder')">{{ old('notes') }}</textarea></div>
+                                <div class="rr-control"><input id="ct-subcontract-notes" name="notes" value="{{ old('notes') }}" class="rr-control__input" maxlength="5000" placeholder="@lang('construction::lang.subcontract_notes_placeholder')"></div>
                             </div>
                         </div>
                     </div>
-                    <p class="rr-modal__note">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 16])<strong>@lang('construction::lang.after_saving_agreement')</strong> @lang('construction::lang.after_saving_agreement_hint')</p>
                 </div>
                 <footer class="rr-modal__foot">
                     <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'check'])@lang('construction::lang.create_agreement')</button>
                     <button type="button" class="rr-btn rr-btn--secondary" data-dismiss="modal">@lang('messages.cancel')</button>
+                    <p class="rr-modal__note">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 16])@lang('construction::lang.after_saving_agreement_hint')</p>
                 </footer>
             </form>
         </div>

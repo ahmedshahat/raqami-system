@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('transactions', 'construction_project_id')) {
+            return;
+        }
+
         Schema::table('transactions', function (Blueprint $table) {
             $table->unsignedInteger('construction_project_id')->nullable()->after('expense_sub_category_id');
             $table->unsignedInteger('construction_boq_item_id')->nullable()->after('construction_project_id');

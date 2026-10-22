@@ -2,46 +2,192 @@
 
 @section('title', __('construction::lang.customer_collection_report'))
 
+@php
+    $statusTones = ['paid' => 'success', 'partial' => 'warning', 'unpaid' => 'danger', 'unbilled' => 'neutral'];
+    $amount = fn ($value) => \Modules\Construction\Support\CurrencyFormatter::parts($value)['amount'];
+    $util = app(\App\Utils\Util::class);
+    $meta = [
+        ['building', $selectedProject ? $selectedProject->code . ' — ' . $selectedProject->name : __('construction::lang.statement_all_projects')],
+        ['user', $selectedCustomer ? ($selectedCustomer->supplier_business_name ?: $selectedCustomer->name) : __('construction::lang.all_customers')],
+        ['calendar', ($fromDate ? $util->format_date($fromDate) : __('construction::lang.account_inception')) . ' — ' . $util->format_date($toDate)],
+    ];
+    $summary = $report['summary'];
+    $agingTotal = (float) array_sum($report['aging']);
+    $agingBuckets = ['current' => 'success', 'days_1_30' => 'info', 'days_31_60' => 'warning', 'days_61_90' => 'warning', 'over_90' => 'danger'];
+@endphp
+
 @section('module_content')
-<section class="content ct-financial-report-page ct-collection-report-page">
-    <nav class="ct-report-switcher" aria-label="@lang('construction::lang.construction_reports')">
-        <a href="{{ route('construction.reports.index') }}"><i class="fa fa-chart-line"></i> @lang('construction::lang.financial_position_report')</a>
-        <a href="{{ route('construction.reports.subcontractor-statement.index') }}"><i class="fa fa-file-invoice-dollar"></i> @lang('construction::lang.subcontractor_statement')</a>
-        <a href="{{ route('construction.reports.boq-subcontract-comparison.index') }}"><i class="fa fa-balance-scale"></i> @lang('construction::lang.boq_subcontract_comparison')</a>
-        <a href="{{ route('construction.reports.boq-cost-profitability.index') }}"><i class="fa fa-coins"></i> @lang('construction::lang.boq_cost_profitability')</a>
-        <a class="is-active" href="{{ route('construction.reports.customer-certificates-collection.index') }}"><i class="fa fa-hand-holding-usd"></i> @lang('construction::lang.customer_collection_report')</a>
-        <a href="{{ route('construction.reports.retention-guarantees.index') }}"><i class="fa fa-shield-alt"></i> @lang('construction::lang.retention_guarantees_report')</a>
-    </nav>
+<main class="content rr-page" aria-labelledby="rr-report-title">
+    @include('construction::dashboard.partials.rr_report_switcher', ['active' => 'collection'])
 
-    <header class="ct-financial-report-heading ct-collection-heading"><div><span><i class="fa fa-file-invoice-dollar"></i> @lang('construction::lang.receivables_control_report')</span><h1>@lang('construction::lang.customer_collection_report')</h1><p>@lang('construction::lang.customer_collection_report_description')</p></div><a class="btn ct-primary-action" target="_blank" href="{{ route('construction.reports.customer-certificates-collection.print',array_filter(['project_id'=>$projectId,'customer_id'=>$customerId,'date_range'=>$dateRange,'from_date'=>$fromDate,'to_date'=>$toDate,'collection_status'=>$collectionStatus])) }}"><i class="fa fa-print"></i> @lang('construction::lang.print_collection_report')</a></header>
+    @include('construction::dashboard.partials.rr_report_head', [
+        'icon' => 'download',
+        'eyebrow' => __('construction::lang.receivables_control_report'),
+        'title' => __('construction::lang.customer_collection_report'),
+        'description' => __('construction::lang.customer_collection_report_description'),
+        'printUrl' => route('construction.reports.customer-certificates-collection.print', array_filter(['project_id' => $projectId, 'customer_id' => $customerId, 'date_range' => $dateRange, 'from_date' => $fromDate, 'to_date' => $toDate, 'collection_status' => $collectionStatus])),
+        'printLabel' => __('construction::lang.print_collection_report'),
+        'meta' => $meta,
+    ])
 
-    <form method="GET" action="{{ route('construction.reports.customer-certificates-collection.index') }}" class="ct-financial-report-filter ct-collection-filter ct-date-range-filter {{ $dateRange === 'custom' ? 'is-custom-range' : 'is-preset-range' }}">
-        <div class="form-group"><label>@lang('construction::lang.project')</label><select name="project_id" class="form-control select2"><option value="">@lang('construction::lang.statement_all_projects')</option>@foreach($projects as $project)<option value="{{ $project->id }}" @selected($projectId === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach</select></div>
-        <div class="form-group"><label>@lang('construction::lang.customer')</label><select name="customer_id" class="form-control select2"><option value="">@lang('construction::lang.all_customers')</option>@foreach($customers as $customer)<option value="{{ $customer->id }}" @selected($customerId === $customer->id)>{{ $customer->supplier_business_name ?: $customer->name }}</option>@endforeach</select></div>
-        <div class="form-group"><label>@lang('construction::lang.collection_status')</label><select name="collection_status" class="form-control"><option value="">@lang('construction::lang.all_statuses')</option>@foreach(['unbilled','unpaid','partial','paid'] as $status)<option value="{{ $status }}" @selected($collectionStatus === $status)>@lang('construction::lang.collection_status_'.$status)</option>@endforeach</select></div>
-        @include('construction::dashboard.partials.date-range-filter')
-        <button class="btn btn-primary"><i class="fa fa-filter"></i> @lang('construction::lang.show_report')</button>
+    <form method="GET" action="{{ route('construction.reports.customer-certificates-collection.index') }}" class="rr-filter ct-date-range-filter {{ $dateRange === 'custom' ? 'is-custom-range' : 'is-preset-range' }}">
+        <div class="rr-filter__fields">
+            <div class="rr-field rr-filter__grow">
+                <label class="rr-field__label" for="ct-report-project">@lang('construction::lang.project')</label>
+                <select id="ct-report-project" name="project_id" class="form-control select2">
+                    <option value="">@lang('construction::lang.statement_all_projects')</option>
+                    @foreach($projects as $project)<option value="{{ $project->id }}" @selected($projectId === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach
+                </select>
+            </div>
+            <div class="rr-field rr-filter__grow">
+                <label class="rr-field__label" for="ct-report-customer">@lang('construction::lang.customer')</label>
+                <select id="ct-report-customer" name="customer_id" class="form-control select2">
+                    <option value="">@lang('construction::lang.all_customers')</option>
+                    @foreach($customers as $customer)<option value="{{ $customer->id }}" @selected($customerId === $customer->id)>{{ $customer->supplier_business_name ?: $customer->name }}</option>@endforeach
+                </select>
+            </div>
+            <div class="rr-field">
+                <label class="rr-field__label" for="ct-report-collection-status">@lang('construction::lang.collection_status')</label>
+                <div class="rr-control">
+                    <select id="ct-report-collection-status" name="collection_status" class="rr-control__input rr-control__select">
+                        <option value="">@lang('construction::lang.all_statuses')</option>
+                        @foreach(['unbilled', 'unpaid', 'partial', 'paid'] as $status)<option value="{{ $status }}" @selected($collectionStatus === $status)>@lang('construction::lang.collection_status_' . $status)</option>@endforeach
+                    </select>
+                    <span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span>
+                </div>
+            </div>
+            @include('construction::dashboard.partials.date-range-filter')
+        </div>
+        <div class="rr-filter__actions">
+            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'filter', 'size' => 16])@lang('construction::lang.show_report')</button>
+        </div>
     </form>
 
-    <div class="ct-collection-context"><span><small>@lang('construction::lang.project')</small><strong>{{ $selectedProject ? $selectedProject->code.' — '.$selectedProject->name : __('construction::lang.statement_all_projects') }}</strong></span><span><small>@lang('construction::lang.customer')</small><strong>{{ $selectedCustomer ? ($selectedCustomer->supplier_business_name ?: $selectedCustomer->name) : __('construction::lang.all_customers') }}</strong></span><span><small>@lang('construction::lang.report_period')</small><strong>{{ $fromDate ? @format_date($fromDate) : __('construction::lang.account_inception') }} — {{ @format_date($toDate) }}</strong></span></div>
-
-    <div class="ct-collection-kpis">
-        <article><small>@lang('construction::lang.approved_customer_work')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['approved_work']])</strong><span>{{ $report['summary']['certificates_count'] }} @lang('construction::lang.approved_certificates')</span></article>
-        <article><small>@lang('construction::lang.customer_retention')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['retention']])</strong><span>@lang('construction::lang.held_by_customer')</span></article>
-        <article><small>@lang('construction::lang.customer_net_due')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['net_due']])</strong><span>@lang('construction::lang.after_tax_and_deductions')</span></article>
-        <article><small>@lang('construction::lang.invoiced_amount')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['invoiced']])</strong><span>{{ $report['summary']['unbilled_count'] }} @lang('construction::lang.unbilled_certificates')</span></article>
-        <article class="is-collected"><small>@lang('construction::lang.collected_amount')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['collected']])</strong><span>{{ $report['summary']['paid_count'] }} @lang('construction::lang.fully_collected_certificates')</span></article>
-        <article class="{{ $report['summary']['outstanding'] > 0 ? 'is-due' : 'is-collected' }}"><small>@lang('construction::lang.customer_receivable')</small><strong>@include('construction::partials.money',['value'=>$report['summary']['outstanding']])</strong><span>{{ $report['summary']['partial_count'] + $report['summary']['unpaid_count'] }} @lang('construction::lang.open_invoices')</span></article>
+    {{-- ═══ المؤشرات ═══ --}}
+    <div class="rr-statgroup-wrap">
+        <div class="rr-statgroup rr-statgroup--3" style="--rr-stats: 3">
+            @foreach([
+                ['approved_work', 'approved_customer_work', 'check-circle', $summary['certificates_count'] . ' ' . __('construction::lang.approved_certificates'), ''],
+                ['retention', 'customer_retention', 'lock', __('construction::lang.held_by_customer'), ''],
+                ['net_due', 'customer_net_due', 'file', __('construction::lang.after_tax_and_deductions'), ''],
+                ['invoiced', 'invoiced_amount', 'list', $summary['unbilled_count'] . ' ' . __('construction::lang.unbilled_certificates'), ''],
+                ['collected', 'collected_amount', 'download', $summary['paid_count'] . ' ' . __('construction::lang.fully_collected_certificates'), 'rr-text--success'],
+                ['outstanding', 'customer_receivable', 'clock', ($summary['partial_count'] + $summary['unpaid_count']) . ' ' . __('construction::lang.open_invoices'), $summary['outstanding'] > 0 ? 'rr-text--danger' : 'rr-text--success'],
+            ] as [$key, $label, $icon, $sub, $tone])
+                <div class="rr-stat">
+                    <div class="rr-stat__label">@include('construction::partials.rr_icon', ['name' => $icon, 'size' => 18])@lang('construction::lang.' . $label)</div>
+                    <div class="rr-stat__value"><span class="rr-money rr-money--lg {{ $tone }}">@include('construction::partials.money', ['value' => $summary[$key]])</span></div>
+                    <div class="rr-stat__sub">{{ $sub }}</div>
+                </div>
+            @endforeach
+        </div>
     </div>
 
-    <section class="ct-aging-panel"><header><div><span>@lang('construction::lang.receivable_aging')</span><h2>@lang('construction::lang.outstanding_by_age')</h2></div><strong>@include('construction::partials.money',['value'=>$report['summary']['outstanding']])</strong></header><div>@foreach(['current','days_1_30','days_31_60','days_61_90','over_90'] as $bucket)<article class="is-{{ $bucket }}"><small>@lang('construction::lang.aging_'.$bucket)</small><strong>@include('construction::partials.money',['value'=>$report['aging'][$bucket]])</strong></article>@endforeach</div></section>
+    {{-- ═══ أعمار المديونية ═══ --}}
+    <section class="rr-card" aria-labelledby="rr-aging-title">
+        <header class="rr-card__head">
+            <div class="rr-card__titles">
+                <div class="rr-eyebrow">@lang('construction::lang.receivable_aging')</div>
+                <h2 id="rr-aging-title" class="rr-card__title">@lang('construction::lang.outstanding_by_age')</h2>
+            </div>
+            <span class="rr-money">@include('construction::partials.money', ['value' => $summary['outstanding']])</span>
+        </header>
+        <div class="rr-aging">
+            @foreach($agingBuckets as $bucket => $tone)
+                <div class="rr-aging__bucket">
+                    <span class="rr-aging__label">@lang('construction::lang.aging_' . $bucket)</span>
+                    <span class="rr-money rr-money--sm {{ $report['aging'][$bucket] == 0 ? 'rr-money--zero' : '' }}">@include('construction::partials.money', ['value' => $report['aging'][$bucket]])</span>
+                    <div class="rr-progress" aria-hidden="true"><div class="rr-progress__fill rr-progress__fill--{{ $tone }}" style="width: {{ $agingTotal > 0 ? round($report['aging'][$bucket] / $agingTotal * 100, 1) : 0 }}%"></div></div>
+                </div>
+            @endforeach
+        </div>
+    </section>
 
-    @if($report['summary']['unbilled_count'] || $report['summary']['invoice_differences_count'])<div class="ct-financial-warnings">@if($report['summary']['unbilled_count'])<div><i class="fa fa-file-circle-exclamation"></i><span>@lang('construction::lang.unbilled_warning',['count'=>$report['summary']['unbilled_count'],'amount'=>\Modules\Construction\Support\CurrencyFormatter::format($report['summary']['unbilled'])])</span></div>@endif @if($report['summary']['invoice_differences_count'])<div><i class="fa fa-not-equal"></i><span>@lang('construction::lang.invoice_difference_warning',['count'=>$report['summary']['invoice_differences_count']])</span></div>@endif</div>@endif
+    @if($summary['unbilled_count'] || $summary['invoice_differences_count'])
+        <div class="rr-alert rr-alert--warning" role="status">
+            <div>
+                <strong>@lang('construction::lang.management_alerts')</strong>
+                <ul class="rr-error-list">
+                    @if($summary['unbilled_count'])<li>@lang('construction::lang.unbilled_warning', ['count' => $summary['unbilled_count'], 'amount' => \Modules\Construction\Support\CurrencyFormatter::format($summary['unbilled'])])</li>@endif
+                    @if($summary['invoice_differences_count'])<li>@lang('construction::lang.invoice_difference_warning', ['count' => $summary['invoice_differences_count']])</li>@endif
+                </ul>
+            </div>
+        </div>
+    @endif
 
-    <section class="ct-financial-table-panel ct-collection-table-panel"><header><div><span>@lang('construction::lang.accountant_details')</span><h2>@lang('construction::lang.customer_certificate_collection_details')</h2></div></header><div class="table-responsive"><table class="table ct-financial-table ct-collection-table"><thead><tr><th>@lang('construction::lang.certificate')</th><th>@lang('construction::lang.project_customer')</th><th>@lang('construction::lang.approved_work')</th><th>@lang('construction::lang.retention')</th><th>@lang('construction::lang.deductions')</th><th>@lang('construction::lang.tax')</th><th>@lang('construction::lang.net_due')</th><th>@lang('construction::lang.invoice')</th><th>@lang('construction::lang.collected')</th><th>@lang('construction::lang.outstanding')</th><th>@lang('construction::lang.collection_status')</th><th>@lang('construction::lang.balance_age')</th></tr></thead><tbody>@forelse($report['rows'] as $row)<tr><td><strong dir="ltr">{{ $row['certificate']->number }}</strong><small>{{ @format_date($row['certificate']->certificate_date) }}</small></td><td><strong>{{ $row['project']?->code }} — {{ $row['project']?->name }}</strong><small>{{ $row['customer']?->supplier_business_name ?: $row['customer']?->name }}</small></td><td>@include('construction::partials.money',['value'=>$row['approved_work']])</td><td>@include('construction::partials.money',['value'=>$row['retention']])</td><td>@include('construction::partials.money',['value'=>$row['deductions']])</td><td>@include('construction::partials.money',['value'=>$row['tax']])</td><td><strong>@include('construction::partials.money',['value'=>$row['net_due']])</strong></td><td>@if($row['invoice'])<strong dir="ltr">{{ $row['invoice']->invoice_no }}</strong><small>@include('construction::partials.money',['value'=>$row['invoice_amount']])</small>@else<span class="ct-no-invoice">@lang('construction::lang.not_invoiced')</span>@endif</td><td>@include('construction::partials.money',['value'=>$row['collected']])</td><td><strong>@include('construction::partials.money',['value'=>$row['outstanding']])</strong></td><td><span class="ct-collection-status is-{{ $row['status'] }}">@lang('construction::lang.collection_status_'.$row['status'])</span></td><td>@if($row['invoice'] && $row['outstanding']>0)<strong>{{ $row['age_days'] }} @lang('construction::lang.days')</strong><small>@lang('construction::lang.due_date'): {{ @format_date($row['due_date']) }}</small>@else—@endif</td></tr>@empty<tr><td colspan="12" class="text-center text-muted">@lang('construction::lang.no_customer_collection_rows')</td></tr>@endforelse</tbody><tfoot><tr><th colspan="2">@lang('construction::lang.total')</th><th>@include('construction::partials.money',['value'=>$report['summary']['approved_work']])</th><th>@include('construction::partials.money',['value'=>$report['summary']['retention']])</th><th>@include('construction::partials.money',['value'=>$report['summary']['deductions']])</th><th>@include('construction::partials.money',['value'=>$report['summary']['tax']])</th><th>@include('construction::partials.money',['value'=>$report['summary']['net_due']])</th><th>@include('construction::partials.money',['value'=>$report['summary']['invoiced']])</th><th>@include('construction::partials.money',['value'=>$report['summary']['collected']])</th><th>@include('construction::partials.money',['value'=>$report['summary']['outstanding']])</th><th colspan="2"></th></tr></tfoot></table></div></section>
-</section>
+    {{-- ═══ تفاصيل المستخلصات ═══ --}}
+    <section class="rr-table-wrap" aria-labelledby="rr-collection-rows-title">
+        <div class="rr-table-head">
+            <div>
+                <div class="rr-eyebrow">@lang('construction::lang.accountant_details')</div>
+                <h2 id="rr-collection-rows-title" class="rr-table-head__title">@lang('construction::lang.customer_certificate_collection_details')</h2>
+            </div>
+            <span class="rr-badge rr-badge--brand"><span class="rr-num">{{ count($report['rows']) }}</span></span>
+        </div>
+        @if(count($report['rows']) === 0)
+            <div class="rr-empty"><h3 class="rr-empty__title">@lang('construction::lang.no_customer_collection_rows')</h3></div>
+        @else
+            <div class="rr-table-scroll">
+                <table class="rr-table rr-table--wide">
+                    <caption class="rr-sr">@lang('construction::lang.customer_certificate_collection_details')</caption>
+                    <thead>
+                        <tr>
+                            <th class="rr-th" scope="col">@lang('construction::lang.certificate')</th>
+                            <th class="rr-th rr-col--text" scope="col">@lang('construction::lang.project_customer')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.approved_work')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.retention')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.deductions')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.tax')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.net_due')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.invoice')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.collected')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.outstanding')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.collection_status')</th>
+                            <th class="rr-th" scope="col">@lang('construction::lang.balance_age')</th>
+                        </tr>
+                    </thead>
+                    <tbody class="rr-tbody">
+                        @foreach($report['rows'] as $row)
+                            <tr class="rr-tr">
+                                <td class="rr-td"><span class="rr-code">{{ $row['certificate']->number }}</span><div class="rr-td__sub"><span class="rr-num">{{ @format_date($row['certificate']->certificate_date) }}</span></div></td>
+                                <td class="rr-td rr-td--wrap"><span class="rr-entity__name">{{ $row['project']?->name }}</span><div class="rr-td__sub"><span class="rr-code">{{ $row['project']?->code }}</span> · {{ $row['customer']?->supplier_business_name ?: $row['customer']?->name }}</div></td>
+                                @foreach(['approved_work', 'retention', 'deductions', 'tax'] as $key)
+                                    <td class="rr-td rr-td--num"><span class="rr-num {{ $row[$key] == 0 ? 'rr-td--muted' : '' }}">{{ $amount($row[$key]) }}</span></td>
+                                @endforeach
+                                <td class="rr-td rr-td--num"><strong class="rr-num">{{ $amount($row['net_due']) }}</strong></td>
+                                <td class="rr-td">
+                                    @if($row['invoice'])
+                                        <span class="rr-code">{{ $row['invoice']->invoice_no }}</span><div class="rr-td__sub"><span class="rr-num">{{ $amount($row['invoice_amount']) }}</span></div>
+                                    @else
+                                        <span class="rr-badge">@lang('construction::lang.not_invoiced')</span>
+                                    @endif
+                                </td>
+                                <td class="rr-td rr-td--num"><span class="rr-num">{{ $amount($row['collected']) }}</span></td>
+                                <td class="rr-td rr-td--num"><strong class="rr-num {{ $row['outstanding'] > 0 ? 'rr-text--danger' : '' }}">{{ $amount($row['outstanding']) }}</strong></td>
+                                <td class="rr-td"><span class="rr-badge rr-badge--{{ $statusTones[$row['status']] ?? 'neutral' }}"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.collection_status_' . $row['status'])</span></td>
+                                <td class="rr-td">
+                                    @if($row['invoice'] && $row['outstanding'] > 0)
+                                        <strong class="rr-num">{{ $row['age_days'] }}</strong> @lang('construction::lang.days')
+                                        <div class="rr-td__sub">@lang('construction::lang.due_date'): <span class="rr-num">{{ @format_date($row['due_date']) }}</span></div>
+                                    @else
+                                        <span class="rr-td--muted">—</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot class="rr-tfoot">
+                        <tr>
+                            <td class="rr-td" colspan="2">@lang('construction::lang.total')</td>
+                            @foreach(['approved_work', 'retention', 'deductions', 'tax', 'net_due', 'invoiced', 'collected', 'outstanding'] as $key)
+                                <td class="rr-td rr-td--num"><span class="rr-num">{{ $amount($summary[$key]) }}</span></td>
+                            @endforeach
+                            <td class="rr-td" colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        @endif
+    </section>
+</main>
 @endsection
-
-@push('ct_quick_css')
-<style>.ct-financial-report-filter.ct-collection-filter.is-custom-range{grid-template-columns:1.35fr 1.2fr .8fr .9fr .7fr .7fr auto}.ct-financial-report-filter.ct-collection-filter.is-preset-range{grid-template-columns:1.35fr 1.2fr .8fr .9fr auto}@media(max-width:1200px){.ct-financial-report-filter.ct-collection-filter.is-custom-range,.ct-financial-report-filter.ct-collection-filter.is-preset-range{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.ct-financial-report-filter.ct-collection-filter.is-custom-range,.ct-financial-report-filter.ct-collection-filter.is-preset-range{grid-template-columns:1fr}}</style>
-@endpush

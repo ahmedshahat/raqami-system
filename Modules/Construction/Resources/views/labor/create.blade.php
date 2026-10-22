@@ -1,6 +1,63 @@
 @extends('construction::layouts.module')
 @section('title', __('construction::lang.new_labor_sheet'))
+
+@php
+    $req = '<span class="rr-field__req" aria-hidden="true">*</span>';
+    $fieldError = fn ($field) => $errors->has($field) ? 'rr-control--invalid' : '';
+@endphp
+
 @section('module_content')
-<section class="content ct-materials-page"><div class="ct-form-shell ct-labor-form-shell"><div class="ct-form-shell__aside"><a href="{{ route('construction.labor.index') }}" class="ct-back-link"><i class="fa fa-arrow-right"></i> @lang('construction::lang.back_to_labor')</a><span class="ct-form-icon"><i class="fas fa-hard-hat"></i></span><h1>@lang('construction::lang.new_labor_sheet')</h1><p>@lang('construction::lang.labor_sheet_draft_hint')</p><div class="ct-form-steps"><div class="is-active"><b>1</b><span><strong>@lang('construction::lang.sheet_data')</strong><small>@lang('construction::lang.sheet_data_hint')</small></span></div><div><b>2</b><span><strong>@lang('construction::lang.add_labor')</strong><small>@lang('construction::lang.add_labor_hint')</small></span></div><div><b>3</b><span><strong>@lang('construction::lang.approve_cost')</strong><small>@lang('construction::lang.approve_labor_hint')</small></span></div></div></div>
-    <div class="ct-form-shell__main"><div class="ct-form-heading"><span>@lang('construction::lang.step_number', ['number' => 1])</span><h2>@lang('construction::lang.sheet_identity')</h2><p>@lang('construction::lang.labor_required_fields_hint')</p></div><form method="POST" action="{{ route('construction.labor.store') }}">@csrf<div class="ct-form-grid"><div class="form-group ct-form-grid__full"><label>@lang('construction::lang.project') *</label><select name="project_id" class="form-control select2" required><option value="">@lang('construction::lang.select_project')</option>@foreach($projects as $project)<option value="{{ $project->id }}" @selected((int) old('project_id') === $project->id)>{{ $project->code }} — {{ $project->name }}</option>@endforeach</select></div><div class="form-group"><label>@lang('construction::lang.sheet_number') *</label><div class="ct-input-icon"><i class="fa fa-hashtag"></i><input name="number" value="{{ old('number', $nextNumber) }}" class="form-control" required></div></div><div class="form-group"><label>@lang('construction::lang.work_site')</label><div class="ct-input-icon"><i class="fa fa-map-marker"></i><input name="work_site" value="{{ old('work_site') }}" class="form-control" placeholder="@lang('construction::lang.work_site_placeholder')"></div></div><div class="form-group"><label>@lang('construction::lang.period_start') *</label><input name="period_start" value="{{ old('period_start', @format_date(now())) }}" class="form-control ct-date-picker" readonly required></div><div class="form-group"><label>@lang('construction::lang.period_end') *</label><input name="period_end" value="{{ old('period_end', @format_date(now())) }}" class="form-control ct-date-picker" readonly required></div><div class="form-group ct-form-grid__full"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="4" placeholder="@lang('construction::lang.labor_notes_placeholder')">{{ old('notes') }}</textarea></div></div><div class="ct-form-footer"><a href="{{ route('construction.labor.index') }}" class="btn btn-default">@lang('messages.cancel')</a><button class="btn ct-primary-action"><i class="fa fa-arrow-left"></i> @lang('construction::lang.create_sheet_and_add_labor')</button></div></form></div></div></section>
+<main class="content rr-page rr-page--form" aria-labelledby="rr-labor-form-title">
+    <header class="rr-head">
+        <span class="rr-chip rr-chip--lg rr-chip--warning" aria-hidden="true">@include('construction::partials.rr_icon', ['name' => 'users', 'size' => 24])</span>
+        <div class="rr-head__titles">
+            <nav aria-label="@lang('construction::lang.breadcrumb_nav')">
+                <ol class="rr-crumbs">
+                    <li><a href="{{ route('construction.labor.index') }}">@lang('construction::lang.labor_sheets')</a></li>
+                    <li><span aria-current="page">@lang('construction::lang.new_labor_sheet')</span></li>
+                </ol>
+            </nav>
+            <h1 id="rr-labor-form-title" class="rr-head__title">@lang('construction::lang.new_labor_sheet')</h1>
+            <p class="rr-head__sub">@lang('construction::lang.labor_sheet_draft_hint')</p>
+        </div>
+    </header>
+
+    <form method="POST" class="rr-form" action="{{ route('construction.labor.store') }}">
+        @csrf
+        @include('construction::labor.partials.form_errors')
+
+        <section class="rr-card" aria-labelledby="rr-labor-identity">
+            <header class="rr-card__head">
+                <span class="rr-step-num" aria-hidden="true">1</span>
+                <div class="rr-card__titles">
+                    <h2 id="rr-labor-identity" class="rr-card__title">@lang('construction::lang.sheet_identity')</h2>
+                    <p class="rr-card__desc">@lang('construction::lang.labor_required_fields_hint')</p>
+                </div>
+            </header>
+            <div class="rr-card__body">
+                <div class="rr-form-wrap">
+                    <div class="rr-form-grid">
+                        <div class="rr-field rr-field--full">
+                            <label class="rr-field__label" for="labor-project">@lang('construction::lang.project'){!! $req !!}</label>
+                            <select id="labor-project" name="project_id" class="form-control select2" required>
+                                <option value="">@lang('construction::lang.select_project')</option>
+                                @foreach($projects as $project)
+                                    <option value="{{ $project->id }}" @selected((int) old('project_id') === $project->id)>{{ $project->code }} — {{ $project->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('project_id')<p class="rr-field__error">{{ $message }}</p>@enderror
+                        </div>
+                        @include('construction::labor.partials.identity_fields', ['sheet' => null, 'defaultNumber' => $nextNumber])
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="rr-form-actions">
+            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'arrow-forward'])<span>@lang('construction::lang.create_sheet_and_add_labor')</span></button>
+            <a href="{{ route('construction.labor.index') }}" class="rr-btn rr-btn--secondary">@lang('messages.cancel')</a>
+            <span class="rr-form-actions__note">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 16])@lang('construction::lang.add_labor_hint')</span>
+        </footer>
+    </form>
+</main>
 @endsection

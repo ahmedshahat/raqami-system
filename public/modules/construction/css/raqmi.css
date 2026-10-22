@@ -1027,3 +1027,140 @@ nav.rr-tabs { overflow-y: hidden; }
 @container (max-width: 480px) { .rr-form-grid--3 { grid-template-columns: minmax(0, 1fr); } }
 /* صف كميته أكبر من كمية التعاقد (بيتغير من JS) */
 .rr-tr.has-limit-error .rr-td, .rr-tr.has-limit-error:hover .rr-td { background: var(--rr-danger-tint); }
+/* عنوان حقل وجنبه رابط صغير: <div class="rr-field__head"><label class="rr-field__label">…</label><button class="rr-link-btn">…</button></div> */
+.rr-field__head { display: flex; align-items: center; justify-content: space-between; gap: var(--rr-space-2); min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-link-btn { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: 0; background: none; color: var(--rr-link); font-size: var(--rr-fs-xs) !important; line-height: 20px; font-weight: var(--rr-fw-medium); white-space: nowrap; cursor: pointer; }
+:is(.rr-page, .rr-scope) .rr-link-btn:hover { text-decoration: underline; }
+:is(.rr-page, .rr-scope) .rr-link-btn:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: 2px; border-radius: var(--rr-radius-sm); }
+/* التقويم مفتوح جوه نافذة: بيطلع برّه حدودها بدل السكرول (الكلاس بيتحط من layouts/module.blade.php) */
+:is(.rr-page, .rr-scope) .rr-modal.rr-modal--picker-open, .rr-modal--picker-open .rr-modal__body { overflow: visible; }
+/* محتوى من الكود الأساسي بعد رأس rr (زي فاتورة المستخلص): من غير مسافة زيادة بينهم */
+/* refinement.css بيدي كل .content أقل ارتفاع 420px وpadding بـ !important */
+.ct-module-content > .rr-page:has(+ .content) { min-height: 0 !important; padding-bottom: var(--rr-space-4) !important; }
+.ct-module-content > .rr-page + .content { padding-top: 0 !important; }
+
+/* ── 32. صف ملغي/غير فعال في جدول: <tr class="rr-tr rr-tr--muted"> ── */
+.rr-tr--muted .rr-td { color: var(--rr-ink-muted); }
+.rr-tr--muted .rr-code, .rr-tr--muted .rr-entity__name, .rr-tr--muted .rr-money { opacity: .7; }
+
+/* ==========================================================================
+   33. الرسوم البيانية (Charts) — بدون مكتبات، HTML + CSS
+   ألوان السلاسل التصنيفية بترتيب ثابت (متحقق منها لعمى الألوان في الوضعين):
+   1 أزرق · 2 برتقالي · 3 أكوا · 4 أصفر. الأرقام نفسها تفضل بلون النص، واللون للعلامة بس.
+
+   عمودي مكدّس:
+   <figure class="rr-chart">
+     <div class="rr-chart__plot">
+       <div class="rr-chart__grid"><div class="rr-chart__tick" style="--rr-tick: 50%"><span>…</span></div>…</div>
+       <div class="rr-chart__cols">
+         <div class="rr-chart__col" tabindex="0" data-rr-tip>
+           <div class="rr-chart__stack" style="height: 60%"><span class="rr-chart__seg rr-chart__seg--1" style="height: 40%"></span>…</div>
+           <span class="rr-chart__x">…</span>
+           <div class="rr-chart__tip-src" hidden>…محتوى التلميح…</div>
+         </div>
+       </div>
+     </div>
+   </figure>
+   شريط النِّسب: <div class="rr-split"><span class="rr-split__seg rr-chart__seg--1" style="width: 40%"></span>…</div>
+   مفتاح: <ul class="rr-legend"><li class="rr-legend__item"><span class="rr-legend__swatch rr-chart__seg--1"></span>…</li></ul>
+   ========================================================================== */
+.rr-page, .rr-scope { --rr-series-1: #2a78d6; --rr-series-2: #eb6834; --rr-series-3: #1baf7a; --rr-series-4: #eda100; }
+[data-theme="dark"] .rr-page, [data-theme="dark"] .rr-scope { --rr-series-1: #3987e5; --rr-series-2: #d95926; --rr-series-3: #199e70; --rr-series-4: #c98500; }
+.rr-chart__seg--1 { background: var(--rr-series-1); }
+.rr-chart__seg--2 { background: var(--rr-series-2); }
+.rr-chart__seg--3 { background: var(--rr-series-3); }
+.rr-chart__seg--4 { background: var(--rr-series-4); }
+
+.rr-chart { margin: 0; padding: var(--rr-space-4) var(--rr-space-5) var(--rr-space-3); }
+.rr-chart__plot { position: relative; height: 240px; padding-inline-start: 56px; padding-bottom: 28px; }
+.rr-chart__grid { position: absolute; inset: 0 0 28px 0; pointer-events: none; }
+.rr-chart__tick { position: absolute; inset-inline: 0; bottom: var(--rr-tick); border-top: 1px solid var(--rr-border); }
+.rr-chart__tick--base { border-top-color: var(--rr-border-control); }
+:is(.rr-page, .rr-scope) .rr-chart__tick span { position: absolute; inset-inline-start: 0; top: -9px; width: 48px; font-size: var(--rr-fs-xs) !important; line-height: 18px; color: var(--rr-ink-muted); font-variant-numeric: tabular-nums; text-align: end; unicode-bidi: isolate; white-space: nowrap; }
+.rr-chart__cols { position: relative; height: 100%; display: flex; align-items: flex-end; gap: var(--rr-space-2); }
+.rr-chart__col { position: relative; flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border-radius: var(--rr-radius-sm); outline: none; cursor: default; }
+.rr-chart__col:hover, .rr-chart__col:focus-visible { background: var(--rr-surface-hover); }
+.rr-chart__col:focus-visible { box-shadow: 0 0 0 2px var(--rr-focus); }
+.rr-chart__stack { width: min(40px, 70%); display: flex; flex-direction: column-reverse; gap: 2px; border-radius: 4px 4px 0 0; overflow: hidden; }
+.rr-chart__seg { display: block; min-height: 2px; }
+:is(.rr-page, .rr-scope) .rr-chart__x { position: absolute; bottom: -24px; inset-inline: 0; text-align: center; font-size: var(--rr-fs-xs) !important; line-height: 18px; color: var(--rr-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rr-chart__empty { position: absolute; inset: 0 0 28px 56px; display: flex; align-items: center; justify-content: center; color: var(--rr-ink-muted); }
+
+/* تلميح عائم واحد لكل الصفحة (بيتملا من .rr-chart__tip-src بالـ JS) */
+.rr-chart-tip { position: fixed; z-index: 1060; min-width: 180px; max-width: 280px; padding: var(--rr-space-3); background: var(--rr-surface); color: var(--rr-ink); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-md); box-shadow: var(--rr-shadow-popover); pointer-events: none; opacity: 0; transition: opacity .1s; }
+.rr-chart-tip.is-visible { opacity: 1; }
+:is(.rr-page, .rr-scope) .rr-chart-tip__title { display: block; margin-bottom: var(--rr-space-2); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-semibold); }
+.rr-chart-tip__row { display: flex; align-items: center; gap: var(--rr-space-2); }
+:is(.rr-page, .rr-scope) .rr-chart-tip__row { font-size: var(--rr-fs-xs) !important; line-height: 20px; }
+.rr-chart-tip__row > span:nth-child(2) { flex: 1; color: var(--rr-ink-muted); }
+.rr-chart-tip__row--total { margin-top: var(--rr-space-1); padding-top: var(--rr-space-1); border-top: 1px solid var(--rr-border); font-weight: var(--rr-fw-semibold); }
+
+/* شريط النسب الأفقي (100%) */
+.rr-split { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; background: var(--rr-surface-sunken); }
+.rr-split__seg { display: block; min-width: 2px; }
+
+/* المفتاح: علامة اللون + الاسم + القيمة + النسبة */
+.rr-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--rr-space-2); }
+.rr-legend--inline { flex-direction: row; flex-wrap: wrap; gap: var(--rr-space-2) var(--rr-space-4); }
+.rr-legend__item { display: flex; align-items: center; gap: var(--rr-space-2); min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-legend__item { font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); }
+.rr-legend__swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.rr-legend__label { flex: 1; min-width: 0; color: var(--rr-ink); }
+.rr-legend--inline .rr-legend__label { flex: none; color: var(--rr-ink-muted); }
+.rr-legend__value { color: var(--rr-ink); font-weight: var(--rr-fw-semibold); }
+:is(.rr-page, .rr-scope) .rr-legend__pct { min-width: 48px; text-align: end; font-size: var(--rr-fs-xs) !important; color: var(--rr-ink-muted); font-variant-numeric: tabular-nums; }
+
+/* لوحة تحليلية: رسم كبير + جانب */
+.rr-insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rr-space-3); margin-top: var(--rr-space-4); padding-top: var(--rr-space-4); border-top: 1px solid var(--rr-border); }
+:is(.rr-page, .rr-scope) .rr-insight dt { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); font-weight: var(--rr-fw-medium); }
+:is(.rr-page, .rr-scope) .rr-insight dd { margin: 2px 0 0; font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+
+/* مرشّحات سريعة للفترة: <nav class="rr-presets"><a class="rr-preset" aria-current="true">…</a></nav> */
+.rr-presets { display: flex; flex-wrap: wrap; gap: var(--rr-space-2); }
+:is(.rr-page, .rr-scope) .rr-preset { display: inline-flex; align-items: center; height: 30px; padding-inline: var(--rr-space-3); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-full); background: var(--rr-surface); color: var(--rr-ink); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); text-decoration: none; }
+:is(.rr-page, .rr-scope) .rr-preset:hover { background: var(--rr-surface-hover); color: var(--rr-ink); text-decoration: none; }
+:is(.rr-page, .rr-scope) .rr-preset[aria-current="true"] { background: var(--rr-brand-tint); border-color: var(--rr-brand); color: var(--rr-brand-tint-ink); }
+.rr-stat__swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
+/* نص بلون الحالة (نتيجة موجبة/سالبة) */
+:is(.rr-page, .rr-scope) .rr-text--success { color: var(--rr-success); }
+:is(.rr-page, .rr-scope) .rr-text--danger { color: var(--rr-danger); }
+/* فترات سريعة كسطر كامل تحت حقول التصفية */
+.rr-filter__presets { flex-basis: 100%; padding-top: var(--rr-space-3); border-top: 1px solid var(--rr-border); }
+
+/* ── 34. مراحل مختصرة لنموذج/مستند (3–4 خطوات من غير عرض أدنى كبير) ── */
+:is(.rr-page, .rr-scope) .rr-steps--compact { min-width: 520px; }
+
+/* ── 35. صفحات التقارير ── */
+/* شبكة كروت التقرير (2 عمود، عمود واحد في المساحات الضيقة) */
+.rr-report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rr-space-4); }
+@media (max-width: 900px) { .rr-report-grid { grid-template-columns: minmax(0, 1fr); } }
+.rr-report-grid > .rr-card { margin: 0; }
+/* ملاحظة صغيرة أسفل كارت */
+:is(.rr-page, .rr-scope) .rr-card__note { display: flex; align-items: flex-start; gap: var(--rr-space-2); margin: 0; padding: var(--rr-space-3) var(--rr-space-5); border-top: 1px solid var(--rr-border); color: var(--rr-ink-muted); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); }
+/* عنوان مجموعة أعمدة في رأس جدول (colspan) */
+.rr-th--group { text-align: center; border-bottom: 1px solid var(--rr-border); background: var(--rr-surface-sunken); }
+/* شرائح قيم أفقية (أعمار المديونية، التدفق المتوقع): <div class="rr-aging"><div class="rr-aging__bucket"><span class="rr-aging__label">…</span><span class="rr-money">…</span><div class="rr-progress">…</div></div></div> */
+.rr-aging { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--rr-border); border-top: 1px solid var(--rr-border); }
+.rr-aging__bucket { display: flex; flex-direction: column; gap: var(--rr-space-2); padding: var(--rr-space-4) var(--rr-space-5); background: var(--rr-surface); min-width: 0; }
+.rr-card--tint .rr-aging__bucket { background: transparent; }
+.rr-card--tint .rr-aging { background: transparent; gap: 0; }
+:is(.rr-page, .rr-scope) .rr-aging__label { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); font-weight: var(--rr-fw-medium); }
+/* قائمة تعريفية على عمودين */
+.rr-deflist--cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rr-deflist--cols .rr-deflist__item { border-inline-end: 1px solid var(--rr-border); }
+.rr-deflist--cols .rr-deflist__item:nth-child(2n) { border-inline-end: 0; }
+.rr-deflist--cols .rr-deflist__item:nth-last-child(-n+2) { border-bottom: 0; }
+@media (max-width: 700px) { .rr-deflist--cols { grid-template-columns: minmax(0, 1fr); } .rr-deflist--cols .rr-deflist__item { border-inline-end: 0; border-bottom: 1px solid var(--rr-border); } }
+/* حقائق صغيرة في رأس جدول: <dl class="rr-inline-facts"><div><dt>…</dt><dd>…</dd></div></dl> */
+.rr-inline-facts { display: flex; flex-wrap: wrap; gap: var(--rr-space-2) var(--rr-space-5); margin: 0; }
+.rr-inline-facts > div { display: flex; align-items: baseline; gap: var(--rr-space-2); }
+:is(.rr-page, .rr-scope) .rr-inline-facts dt { font-size: var(--rr-fs-xs) !important; color: var(--rr-ink-muted); font-weight: var(--rr-fw-medium); }
+:is(.rr-page, .rr-scope) .rr-inline-facts dd { margin: 0; font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+
+/* ── 36. الإعدادات ── */
+/* وصف تحت عنوان صف تنقل: <span class="rr-nav-row__label">عنوان<span class="rr-nav-row__desc">…</span></span> */
+.rr-settings-list { list-style: none; margin: 0; padding: 0; }
+.rr-settings-list .rr-nav-row { min-height: 72px; padding-block: var(--rr-space-3); }
+:is(.rr-page, .rr-scope) .rr-nav-row__desc { display: block; margin-top: 2px; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); }
+/* "من" إجمالي بجانب قيمة مؤشر: 12 / 17 */
+:is(.rr-page, .rr-scope) .rr-stat__of { font-size: var(--rr-fs-lg) !important; color: var(--rr-ink-muted); font-weight: var(--rr-fw-medium); }

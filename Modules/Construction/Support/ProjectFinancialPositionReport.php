@@ -29,7 +29,6 @@ class ProjectFinancialPositionReport
             ? (float) $contract->adjustments()->where('status', 'approved')->whereDate('adjustment_date', '<=', $toDate)->sum('total')
             : 0.0;
         $contractValue = (float) ($contract?->original_value ?? 0) + $approvedAdjustments;
-        $estimatedCost = (float) ($contract?->boqVersion?->estimated_cost_total ?? $project->approvedBoq?->estimated_cost_total ?? 0);
 
         $customerCertificatesQuery = ConstructionCustomerCertificate::query()
             ->where('business_id', $project->business_id)
@@ -167,9 +166,6 @@ class ProjectFinancialPositionReport
                 'original' => round((float) ($contract?->original_value ?? 0), 4),
                 'adjustments' => round($approvedAdjustments, 4),
                 'value' => round($contractValue, 4),
-                'estimated_cost' => round($estimatedCost, 4),
-                'budget_margin' => round($contractValue - $estimatedCost, 4),
-                'budget_margin_percent' => $contractValue > 0 ? round((($contractValue - $estimatedCost) / $contractValue) * 100, 2) : 0,
             ],
             'customer' => [
                 'approved_work' => round($approvedWork, 4),
@@ -182,8 +178,6 @@ class ProjectFinancialPositionReport
             ],
             'costs' => $costs + [
                 'actual' => $actualCost,
-                'variance_to_budget' => round($estimatedCost - $actualCost, 4),
-                'consumption_percent' => $estimatedCost > 0 ? round(($actualCost / $estimatedCost) * 100, 2) : 0,
             ],
             'result' => [
                 'current' => $currentResult,
@@ -208,8 +202,6 @@ class ProjectFinancialPositionReport
             'subcontractors' => $subcontractors,
             'warnings' => collect([
                 ! $contract ? __('construction::lang.financial_report_warning_no_contract') : null,
-                $estimatedCost <= 0 ? __('construction::lang.financial_report_warning_no_budget') : null,
-                $estimatedCost > 0 && $actualCost > $estimatedCost ? __('construction::lang.financial_report_warning_over_budget') : null,
                 $invoiced > $collected + 0.0001 ? __('construction::lang.financial_report_warning_receivables') : null,
             ])->filter()->values(),
         ];

@@ -9,8 +9,6 @@ use App\Unit;
 use App\User;
 use App\Variation;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
-use Modules\Construction\Entities\ConstructionBoqCostAllocation;
-use Modules\Construction\Entities\ConstructionCostCode;
 use Modules\Construction\Entities\ConstructionLaborSheet;
 use Modules\Construction\Entities\ConstructionMaterialDocument;
 use Modules\Construction\Entities\ConstructionProject;
@@ -42,20 +40,13 @@ class ConstructionBoqCostProfitabilityReportTest extends TestCase
         ]);
         $boq = $project->boqVersions()->create([
             'business_id' => $business->id, 'version_number' => 1, 'name' => 'Cost report BOQ', 'status' => 'approved',
-            'sales_total' => 2000, 'estimated_cost_total' => 1000, 'approved_by' => $user->id,
+            'sales_total' => 2000, 'approved_by' => $user->id,
             'approved_at' => now(), 'created_by' => $user->id,
         ]);
         $item = $boq->items()->create([
             'business_id' => $business->id, 'project_id' => $project->id, 'row_type' => 'item', 'code' => 'COST-01',
             'description' => 'Cost controlled item', 'unit' => 'unit', 'contract_quantity' => 1,
             'sales_unit_price' => 2000, 'sales_total' => 2000,
-        ]);
-        $costCode = ConstructionCostCode::create([
-            'business_id' => $business->id, 'code' => 'COST-'.uniqid(), 'name' => 'Estimated item cost', 'category' => 'material',
-        ]);
-        ConstructionBoqCostAllocation::create([
-            'business_id' => $business->id, 'project_id' => $project->id, 'boq_version_id' => $boq->id,
-            'boq_item_id' => $item->id, 'cost_code_id' => $costCode->id, 'estimated_cost' => 1000,
         ]);
 
         $material = ConstructionMaterialDocument::create([
@@ -112,16 +103,18 @@ class ConstructionBoqCostProfitabilityReportTest extends TestCase
 
         $report = app(BoqCostProfitabilityReport::class)->build($project, now()->toDateString());
         $row = $report['rows']->firstWhere('code', 'COST-01');
-        $this->assertEquals(1000, $row['estimated']['total']);
         $this->assertEquals(200, $row['actual']['materials']);
         $this->assertEquals(150, $row['actual']['labor']);
         $this->assertEquals(300, $row['actual']['subcontracts']);
         $this->assertEquals(100, $row['actual']['expenses']);
         $this->assertEquals(750, $row['actual']['total']);
-        $this->assertEquals(250, $row['variance']);
+        $this->assertEquals(1250, $row['sale_less_actual']);
+        $this->assertEquals(37.5, $row['cost_percent']);
+        $this->assertSame('healthy', $row['status']);
         $this->assertEquals(50, $report['unlinked']['expenses']);
         $this->assertEquals(800, $report['summary']['actual']);
-        $this->assertEquals(200, $report['summary']['remaining_budget']);
+        $this->assertSame(0, $report['summary']['loss_items']);
+        $this->assertArrayNotHasKey('estimated', $row);
         $this->assertEquals(1200, $report['summary']['sale_less_actual']);
 
         $params = ['project_id' => $project->id, 'to_date' => now()->toDateString()];

@@ -1,8 +1,63 @@
 @extends('construction::layouts.module')
 @section('title', __('construction::lang.edit_document'))
+
+@php
+    $req = '<span class="rr-field__req" aria-hidden="true">*</span>';
+    $fieldError = fn ($field) => $errors->has($field) ? 'rr-control--invalid' : '';
+@endphp
+
 @section('module_content')
-<section class="content ct-materials-page"><div class="ct-form-shell ct-form-shell--edit">
-    <div class="ct-form-shell__aside"><a href="{{ route('construction.materials.show', $document->id) }}" class="ct-back-link"><i class="fa fa-arrow-right"></i> {{ $document->number }}</a><span class="ct-form-icon is-amber"><i class="fas fa-pencil-alt"></i></span><h1>@lang('construction::lang.edit_document')</h1><p>@lang('construction::lang.edit_draft_hint')</p><div class="ct-locked-context"><div><small>@lang('construction::lang.project')</small><strong>{{ $document->project->code }} — {{ $document->project->name }}</strong></div><div><small>@lang('construction::lang.source_warehouse')</small><strong>{{ $document->location->name }}</strong></div><p><i class="fa fa-lock"></i> @lang('construction::lang.fixed_after_creation')</p></div></div>
-    <div class="ct-form-shell__main"><div class="ct-form-heading"><span>@lang('construction::lang.draft')</span><h2>@lang('construction::lang.document_identity')</h2><p>@lang('construction::lang.edit_document_identity_hint')</p></div><form method="POST" action="{{ route('construction.materials.update', $document->id) }}">@csrf @method('PUT')<div class="ct-form-grid"><div class="form-group"><label>@lang('construction::lang.document_number') <em>*</em></label><div class="ct-input-icon"><i class="fa fa-hashtag"></i><input name="number" value="{{ old('number', $document->number) }}" class="form-control" required maxlength="60"></div></div><div class="form-group"><label>@lang('construction::lang.document_date') <em>*</em></label><div class="ct-input-icon"><i class="fa fa-calendar"></i><input name="document_date" value="{{ old('document_date', @format_date($document->document_date)) }}" class="form-control ct-date-picker" readonly required></div></div><div class="form-group ct-form-grid__full"><label>@lang('construction::lang.notes')</label><textarea name="notes" class="form-control" rows="5" placeholder="@lang('construction::lang.document_notes_placeholder')">{{ old('notes', $document->notes) }}</textarea></div></div><div class="ct-form-footer"><a href="{{ route('construction.materials.show', $document->id) }}" class="btn btn-default">@lang('messages.cancel')</a><button class="btn ct-primary-action"><i class="fa fa-save"></i> @lang('construction::lang.save_changes')</button></div></form></div>
-</div></section>
+<main class="content rr-page rr-page--form" aria-labelledby="rr-material-form-title">
+    <header class="rr-head">
+        <span class="rr-chip rr-chip--lg rr-chip--info" aria-hidden="true">@include('construction::partials.rr_icon', ['name' => 'edit', 'size' => 24])</span>
+        <div class="rr-head__titles">
+            <nav aria-label="@lang('construction::lang.breadcrumb_nav')">
+                <ol class="rr-crumbs">
+                    <li><a href="{{ route('construction.materials.index') }}">@lang('construction::lang.material_documents')</a></li>
+                    <li><a href="{{ route('construction.materials.show', $document->id) }}" class="rr-num">{{ $document->number }}</a></li>
+                    <li><span aria-current="page">@lang('construction::lang.edit')</span></li>
+                </ol>
+            </nav>
+            <h1 id="rr-material-form-title" class="rr-head__title">@lang('construction::lang.edit_document')</h1>
+            <p class="rr-head__sub">@lang('construction::lang.edit_draft_hint')</p>
+        </div>
+    </header>
+
+    <form method="POST" class="rr-form" action="{{ route('construction.materials.update', $document->id) }}">
+        @csrf
+        @method('PUT')
+        @include('construction::labor.partials.form_errors')
+
+        <section class="rr-card" aria-labelledby="rr-material-identity">
+            <header class="rr-card__head">
+                <div class="rr-card__titles">
+                    <h2 id="rr-material-identity" class="rr-card__title">@lang('construction::lang.document_identity')</h2>
+                    <p class="rr-card__desc">@lang('construction::lang.edit_document_identity_hint')</p>
+                </div>
+                <span class="rr-badge rr-badge--warning"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.draft')</span>
+            </header>
+            <div class="rr-card__body">
+                <div class="rr-form-wrap">
+                    <div class="rr-form-grid">
+                        <div class="rr-field">
+                            <span class="rr-field__label">@lang('construction::lang.project')</span>
+                            <div class="rr-locked">@include('construction::partials.rr_icon', ['name' => 'lock', 'size' => 16])<span><span class="rr-code">{{ $document->project->code }}</span> — {{ $document->project->name }}</span></div>
+                        </div>
+                        <div class="rr-field">
+                            <span class="rr-field__label">@lang('construction::lang.source_warehouse')</span>
+                            <div class="rr-locked">@include('construction::partials.rr_icon', ['name' => 'lock', 'size' => 16])<span>{{ $document->location->name }}</span></div>
+                            <p class="rr-field__hint">@lang('construction::lang.fixed_after_creation')</p>
+                        </div>
+                        @include('construction::materials.partials.identity_fields', ['defaultNumber' => $document->number, 'notesRows' => 4])
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="rr-form-actions">
+            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'check'])<span>@lang('construction::lang.save_changes')</span></button>
+            <a href="{{ route('construction.materials.show', $document->id) }}" class="rr-btn rr-btn--secondary">@lang('messages.cancel')</a>
+        </footer>
+    </form>
+</main>
 @endsection

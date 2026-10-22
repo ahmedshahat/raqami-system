@@ -4,6 +4,8 @@ namespace Modules\Construction\Exports;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use Modules\Construction\Exports\Concerns\BindsTextSafely;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -12,7 +14,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class QuoteItemsWorkbookExport implements FromArray, WithColumnWidths, WithStyles, WithColumnFormatting, WithTitle
+class QuoteItemsWorkbookExport extends BindsTextSafely implements FromArray, WithCustomValueBinder, WithColumnWidths, WithStyles, WithColumnFormatting, WithTitle
 {
     public function __construct(private readonly Collection $items, private readonly string $sheetTitle = 'بنود عرض السعر')
     {

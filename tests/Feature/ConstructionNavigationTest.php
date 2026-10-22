@@ -58,7 +58,6 @@ class ConstructionNavigationTest extends TestCase
             route('construction.projects.contracts.create', $project->id),
             route('construction.projects.measurements.index', $project->id),
             route('construction.projects.certificates.index', $project->id),
-            route('construction.cost-codes.index'),
         ];
 
         foreach ($pages as $url) {

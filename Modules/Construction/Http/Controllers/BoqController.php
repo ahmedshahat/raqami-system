@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Unit;
-use Modules\Construction\Entities\ConstructionBoqCostAllocation;
 use Modules\Construction\Entities\ConstructionBoqItem;
 use Modules\Construction\Entities\ConstructionBoqVersion;
 use Modules\Construction\Entities\ConstructionProject;
@@ -72,7 +71,6 @@ class BoqController extends BaseController
         $version->load([
             'approvedBy:id,surname,first_name,last_name,username',
             'items' => fn ($query) => $query
-                ->with('allocations.costCode')
                 ->orderBy('sort_order')
                 ->orderBy('id'),
         ]);
@@ -224,59 +222,11 @@ class BoqController extends BaseController
 
         DB::transaction(function () use ($item, $version) {
             AuditTrail::record('project_item_deleted', $item, $item->project_id, $item->only(['code', 'description', 'unit_id', 'contract_quantity', 'sales_unit_price', 'sales_total', 'notes']), []);
-            $item->allocations()->delete();
             $item->delete();
             $version->refreshTotals();
         });
 
         return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.boq_item_deleted')]);
-    }
-
-    public function storeAllocation(Request $request, int $project, int $version, int $item)
-    {
-        $this->authorizePermission('construction.boq.manage');
-        $project = $this->findProject($project);
-        $version = $this->findVersion($project, $version);
-        $this->ensureEditable($project, $version);
-        $item = $version->items()->where('row_type', 'item')->findOrFail($item);
-        $validated = $request->validate([
-            'cost_code_id' => [
-                'required', 'integer',
-                Rule::exists('construction_cost_codes', 'id')->where(fn ($query) => $query
-                    ->where('business_id', $this->businessId())
-                    ->where('is_active', true)),
-            ],
-            'estimated_cost' => ['required', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
-
-        ConstructionBoqCostAllocation::updateOrCreate(
-            ['boq_item_id' => $item->id, 'cost_code_id' => $validated['cost_code_id']],
-            [
-                'business_id' => $this->businessId(),
-                'project_id' => $project->id,
-                'boq_version_id' => $version->id,
-                'estimated_cost' => $validated['estimated_cost'],
-                'notes' => $validated['notes'] ?? null,
-            ]
-        );
-        $version->refreshTotals();
-
-        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.cost_allocation_saved')]);
-    }
-
-    public function destroyAllocation(int $project, int $version, int $item, int $allocation)
-    {
-        $this->authorizePermission('construction.boq.manage');
-        $project = $this->findProject($project);
-        $version = $this->findVersion($project, $version);
-        $this->ensureEditable($project, $version);
-        $item = $version->items()->findOrFail($item);
-        $allocation = $item->allocations()->where('business_id', $this->businessId())->findOrFail($allocation);
-        $allocation->delete();
-        $version->refreshTotals();
-
-        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.cost_allocation_deleted')]);
     }
 
     public function approve(int $project, int $version)
@@ -301,6 +251,38 @@ class BoqController extends BaseController
         return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.boq_approved')]);
     }
 
+    public function destroyVersion(int $project, int $version)
+    {
+        $this->authorizePermission('construction.boq.manage');
+        $project = $this->findProject($project);
+        $version = $this->findVersion($project, $version);
+
+        $error = null;
+        if ($version->status !== 'draft') {
+            $error = __('construction::lang.only_draft_boq_version_can_be_deleted');
+        } elseif ($project->boqVersions()->where('id', '!=', $version->id)->doesntExist()) {
+            $error = __('construction::lang.cannot_delete_last_boq_version');
+        } elseif ($this->boqVersionIsReferenced($version)) {
+            $error = __('construction::lang.boq_version_in_use');
+        }
+
+        if ($error) {
+            return back()->with('status', ['success' => 0, 'msg' => $error]);
+        }
+
+        DB::transaction(function () use ($project, $version) {
+            AuditTrail::record('project_items_version_deleted', $version, $project->id, $version->only(['version_number', 'name', 'status', 'sales_total', 'notes']), []);
+            $version->items()->delete();
+            DB::table('construction_boq_import_batches')->where('boq_version_id', $version->id)->delete();
+            $version->delete();
+        });
+
+        $fallback = $project->boqVersions()->latest('version_number')->first();
+
+        return redirect()->route('construction.projects.boq.show', [$project->id, $fallback->id])
+            ->with('status', ['success' => 1, 'msg' => __('construction::lang.boq_version_deleted')]);
+    }
+
     public function revise(int $project, int $version)
     {
         $this->authorizePermission('construction.boq.manage');
@@ -309,7 +291,7 @@ class BoqController extends BaseController
         abort_if($source->status === 'draft', 422, __('construction::lang.draft_boq_cannot_be_revised'));
 
         $newVersion = DB::transaction(function () use ($project, $source) {
-            $source->load('items.allocations');
+            $source->load('items');
             $copy = $this->createVersion(
                 $project,
                 __('construction::lang.boq_revision_name', ['number' => $source->version_number + 1]),
@@ -335,17 +317,6 @@ class BoqController extends BaseController
                     'notes' => $item->notes,
                 ]);
                 $itemMap[$item->id] = $newItem->id;
-
-                foreach ($item->allocations as $allocation) {
-                    $newItem->allocations()->create([
-                        'business_id' => $this->businessId(),
-                        'project_id' => $project->id,
-                        'boq_version_id' => $copy->id,
-                        'cost_code_id' => $allocation->cost_code_id,
-                        'estimated_cost' => $allocation->estimated_cost,
-                        'notes' => $allocation->notes,
-                    ]);
-                }
             }
 
             $copy->refreshTotals();
@@ -392,6 +363,37 @@ class BoqController extends BaseController
             && ! $project->contracts()->whereIn('status', ['active', 'completed'])->exists()
             && ! $project->measurements()->where('status', 'approved')->exists()
             && ! $project->customerCertificates()->whereIn('status', ['approved', 'partially_approved', 'posted', 'paid'])->exists();
+    }
+
+    private function boqVersionIsReferenced(ConstructionBoqVersion $version): bool
+    {
+        if (DB::table('construction_contracts')->where('boq_version_id', $version->id)->exists()
+            || DB::table('construction_customer_certificates')->where('boq_version_id', $version->id)->exists()) {
+            return true;
+        }
+
+        $itemIds = $version->items()->pluck('id');
+        if ($itemIds->isEmpty()) {
+            return false;
+        }
+
+        foreach ([
+            'construction_contract_adjustments' => ['boq_item_id', 'original_boq_item_id'],
+            'construction_customer_certificate_items' => ['boq_item_id'],
+            'construction_labor_sheet_lines' => ['boq_item_id'],
+            'construction_material_document_lines' => ['boq_item_id'],
+            'construction_measurement_items' => ['boq_item_id'],
+            'construction_subcontract_items' => ['boq_item_id'],
+            'transactions' => ['construction_boq_item_id'],
+        ] as $table => $columns) {
+            foreach ($columns as $column) {
+                if (DB::table($table)->whereIn($column, $itemIds)->exists()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function ensureEditable(ConstructionProject $project, ConstructionBoqVersion $version): void

@@ -1,11 +1,113 @@
 @extends('construction::layouts.module')
 @section('title', __('construction::lang.create_material_return'))
+
+@php
+    $req = '<span class="rr-field__req" aria-hidden="true">*</span>';
+    $fieldError = fn ($field) => $errors->has($field) ? 'rr-control--invalid' : '';
+@endphp
+
 @section('module_content')
-<section class="content ct-materials-page">
-    <div class="ct-return-hero"><div><a href="{{ route('construction.materials.show', $issue->id) }}" class="ct-back-link"><i class="fa fa-arrow-right"></i> {{ $issue->number }}</a><span class="ct-form-icon is-cyan"><i class="fas fa-undo-alt"></i></span><h1>@lang('construction::lang.create_material_return')</h1><p>@lang('construction::lang.material_return_hint', ['number' => $issue->number])</p></div><div class="ct-return-source"><span>@lang('construction::lang.source_issue')</span><strong>{{ $issue->number }}</strong><small>{{ $issue->project->code }} — {{ $issue->project->name }}</small><small><i class="fa fa-warehouse"></i> {{ $issue->location->name }}</small></div></div>
-    <form method="POST" action="{{ route('construction.materials.returns.store', $issue->id) }}">@csrf
-        <div class="ct-material-panel"><div class="ct-panel-heading"><div><span>@lang('construction::lang.return_document_data')</span><h2>@lang('construction::lang.document_identity')</h2><p>@lang('construction::lang.return_document_data_hint')</p></div></div><div class="ct-return-form"><div class="form-group"><label>@lang('construction::lang.document_number') *</label><div class="ct-input-icon"><i class="fa fa-hashtag"></i><input name="number" value="{{ old('number', $nextNumber) }}" class="form-control" required></div></div><div class="form-group"><label>@lang('construction::lang.document_date') *</label><div class="ct-input-icon"><i class="fa fa-calendar"></i><input name="document_date" value="{{ old('document_date', @format_date(now())) }}" class="form-control ct-date-picker" readonly required></div></div><div class="form-group ct-return-notes"><label>@lang('construction::lang.notes')</label><input name="notes" value="{{ old('notes') }}" class="form-control" placeholder="@lang('construction::lang.document_notes_placeholder')"></div></div></div>
-        <div class="ct-material-panel ct-return-lines"><div class="ct-panel-heading"><div><span>@lang('construction::lang.return_quantities')</span><h2>@lang('construction::lang.select_return_quantities')</h2><p>@lang('construction::lang.select_return_quantities_hint')</p></div></div><div class="table-responsive"><table class="table ct-material-table"><thead><tr><th>@lang('construction::lang.material_product')</th><th>@lang('construction::lang.project_item')</th><th>@lang('construction::lang.issued_quantity')</th><th>@lang('construction::lang.previously_returned')</th><th>@lang('construction::lang.available_to_return')</th><th>@lang('construction::lang.return_quantity')</th></tr></thead><tbody>@foreach($issue->lines as $index => $line)@php($remaining = max(0, (float)$line->quantity - (float)($returned[$line->id] ?? 0)))<tr><td><strong>{{ $line->variation->full_name }}</strong><small class="ct-table-muted">{{ $line->product->unit?->short_name }}</small><input type="hidden" name="lines[{{ $index }}][id]" value="{{ $line->id }}"></td><td>{{ $line->boqItem ? $line->boqItem->code.' — '.$line->boqItem->description : __('construction::lang.general_project_material') }}</td><td>{{ @num_format($line->quantity) }}</td><td>{{ @num_format($returned[$line->id] ?? 0) }}</td><td><span class="ct-available-pill {{ $remaining <= 0 ? 'is-empty' : '' }}">{{ @num_format($remaining) }}</span></td><td><input name="lines[{{ $index }}][quantity]" value="{{ old('lines.'.$index.'.quantity', 0) }}" class="form-control input_number ct-quantity-input" @disabled($remaining <= 0)></td></tr>@endforeach</tbody></table></div><div class="ct-form-footer"><a href="{{ route('construction.materials.show', $issue->id) }}" class="btn btn-default">@lang('messages.cancel')</a><button class="btn ct-primary-action"><i class="fa fa-save"></i> @lang('construction::lang.save_return_draft')</button></div></div>
+<main class="content rr-page rr-page--form" aria-labelledby="rr-material-return-title">
+    <header class="rr-head">
+        <span class="rr-chip rr-chip--lg rr-chip--warning" aria-hidden="true">@include('construction::partials.rr_icon', ['name' => 'arrow-back', 'size' => 24])</span>
+        <div class="rr-head__titles">
+            <nav aria-label="@lang('construction::lang.breadcrumb_nav')">
+                <ol class="rr-crumbs">
+                    <li><a href="{{ route('construction.materials.index') }}">@lang('construction::lang.material_documents')</a></li>
+                    <li><a href="{{ route('construction.materials.show', $issue->id) }}" class="rr-num">{{ $issue->number }}</a></li>
+                    <li><span aria-current="page">@lang('construction::lang.create_material_return')</span></li>
+                </ol>
+            </nav>
+            <h1 id="rr-material-return-title" class="rr-head__title">@lang('construction::lang.create_material_return')</h1>
+            <p class="rr-head__sub">@lang('construction::lang.material_return_hint', ['number' => $issue->number])</p>
+        </div>
+    </header>
+
+    <div class="rr-callout rr-callout--info">
+        <span class="rr-callout__icon">@include('construction::partials.rr_icon', ['name' => 'folder-open', 'size' => 20])</span>
+        <div class="rr-callout__copy">
+            <strong>@lang('construction::lang.source_issue'): <a class="rr-code-link" href="{{ route('construction.materials.show', $issue->id) }}"><span class="rr-code">{{ $issue->number }}</span></a></strong>
+            <p>{{ $issue->project->code }} — {{ $issue->project->name }} · {{ $issue->location->name }}</p>
+        </div>
+    </div>
+
+    <form method="POST" class="rr-form" action="{{ route('construction.materials.returns.store', $issue->id) }}">
+        @csrf
+        @include('construction::labor.partials.form_errors')
+
+        <section class="rr-card" aria-labelledby="rr-return-identity">
+            <header class="rr-card__head">
+                <span class="rr-step-num" aria-hidden="true">1</span>
+                <div class="rr-card__titles">
+                    <h2 id="rr-return-identity" class="rr-card__title">@lang('construction::lang.return_document_data')</h2>
+                    <p class="rr-card__desc">@lang('construction::lang.return_document_data_hint')</p>
+                </div>
+            </header>
+            <div class="rr-card__body">
+                <div class="rr-form-wrap">
+                    <div class="rr-form-grid">
+                        @include('construction::materials.partials.identity_fields', ['document' => null, 'defaultNumber' => $nextNumber, 'notesRows' => 2])
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="rr-table-wrap" aria-labelledby="rr-return-lines">
+            <div class="rr-table-head">
+                <span class="rr-step-num" aria-hidden="true">2</span>
+                <div>
+                    <h2 id="rr-return-lines" class="rr-table-head__title">@lang('construction::lang.select_return_quantities')</h2>
+                    <p class="rr-table-head__sub">@lang('construction::lang.select_return_quantities_hint')</p>
+                </div>
+            </div>
+            <div class="rr-table-scroll">
+                <table class="rr-table">
+                    <caption class="rr-sr">@lang('construction::lang.return_quantities')</caption>
+                    <thead>
+                        <tr>
+                            <th class="rr-th rr-col--text" scope="col">@lang('construction::lang.material_product')</th>
+                            <th class="rr-th rr-col--text" scope="col">@lang('construction::lang.project_item')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.issued_quantity')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.previously_returned')</th>
+                            <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.available_to_return')</th>
+                            <th class="rr-th rr-th--num rr-th--focus" scope="col">@lang('construction::lang.return_quantity')</th>
+                        </tr>
+                    </thead>
+                    <tbody class="rr-tbody">
+                        @foreach($issue->lines as $index => $line)
+                            @php $remaining = max(0, (float) $line->quantity - (float) ($returned[$line->id] ?? 0)); @endphp
+                            <tr class="rr-tr {{ $remaining <= 0 ? 'rr-tr--muted' : '' }}">
+                                <td class="rr-td rr-td--wrap">
+                                    <span class="rr-entity__name">{{ $line->variation->full_name }}</span>
+                                    <div class="rr-td__sub">{{ $line->product->unit?->short_name }}</div>
+                                    <input type="hidden" name="lines[{{ $index }}][id]" value="{{ $line->id }}">
+                                </td>
+                                <td class="rr-td rr-td--wrap">
+                                    @if($line->boqItem)
+                                        <span class="rr-code">{{ $line->boqItem->code }}</span> {{ $line->boqItem->description }}
+                                    @else
+                                        <span class="rr-td--muted">@lang('construction::lang.general_project_material')</span>
+                                    @endif
+                                </td>
+                                <td class="rr-td rr-td--num"><span class="rr-num">{{ @num_format($line->quantity) }}</span></td>
+                                <td class="rr-td rr-td--num"><span class="rr-num">{{ @num_format($returned[$line->id] ?? 0) }}</span></td>
+                                <td class="rr-td rr-td--num"><span class="rr-badge rr-badge--{{ $remaining <= 0 ? 'neutral' : 'success' }}"><span class="rr-num">{{ @num_format($remaining) }}</span></span></td>
+                                <td class="rr-td rr-td--num rr-td--focus rr-td--input">
+                                    <div class="rr-control rr-control--sm {{ $errors->has('lines.' . $index . '.quantity') ? 'rr-control--invalid' : '' }}"><input name="lines[{{ $index }}][quantity]" value="{{ old('lines.' . $index . '.quantity', 0) }}" class="rr-control__input rr-control__input--num input_number" inputmode="decimal" aria-label="@lang('construction::lang.return_quantity'): {{ $line->variation->full_name }}" @disabled($remaining <= 0)></div>
+                                    @error('lines.' . $index . '.quantity')<small class="rr-field__error">{{ $message }}</small>@enderror
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer class="rr-form-actions">
+            <button class="rr-btn rr-btn--primary" type="submit">@include('construction::partials.rr_icon', ['name' => 'check'])<span>@lang('construction::lang.save_return_draft')</span></button>
+            <a href="{{ route('construction.materials.show', $issue->id) }}" class="rr-btn rr-btn--secondary">@lang('messages.cancel')</a>
+            <span class="rr-form-actions__note">@include('construction::partials.rr_icon', ['name' => 'info', 'size' => 16])@lang('construction::lang.stock_changes_after_approval')</span>
+        </footer>
     </form>
-</section>
+</main>
 @endsection

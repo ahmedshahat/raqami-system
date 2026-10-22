@@ -15,9 +15,6 @@
             <h1 id="rr-boq-workspace-title" class="rr-head__title">@lang('construction::lang.boq_workspace_title')</h1>
             <p class="rr-head__sub">@lang('construction::lang.boq_workspace_description')</p>
         </div>
-        <div class="rr-head__actions">
-            <a href="{{ route('construction.cost-codes.index') }}" class="rr-btn rr-btn--secondary">@include('construction::partials.rr_icon', ['name' => 'list'])@lang('construction::lang.manage_cost_codes')</a>
-        </div>
     </header>
 
     <section class="rr-table-wrap" id="ct-quick-list" aria-labelledby="rr-boq-projects-title">
