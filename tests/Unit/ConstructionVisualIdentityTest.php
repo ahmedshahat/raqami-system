@@ -11,7 +11,7 @@ class ConstructionVisualIdentityTest extends TestCase
         $root = dirname(__DIR__, 2);
         $dashboard = file_get_contents($root . '/public/modules/construction/css/dashboard.css');
         $refinement = file_get_contents($root . '/public/modules/construction/css/refinement.css');
-        $raqmi = file_get_contents($root . '/public/modules/construction/css/raqmi.css');
+        $raqmi = file_get_contents($root . '/public/css/raqmi.css');
         $quotePrint = file_get_contents($root . '/Modules/Construction/Resources/views/quotes/print.blade.php');
 
         $this->assertStringContainsString('--ct-brand-900: #102f63;', $dashboard);

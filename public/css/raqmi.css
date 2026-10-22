@@ -1,12 +1,13 @@
 /* ==========================================================================
-   رقمي للمقاولات — ملف التصميم المشترك لموديول المقاولات
+   رقمي — ملف التصميم المشترك للبرنامج (موديول المقاولات + الشاشات العامة)
    --------------------------------------------------------------------------
    الاستخدام:
-   1. الملف محمّل تلقائيًا من layouts/module.blade.php لكل شاشات الموديول.
+   1. الملف محمّل تلقائيًا من layouts/module.blade.php لكل شاشات موديول المقاولات،
+      والشاشات العامة (الرئيسية، الشيكات) بتحمّله بـ asset('css/raqmi.css') في @section('css').
    2. لفّ محتوى الشاشة في <main class="content rr-page"> — كل المتغيرات معرّفة
       على .rr-page، ولن تعمل المكوّنات خارجه. العناصر التي تقع خارج <main>
       (مثل النوافذ المنبثقة) تأخذ class="rr-scope" لتعمل بنفس النظام.
-   3. الأيقونات: @include('construction::partials.rr_icon', ['name' => '...'])
+   3. الأيقونات: @include('partials.rr.icon', ['name' => '...']) (أو construction::partials.rr_icon جوه الموديول)
       الترقيم:  @include('construction::partials.rr_pager', ['paginator' => $x, 'itemLabel' => '...'])
    4. الثيم العام يفرض font-family و font-size بـ !important على كل العناصر؛
       لذلك كل حجم خط هنا مكتوب بـ !important. اتبع نفس النمط في أي قاعدة جديدة.
@@ -1164,3 +1165,160 @@ nav.rr-tabs { overflow-y: hidden; }
 :is(.rr-page, .rr-scope) .rr-nav-row__desc { display: block; margin-top: 2px; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); }
 /* "من" إجمالي بجانب قيمة مؤشر: 12 / 17 */
 :is(.rr-page, .rr-scope) .rr-stat__of { font-size: var(--rr-fs-lg) !important; color: var(--rr-ink-muted); font-weight: var(--rr-fw-medium); }
+
+/* ==========================================================================
+   37. الرئيسية (Home dashboard)
+   بانر ترحيب ملوّن:
+   <section class="rr-hero"><div class="rr-hero__titles"><p class="rr-hero__eyebrow">…</p>
+     <h1 class="rr-hero__title">…</h1><p class="rr-hero__sub">…</p></div>
+     <div class="rr-hero__actions"><a class="rr-btn rr-btn--hero">…</a><a class="rr-btn rr-btn--on-hero">…</a></div></section>
+   كارت مؤشر بخط اتجاه (اللون من سلاسل الرسوم 1–5):
+   <article class="rr-kpi rr-kpi--1"><div class="rr-kpi__top"><span class="rr-kpi__icon">icon</span>
+     <span class="rr-kpi__label">…</span><span class="rr-delta rr-delta--good|bad">…</span></div>
+     <div class="rr-kpi__value">…</div><div class="rr-kpi__meta">…</div>
+     <svg class="rr-kpi__spark" viewBox="0 0 100 40" preserveAspectRatio="none"><path class="rr-kpi__area"/><path class="rr-kpi__line"/></svg></article>
+   أعمدة مجمّعة + خط: <figure class="rr-chart rr-chart--grouped"> … <div class="rr-chart__col">
+     <div class="rr-chart__group"><span class="rr-chart__bar rr-chart__seg--1" style="height: 40%"></span>…</div>
+     <span class="rr-chart__dot" style="bottom: 30%"></span></div> … <svg class="rr-chart__line">…</svg>
+   ترتيب بشريط: <ol class="rr-rank"><li class="rr-rank__row"><span class="rr-rank__n">1</span>
+     <span class="rr-rank__name">…</span><span class="rr-rank__value">…</span>
+     <div class="rr-rank__bar"><span style="width: 60%"></span></div></li></ol>
+   الخطوط (sparkline / خط الرسم) بتترسم من الشمال لليمين وبتتقلب تلقائيًا في RTL.
+   ========================================================================== */
+.rr-page, .rr-scope {
+    --rr-series-5: #7357D9;
+    --rr-hero-from: #22177A; --rr-hero-to: #4232C4;
+    --rr-on-hero: #FFFFFF; --rr-on-hero-muted: rgba(255, 255, 255, .8);
+}
+[data-theme="dark"] .rr-page, [data-theme="dark"] .rr-scope {
+    --rr-series-5: #8A70EE;
+    --rr-hero-from: #1C1750; --rr-hero-to: #2E2580;
+    --rr-on-hero: #EDEFF4; --rr-on-hero-muted: #C4C0EA;
+}
+.rr-chart__seg--5 { background: var(--rr-series-5); }
+
+/* البانر */
+.rr-hero { position: relative; overflow: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-5); margin-top: var(--rr-space-6); padding: var(--rr-space-6) var(--rr-space-8); border-radius: var(--rr-radius-xl); background: linear-gradient(120deg, var(--rr-hero-from) 0%, var(--rr-hero-to) 100%); color: var(--rr-on-hero); box-shadow: var(--rr-shadow-card); }
+.rr-hero::before, .rr-hero::after { content: ""; position: absolute; border-radius: 50%; pointer-events: none; }
+.rr-hero::before { width: 340px; height: 340px; inset-inline-end: -90px; top: -170px; background: radial-gradient(circle, rgba(255, 255, 255, .16), transparent 70%); }
+.rr-hero::after { width: 220px; height: 220px; inset-inline-end: 22%; bottom: -150px; background: radial-gradient(circle, rgba(255, 255, 255, .1), transparent 70%); }
+.rr-hero__titles { position: relative; z-index: 1; flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: var(--rr-space-1); }
+:is(.rr-page, .rr-scope) .rr-hero__eyebrow { display: inline-flex; align-items: center; gap: var(--rr-space-2); font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); font-weight: var(--rr-fw-medium); color: var(--rr-on-hero-muted); }
+:is(.rr-page, .rr-scope) .rr-hero__title { font-size: var(--rr-fs-2xl) !important; line-height: 36px; font-weight: var(--rr-fw-bold); color: var(--rr-on-hero); }
+:is(.rr-page, .rr-scope) .rr-hero__sub { font-size: var(--rr-fs-md) !important; line-height: var(--rr-lh-md); color: var(--rr-on-hero-muted); }
+.rr-hero__actions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: var(--rr-space-2); }
+:is(.rr-page, .rr-scope) .rr-btn--hero, :is(.rr-page, .rr-scope) .rr-btn--hero:focus { background: var(--rr-on-hero); color: var(--rr-hero-from); }
+:is(.rr-page, .rr-scope) .rr-btn--hero:hover { background: var(--rr-on-hero); color: var(--rr-hero-to); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+:is(.rr-page, .rr-scope) .rr-btn--on-hero, :is(.rr-page, .rr-scope) .rr-btn--on-hero:focus { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .3); color: var(--rr-on-hero); }
+:is(.rr-page, .rr-scope) .rr-btn--on-hero:hover { background: rgba(255, 255, 255, .22); color: var(--rr-on-hero); }
+:is(.rr-page, .rr-scope) :is(.rr-btn--hero, .rr-btn--on-hero):focus-visible { outline-color: var(--rr-on-hero); }
+
+/* شريط الفترة والفرع */
+.rr-period { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-3); padding: var(--rr-space-3) var(--rr-space-4); background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); box-shadow: var(--rr-shadow-card); }
+.rr-period .rr-presets { flex: 1 1 auto; }
+:is(.rr-page, .rr-scope) button.rr-preset { font-family: inherit; cursor: pointer; }
+.rr-period__custom { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-2); }
+.rr-period__custom .rr-control { width: 150px; height: var(--rr-control-sm); }
+.rr-period .rr-control--location { width: 200px; height: var(--rr-control-sm); }
+:is(.rr-page, .rr-scope) .rr-period .rr-control__input { font-size: var(--rr-fs-sm) !important; }
+:is(.rr-page, .rr-scope) .rr-period__range { flex-basis: 100%; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+
+/* كروت المؤشرات */
+.rr-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--rr-space-4); }
+@media (max-width: 1100px) { .rr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .rr-kpis { grid-template-columns: minmax(0, 1fr); } }
+.rr-kpi { --rr-kpi: var(--rr-series-1); position: relative; display: flex; flex-direction: column; gap: var(--rr-space-2); min-width: 0; padding: var(--rr-space-5) var(--rr-space-5) 0; background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); box-shadow: var(--rr-shadow-card); overflow: hidden; }
+.rr-kpi::before { content: ""; position: absolute; inset-inline: 0; top: 0; height: 3px; background: var(--rr-kpi); }
+.rr-kpi--1 { --rr-kpi: var(--rr-series-1); }
+.rr-kpi--2 { --rr-kpi: var(--rr-series-2); }
+.rr-kpi--3 { --rr-kpi: var(--rr-series-3); }
+.rr-kpi--4 { --rr-kpi: var(--rr-series-4); }
+.rr-kpi--5 { --rr-kpi: var(--rr-series-5); }
+.rr-kpi__top { display: flex; align-items: center; gap: var(--rr-space-3); }
+.rr-kpi__icon { width: 38px; height: 38px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-md); background: color-mix(in srgb, var(--rr-kpi) 14%, var(--rr-surface)); color: var(--rr-kpi); }
+:is(.rr-page, .rr-scope) .rr-kpi__label { flex: 1; min-width: 0; font-size: var(--rr-fs-sm) !important; line-height: 20px; font-weight: var(--rr-fw-semibold); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-kpi__value { margin-top: var(--rr-space-1); font-size: 26px !important; line-height: 34px; font-weight: var(--rr-fw-bold); color: var(--rr-ink); }
+:is(.rr-page, .rr-scope) .rr-kpi__meta { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+.rr-kpi__spark { display: block; width: calc(100% + 2 * var(--rr-space-5)); height: 56px; margin: var(--rr-space-2) calc(-1 * var(--rr-space-5)) 0; color: var(--rr-kpi); overflow: visible; }
+[dir="rtl"] .rr-kpi__spark, [dir="rtl"] .rr-chart__line { transform: scaleX(-1); }
+.rr-kpi__area { fill: currentColor; opacity: .14; stroke: none; }
+.rr-kpi__line { fill: none; stroke: currentColor; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+
+/* نسبة التغيّر عن الفترة السابقة */
+.rr-delta { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding-inline: var(--rr-space-2); border-radius: var(--rr-radius-full); background: var(--rr-neutral-tint); color: var(--rr-ink-muted); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-semibold); white-space: nowrap; }
+.rr-delta--good { background: var(--rr-success-tint); color: var(--rr-success); }
+.rr-delta--bad { background: var(--rr-danger-tint); color: var(--rr-danger); }
+
+/* مؤشرات ثانوية في 4 أعمدة */
+.rr-stat-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .rr-stat-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .rr-stat-grid--4 { grid-template-columns: minmax(0, 1fr); } }
+
+/* أعمدة مجمّعة (مش مكدّسة) + خط فوقها */
+.rr-chart--grouped .rr-chart__cols { gap: 0; }
+.rr-chart--grouped .rr-chart__plot { height: 280px; }
+/* الأعمدة كتير ورفيعة، فالتسمية (اللي بتظهر كل كام عمود) تاخد عرض أكبر من العمود */
+.rr-chart--grouped .rr-chart__x { inset-inline: -32px; overflow: visible; }
+.rr-chart__group { width: min(48px, 78%); height: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+.rr-chart__bar { display: block; flex: 1 1 0; max-width: 14px; border-radius: 3px 3px 0 0; transition: filter .12s; }
+.rr-chart__col:hover .rr-chart__bar { filter: brightness(1.08); }
+.rr-chart__line { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; color: var(--rr-series-3); }
+.rr-chart__line polyline { fill: none; stroke: currentColor; stroke-width: 2.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.rr-chart__dot { position: absolute; z-index: 1; left: 50%; width: 9px; height: 9px; margin-bottom: -4px; transform: translateX(-50%); border-radius: 50%; background: var(--rr-surface); border: 2px solid var(--rr-series-3); pointer-events: none; }
+.rr-legend__swatch--line { width: 14px; height: 3px; border-radius: 2px; }
+
+/* ترتيب بشريط (أعلى المنتجات/العملاء) */
+:is(.rr-page, .rr-scope) .rr-rank { list-style: none; margin: 0; padding: var(--rr-space-2) 0; }
+.rr-rank__row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: var(--rr-space-1) var(--rr-space-3); padding: var(--rr-space-2) var(--rr-space-5); }
+:is(.rr-page, .rr-scope) .rr-rank__n { grid-row: span 3; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--rr-radius-full); background: var(--rr-surface-sunken); color: var(--rr-ink-muted); font-weight: var(--rr-fw-bold); font-size: var(--rr-fs-xs) !important; }
+.rr-rank__row:first-child .rr-rank__n { background: var(--rr-series-1); color: #FFFFFF; }
+.rr-rank__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+:is(.rr-page, .rr-scope) .rr-rank__value { font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+.rr-rank__bar { grid-column: 2 / -1; height: 6px; border-radius: var(--rr-radius-full); background: var(--rr-surface-sunken); overflow: hidden; }
+.rr-rank__bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--rr-series-1), var(--rr-series-5)); }
+:is(.rr-page, .rr-scope) .rr-rank__sub { grid-column: 2 / -1; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+
+/* صف قائمة كرابط (محتاج انتباهك) */
+:is(.rr-page, .rr-scope) a.rr-list__row { color: inherit; text-decoration: none; transition: background-color .12s; }
+:is(.rr-page, .rr-scope) a.rr-list__row:hover { background: var(--rr-surface-hover); }
+:is(.rr-page, .rr-scope) a.rr-list__row:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: -2px; }
+:is(.rr-page, .rr-scope) .rr-list__count { font-size: var(--rr-fs-xl) !important; line-height: var(--rr-lh-xl); font-weight: var(--rr-fw-bold); color: var(--rr-ink); }
+.rr-list__row--clear .rr-list__count { color: var(--rr-ink-subtle); }
+.rr-list__go { flex: none; color: var(--rr-ink-subtle); }
+
+/* شريط نسب أطول للوحات */
+.rr-split--lg { height: 18px; border-radius: var(--rr-radius-md); }
+
+/* ألوان شرائح أعمار المديونية (من "لسه مااستحقش" للأقدم): rr-age--1 … rr-age--5 */
+.rr-age--1 { background: var(--rr-series-3); }
+.rr-age--2 { background: var(--rr-series-1); }
+.rr-age--3 { background: var(--rr-series-4); }
+.rr-age--4 { background: var(--rr-series-2); }
+.rr-age--5 { background: var(--rr-danger-solid); }
+:is(.rr-page, .rr-scope) .rr-legend__count { font-size: var(--rr-fs-xs) !important; color: var(--rr-ink-muted); white-space: nowrap; }
+
+/* خريطة حرارة (يوم × ساعة):
+   <div class="rr-heat-scroll"><div class="rr-heat" style="--rr-hours: 12">
+     <span></span><span class="rr-heat__hour">…</span>…            ← صف الساعات
+     <span class="rr-heat__day">…</span><div class="rr-heat__cell" style="--rr-heat: 40" data-rr-tip>…</div>…
+   </div></div>  — --rr-heat من 0 لـ 100 (شدة اللون) */
+.rr-heat-scroll { overflow-x: auto; padding: var(--rr-space-4) var(--rr-space-5); }
+.rr-heat { display: grid; grid-template-columns: 72px repeat(var(--rr-hours, 24), minmax(22px, 1fr)); gap: 3px; min-width: calc(72px + var(--rr-hours, 24) * 25px); }
+:is(.rr-page, .rr-scope) .rr-heat__hour { text-align: center; font-size: 11px !important; line-height: 16px; color: var(--rr-ink-muted); font-variant-numeric: tabular-nums; }
+:is(.rr-page, .rr-scope) .rr-heat__day { display: flex; align-items: center; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-medium); color: var(--rr-ink-muted); white-space: nowrap; }
+.rr-heat__cell { height: 28px; border-radius: 4px; background: color-mix(in srgb, var(--rr-series-1) calc(var(--rr-heat, 0) * 1%), var(--rr-surface-sunken)); outline: none; cursor: default; transition: transform .1s; }
+.rr-heat__cell:hover, .rr-heat__cell:focus-visible { transform: scale(1.12); box-shadow: 0 0 0 2px var(--rr-surface), 0 0 0 3px var(--rr-series-1); }
+.rr-heat-scale { display: flex; align-items: center; gap: var(--rr-space-2); font-size: var(--rr-fs-xs) !important; color: var(--rr-ink-muted); }
+.rr-heat-scale__bar { width: 96px; height: 8px; border-radius: var(--rr-radius-full); background: linear-gradient(to left, var(--rr-series-1), var(--rr-surface-sunken)); }
+[dir="ltr"] .rr-heat-scale__bar { background: linear-gradient(to right, var(--rr-surface-sunken), var(--rr-series-1)); }
+
+/* مؤشرات صغيرة داخل كارت (ويدجتات الموديولات):
+   <div class="rr-minis"><div class="rr-mini"><span class="rr-mini__label">…</span><span class="rr-mini__value rr-mini__value--danger">…</span></div></div> */
+.rr-minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1px; background: var(--rr-border); border-bottom-left-radius: var(--rr-radius-lg); border-bottom-right-radius: var(--rr-radius-lg); overflow: hidden; }
+.rr-mini { display: flex; flex-direction: column; gap: 2px; padding: var(--rr-space-3) var(--rr-space-5); background: var(--rr-surface); min-width: 0; }
+:is(.rr-page, .rr-scope) .rr-mini__label { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-mini__value { font-size: var(--rr-fs-xl) !important; line-height: var(--rr-lh-xl); font-weight: var(--rr-fw-bold); color: var(--rr-ink); }
+.rr-mini__value--success { color: var(--rr-success); }
+.rr-mini__value--warning { color: var(--rr-warning); }
+.rr-mini__value--danger { color: var(--rr-danger); }
+.rr-mini__value--info { color: var(--rr-info); }

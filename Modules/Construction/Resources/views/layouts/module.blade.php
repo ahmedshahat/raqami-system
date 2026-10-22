@@ -5,7 +5,7 @@
     @yield('module_css')
     <link rel="stylesheet" href="{{ asset('modules/construction/css/refinement.css?v=' . config('construction.module_version')) }}">
     {{-- نظام التصميم المشترك للموديول (متغيرات + مكوّنات rr-*) — انظر CLAUDE.md --}}
-    <link rel="stylesheet" href="{{ asset('modules/construction/css/raqmi.css?v=' . config('construction.module_version')) }}">
+    <link rel="stylesheet" href="{{ asset('css/raqmi.css?v=' . config('construction.module_version')) }}">
     @stack('ct_quick_css')
 @endsection
 

@@ -4740,6 +4740,21 @@ class TransactionUtil extends Util
 
     public function getGrossProfit($business_id, $start_date = null, $end_date = null, $location_id = null, $user_id = null, $permitted_locations)
     {
+        $gross_profit_obj = $this->grossProfitQuery($business_id, $start_date, $end_date, $location_id, $user_id, $permitted_locations)->first();
+
+        $gross_profit = ! empty($gross_profit_obj->gross_profit) ? $gross_profit_obj->gross_profit : 0;
+
+        //KNOWS ISSUE: If products are returned then also the discount gets applied for it.
+
+        return $gross_profit;
+    }
+
+    /**
+     * Builds the gross profit query used by getGrossProfit(); callers can add
+     * a select + groupBy on sale columns to get gross profit per day/month.
+     */
+    public function grossProfitQuery($business_id, $start_date = null, $end_date = null, $location_id = null, $user_id = null, $permitted_locations = null)
+    {
         $query = TransactionSellLine::join('transactions as sale', 'transaction_sell_lines.transaction_id', '=', 'sale.id')
             ->leftjoin('transaction_sell_lines_purchase_lines as TSPL', 'transaction_sell_lines.id', '=', 'TSPL.sell_line_id')
             ->leftjoin(
@@ -4788,13 +4803,7 @@ class TransactionUtil extends Util
             $query->where('sale.created_by', $user_id);
         }
 
-        $gross_profit_obj = $query->first();
-
-        $gross_profit = ! empty($gross_profit_obj->gross_profit) ? $gross_profit_obj->gross_profit : 0;
-
-        //KNOWS ISSUE: If products are returned then also the discount gets applied for it.
-
-        return $gross_profit;
+        return $query;
     }
 
     /**
