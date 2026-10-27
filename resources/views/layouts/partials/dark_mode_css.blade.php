@@ -378,7 +378,8 @@ body.theme-dark .modal-footer {
     border-color: var(--dark-border) !important;
 }
 
-body.theme-dark a:not(.btn):not([class*="tw-text-white"]) {
+/* شاشات نظام رقمي (rr-page / rr-scope) ليها ألوان روابطها من raqmi.css، فمش بتاخد اللون ده */
+body.theme-dark a:not(.btn):not([class*="tw-text-white"]):not(.rr-page a):not(.rr-scope a) {
     color: #7dd3fc;
 }
 

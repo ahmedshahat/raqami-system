@@ -2,9 +2,11 @@
      <div class="row">
         <div class="col-sm-4">
             <div class="form-group">
-                {!! Form::label('theme_color', __('lang_v1.theme_color')); !!}
-                {!! Form::select('theme_color', $theme_colors,   $business->theme_color, 
-                    ['class' => 'form-control select2', 'placeholder' => __('messages.please_select'), 'style' => 'width: 100%;']); !!}
+                {!! Form::label('theme_color', __('lang_v1.appearance')); !!}
+                {{-- فاتح أو غامق بس؛ ألوان الثيم القديمة (purple, green, …) بتظهر هنا "فاتح" --}}
+                {!! Form::select('theme_color', $theme_colors, $business->theme_color == 'dark' ? 'dark' : 'primary',
+                    ['class' => 'form-control select2', 'style' => 'width: 100%;']); !!}
+                <p class="help-block">@lang('lang_v1.appearance_help')</p>
             </div>
         </div>
         <div class="col-sm-4">

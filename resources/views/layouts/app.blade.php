@@ -36,6 +36,8 @@
     @include('layouts.partials.extracss')
 
     <link rel="stylesheet" href="{{ asset('css/saudi-riyal-symbol.css') }}">
+    {{-- نظام التصميم "رقمي": كل قواعده محصورة في rr-page / rr-scope، فتحميله لكل الصفحات آمن (الشريط العلوي بيستخدمه) --}}
+    <link rel="stylesheet" href="{{ asset('css/raqmi.css?v=' . $asset_v) }}">
     @yield('css')
 
     @if($is_dark_mode)

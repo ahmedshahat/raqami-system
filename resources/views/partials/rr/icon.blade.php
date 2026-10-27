@@ -25,6 +25,7 @@
     @case('trash')<path d="M4 7h16M10 11v6M14 11v6"></path><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"></path>@break
     @case('search')<circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path>@break
     @case('chevron-down')<path d="M6 9l6 6 6-6"></path>@break
+    @case('chevron-up')<path d="M6 15l6-6 6 6"></path>@break
     @case('chevron-back')<path d="M15 6l-6 6 6 6"></path>@break
     @case('more')<circle cx="5" cy="12" r="1.3" fill="currentColor"></circle><circle cx="12" cy="12" r="1.3" fill="currentColor"></circle><circle cx="19" cy="12" r="1.3" fill="currentColor"></circle>@break
     @case('user')<circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path>@break
@@ -49,6 +50,7 @@
     @case('arrow-up')<path d="M12 19V5M6 11l6-6 6 6"></path>@break
     @case('arrow-down')<path d="M12 5v14M6 13l6 6 6-6"></path>@break
     @case('monitor')<rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path>@break
+    @case('sliders')<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle>@break
     @case('sun')<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>@break
 @endswitch
 </svg>

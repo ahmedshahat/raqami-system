@@ -143,7 +143,9 @@ class ConstructionModuleFoundationTest extends TestCase
         // شاشة النظرة العامة ليها هيدر نظام التصميم الخاص بيها، والهيدر القديم للمسار القديم بس
         $this->assertStringContainsString("@if(request()->routeIs('construction.dashboard'))", $layout);
         $this->assertStringNotContainsString("request()->routeIs('construction.overview.*')", $layout);
-        $this->assertStringContainsString('css/raqmi.css', $layout);
+        // نظام التصميم محمّل لكل البرنامج من الـ layout العام اللي الموديول بيورثه
+        $this->assertStringContainsString("@extends('layouts.app')", $layout);
+        $this->assertStringContainsString('css/raqmi.css', file_get_contents(resource_path('views/layouts/app.blade.php')));
         $this->assertStringContainsString('Two-line screen headers', $refinementCss);
         $this->assertStringContainsString('Single-title card headers', $refinementCss);
         $this->assertStringContainsString('.ct-aging-panel>header>div>span:first-child', $refinementCss);

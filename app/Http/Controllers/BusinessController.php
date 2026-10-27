@@ -62,21 +62,11 @@ class BusinessController extends Controller
         $this->moduleUtil = $moduleUtil;
         $this->babelWhatsApp = $babelWhatsApp;
 
+        // المظهر: فاتح أو غامق بس. الهيدر والقائمة الجانبية بقوا بنظام رقمي الثابت، فألوان الثيم القديمة
+        // (purple, green, …) مابقاش ليها تأثير؛ أي قيمة غير dark بتتعامل كفاتح (القيمة متخزنة في theme_color)
         $this->theme_colors = [
-            'primary' => 'Blue',
-            'dark' => 'Dark Mode - الوضع الداكن',
-            // 'black' => 'Black',
-            'purple' => 'Purple',
-            'green' => 'Green',
-            'red' => 'Red',
-            'yellow' => 'Yellow',
-            'orange' => 'Orange',
-            'sky' => 'Sky',
-            // 'blue-light' => 'Blue Light',
-            // 'black-light' => 'Black Light',
-            // 'purple-light' => 'Purple Light',
-            // 'green-light' => 'Green Light',
-            // 'red-light' => 'Red Light',
+            'primary' => 'lang_v1.appearance_light',
+            'dark' => 'lang_v1.appearance_dark',
         ];
 
         $this->mailDrivers = [
@@ -396,7 +386,7 @@ class BusinessController extends Controller
 
         $modules = $this->moduleUtil->availableModules();
 
-        $theme_colors = $this->theme_colors;
+        $theme_colors = array_map(fn ($label) => __($label), $this->theme_colors);
 
         $mail_drivers = $this->mailDrivers;
 

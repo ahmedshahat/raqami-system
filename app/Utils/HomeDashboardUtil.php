@@ -20,6 +20,23 @@ use Illuminate\Support\Facades\Schema;
  */
 class HomeDashboardUtil
 {
+    /**
+     * Dashboard sections by zone, in their default order. Users can hide
+     * sections and reorder them inside their zone (users.dashboard_layout).
+     */
+    public const SECTIONS = [
+        'top' => ['kpis', 'secondary'],
+        'main' => ['chart', 'attention'],
+        'cards' => ['top_products', 'aging', 'payment_methods', 'forecast'],
+        'bottom' => ['heatmap', 'modules'],
+    ];
+
+    /** Main-zone sections that take twice the width of the others in their row. */
+    public const WIDE_SECTIONS = ['chart'];
+
+    /** The cards zone has this many columns; extra cards stack in the last one. */
+    public const CARD_COLUMNS = 3;
+
     protected $transactionUtil;
 
     protected $productUtil;
@@ -119,7 +136,7 @@ class HomeDashboardUtil
             }
         } else {
             while ($cursor->lte($end)) {
-                $buckets[$cursor->toDateString()] = ['short' => $cursor->translatedFormat('j M'), 'full' => $cursor->translatedFormat('l j F Y')];
+                $buckets[$cursor->toDateString()] = ['short' => $cursor->translatedFormat('j'), 'full' => $cursor->translatedFormat('l j F Y')];
                 $cursor->addDay();
             }
         }
@@ -504,6 +521,66 @@ class HomeDashboardUtil
         }
 
         return $widgets;
+    }
+
+    /**
+     * The user's saved layout merged with the defaults: every zone lists all of
+     * its sections (saved order first, new sections appended) plus the hidden keys.
+     */
+    public function userLayout($user)
+    {
+        $saved = json_decode((string) $user->dashboard_layout, true) ?: [];
+        $order = [];
+        foreach (self::SECTIONS as $zone => $defaults) {
+            $keys = array_values(array_intersect((array) ($saved['order'][$zone] ?? []), $defaults));
+            $order[$zone] = array_values(array_unique(array_merge($keys, $defaults)));
+        }
+        $hidden = array_values(array_intersect((array) ($saved['hidden'] ?? []), array_merge(...array_values(self::SECTIONS))));
+
+        return ['order' => $order, 'hidden' => $hidden];
+    }
+
+    /**
+     * Saves the order per zone and the visible sections; null resets to the default layout.
+     */
+    public function saveUserLayout($user, ?array $order, array $visible = [])
+    {
+        if ($order === null) {
+            $user->dashboard_layout = null;
+        } else {
+            $layout = ['order' => [], 'hidden' => []];
+            foreach (self::SECTIONS as $zone => $defaults) {
+                $layout['order'][$zone] = array_values(array_intersect((array) ($order[$zone] ?? []), $defaults));
+                // بس الأقسام اللي كانت في النافذة؛ قسم مش متاح لليوزر دلوقتي مايتسجلش مخفي
+                $layout['hidden'] = array_merge($layout['hidden'], array_values(array_diff($layout['order'][$zone], $visible)));
+            }
+            $user->dashboard_layout = json_encode($layout);
+        }
+        $user->save();
+    }
+
+    /**
+     * Sections to render per zone: visible and available to this user, in the
+     * user's order. The cards zone comes back as columns: one card per column,
+     * and the cards beyond CARD_COLUMNS stacked in the last column.
+     */
+    public function renderLayout(array $layout, array $available)
+    {
+        $out = [];
+        foreach ($layout['order'] as $zone => $keys) {
+            $out[$zone] = array_values(array_filter($keys, function ($key) use ($layout, $available) {
+                return ! empty($available[$key]) && ! in_array($key, $layout['hidden']);
+            }));
+        }
+
+        $columns = array_map(fn ($key) => [$key], array_slice($out['cards'], 0, self::CARD_COLUMNS - 1));
+        $rest = array_slice($out['cards'], self::CARD_COLUMNS - 1);
+        if (! empty($rest)) {
+            $columns[] = $rest;
+        }
+        $out['cards'] = $columns;
+
+        return $out;
     }
 
     protected function bucketFormat($bucket)
