@@ -61,6 +61,16 @@
 
         {{-- النهاية: الإشعارات والأدوات والأزرار --}}
         <div class="rr-appbar__end header-actions">
+            {{-- مظهر اليوزر نفسه بس (users.theme_mode)؛ مابيغيّرش إعداد النشاط لباقي المستخدمين --}}
+            @php $rrNextTheme = ! empty($is_dark_mode) ? 'light' : 'dark'; @endphp
+            <form method="POST" action="{{ route('user.theme-mode') }}" class="rr-appbar__theme">
+                @csrf
+                <input type="hidden" name="mode" value="{{ $rrNextTheme }}">
+                <button type="submit" class="rr-btn rr-btn--secondary rr-btn--icon" title="@lang('lang_v1.switch_to_' . $rrNextTheme)" aria-label="@lang('lang_v1.switch_to_' . $rrNextTheme)">
+                    @include('partials.rr.icon', ['name' => $rrNextTheme == 'dark' ? 'moon' : 'sun'])
+                </button>
+            </form>
+
             @include('layouts.partials.header-notifications')
 
             <details class="rr-appbar__menu">

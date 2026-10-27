@@ -1205,6 +1205,13 @@ nav.rr-tabs { overflow-y: hidden; }
 :is(.rr-page, .rr-scope) .rr-period__range { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--rr-space-2); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
 :is(.rr-page, .rr-scope) .rr-period__range a { color: var(--rr-link); }
 :is(.rr-page, .rr-scope) .rr-period__range a:hover { text-decoration: underline; }
+/* فورم في سطر واحد + زرار شكله رابط (للإجراءات اللي لازم تبقى POST) */
+.rr-inline-form { display: inline; margin: 0; }
+:is(.rr-page, .rr-scope) .rr-linkbtn { padding: 0; border: 0; background: none; color: var(--rr-link); font: inherit; cursor: pointer; }
+:is(.rr-page, .rr-scope) .rr-linkbtn:hover { text-decoration: underline; }
+:is(.rr-page, .rr-scope) .rr-linkbtn:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: 2px; border-radius: var(--rr-radius-sm); }
+/* شريط فوق الرئيسية القديمة: "فيه واجهة جديدة" + زرار الرجوع لها */
+.rr-classic-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--rr-space-3); padding: var(--rr-space-3) var(--rr-space-6); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); border-bottom: 1px solid var(--rr-border); font-weight: var(--rr-fw-medium); }
 
 /* زرار اختيار (فترة، فلتر): <button class="rr-chip-btn" aria-pressed="true|false"> */
 :is(.rr-page, .rr-scope) .rr-chip-btn { height: var(--rr-control-md); padding-inline: var(--rr-space-4); border-radius: var(--rr-radius-md); border: 1px solid var(--rr-border-control); background: var(--rr-surface); color: var(--rr-ink); font-family: inherit; font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); cursor: pointer; white-space: nowrap; }
@@ -1406,6 +1413,7 @@ nav.rr-tabs { overflow-y: hidden; }
 :is(.rr-page, .rr-scope) .rr-appbar__signed strong { font-size: var(--rr-fs-sm) !important; color: var(--rr-ink); }
 :is(.rr-page, .rr-scope) .rr-appbar__item { display: flex; align-items: center; gap: var(--rr-space-2); padding: var(--rr-space-2) var(--rr-space-3); border-radius: var(--rr-radius-md); color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); text-decoration: none; }
 :is(.rr-page, .rr-scope) .rr-appbar__item:hover, :is(.rr-page, .rr-scope) .rr-appbar__item:focus-visible { background: var(--rr-surface-hover); color: var(--rr-ink); text-decoration: none; }
+.rr-appbar__theme { display: inline-flex; margin: 0; }
 /* أيقونة واتساب بلونها المعروف عشان الزرار يتعرف بسرعة */
 .rr-appbar__whatsapp { color: #25D366; }
 

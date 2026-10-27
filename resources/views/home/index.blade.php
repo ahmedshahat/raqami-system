@@ -3,6 +3,16 @@
 
 @section('content')
 
+    {{-- الواجهة القديمة بتظهر بس لليوزر اللي رجع لها؛ الشريط ده بيرجّعه للجديدة --}}
+    <div class="rr-scope rr-classic-note">
+        <span>@lang('home_v2.classic_note')</span>
+        <form method="POST" action="{{ route('home.switch') }}" class="rr-inline-form">
+            @csrf
+            <input type="hidden" name="version" value="new">
+            <button type="submit" class="rr-btn rr-btn--primary rr-btn--sm">@lang('home_v2.try_new_home')</button>
+        </form>
+    </div>
+
     <div class="tw-pb-6 tw-bg-gradient-to-r tw-from-@if(!empty(session('business.theme_color'))){{session('business.theme_color')}}@else{{'primary'}}@endif-800 tw-to-@if(!empty(session('business.theme_color'))){{session('business.theme_color')}}@else{{'primary'}}@endif-900 xl:tw-pb-0 ">
         <div class="tw-px-5 tw-pt-3">
             {{-- <div class="sm:tw-flex sm:tw-items-center sm:tw-justify-between sm:tw-gap-12">

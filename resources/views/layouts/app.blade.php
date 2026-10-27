@@ -14,7 +14,11 @@
 
 @php
     $whitelist = ['127.0.0.1', '::1'];
-    $is_dark_mode = session('business.theme_color') === 'dark';
+    // مظهر اليوزر نفسه (زرار فاتح/داكن في الشريط العلوي) بيغلب مظهر النشاط من الإعدادات
+    $user_theme_mode = auth()->check() ? auth()->user()->theme_mode : null;
+    $is_dark_mode = in_array($user_theme_mode, ['light', 'dark'], true)
+        ? $user_theme_mode === 'dark'
+        : session('business.theme_color') === 'dark';
 @endphp
 
 <!DOCTYPE html>

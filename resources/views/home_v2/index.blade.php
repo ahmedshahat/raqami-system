@@ -67,7 +67,7 @@
     @if($can_view_data)
         {{-- ═══ الفترة والفرع ═══ --}}
         <section class="rr-period-wrap">
-            <form class="rr-period" method="GET" action="{{ route('home.v2') }}" id="rr-period-form">
+            <form class="rr-period" method="GET" action="{{ route('home') }}" id="rr-period-form">
                 <input type="hidden" name="period" value="{{ $period['preset'] }}">
                 <div class="rr-period__presets" role="group" aria-label="@lang('home_v2.period')">
                     @foreach($presets as $preset)
@@ -103,7 +103,12 @@
                     @lang('home_v2.range', ['start' => \Carbon::parse($period['start'])->translatedFormat('j F Y'), 'end' => \Carbon::parse($period['end'])->translatedFormat('j F Y')])
                     · @lang('home_v2.compared_to', ['start' => \Carbon::parse($period['prev_start'])->translatedFormat('j F'), 'end' => \Carbon::parse($period['prev_end'])->translatedFormat('j F Y')])
                 </span>
-                <a href="{{ route('home') }}">@lang('home_v2.old_home')</a>
+                {{-- الرجوع للواجهة القديمة لليوزر ده بس (users.use_classic_home) --}}
+                <form method="POST" action="{{ route('home.switch') }}" class="rr-inline-form">
+                    @csrf
+                    <input type="hidden" name="version" value="classic">
+                    <button type="submit" class="rr-linkbtn">@lang('home_v2.old_home')</button>
+                </form>
             </p>
         </section>
 

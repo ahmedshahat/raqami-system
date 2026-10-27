@@ -21,6 +21,8 @@ class HomeDashboardTest extends TestCase
         $business = Business::whereHas('locations')->firstOrFail();
         $this->user = User::findOrFail($business->owner_id);
         $this->user->dashboard_layout = null;
+        $this->user->theme_mode = null;
+        $this->user->use_classic_home = false;
         $this->user->save();
         $this->actingAs($this->user);
         $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
@@ -71,6 +73,40 @@ class HomeDashboardTest extends TestCase
         $this->post('/home/v2/layout', ['reset' => 1])->assertRedirect();
 
         $this->assertNull($this->user->fresh()->dashboard_layout);
+    }
+
+    public function test_home_serves_the_new_dashboard_and_a_user_can_switch_back_to_the_classic_one()
+    {
+        // الجديدة هي الافتراضية على /home
+        $this->get('/home')->assertOk()->assertSee('rr-home', false)->assertSee(route('home.switch'), false);
+
+        $this->post('/home/switch', ['version' => 'classic'])->assertRedirect(route('home'));
+        $this->assertTrue((bool) $this->user->fresh()->use_classic_home);
+        $this->get('/home')->assertOk()->assertSee('rr-classic-note', false)->assertDontSee('rr-home__head', false);
+
+        $this->post('/home/switch', ['version' => 'new'])->assertRedirect(route('home'));
+        $this->assertFalse((bool) $this->user->fresh()->use_classic_home);
+        $this->get('/home')->assertOk()->assertSee('rr-home__head', false);
+    }
+
+    public function test_theme_toggle_applies_to_the_current_user_only()
+    {
+        $this->user->business->theme_color = 'primary';
+        $this->user->business->save();
+        $other = User::where('business_id', $this->user->business_id)->where('id', '!=', $this->user->id)->first();
+
+        $this->post('/user/theme-mode', ['mode' => 'dark'])->assertRedirect();
+
+        $this->assertSame('dark', $this->user->fresh()->theme_mode);
+        if ($other) {
+            $this->assertNull($other->fresh()->theme_mode);
+        }
+        // مظهر اليوزر بيغلب مظهر النشاط (فاتح)، والزرار بيعرض التبديل للفاتح
+        $this->get('/home/v2')->assertOk()
+            ->assertSee('theme-dark', false)
+            ->assertSee('name="mode" value="light"', false);
+
+        $this->post('/user/theme-mode', ['mode' => 'purple'])->assertSessionHasErrors('mode');
     }
 
     public function test_cards_zone_stacks_extra_cards_in_the_last_column()

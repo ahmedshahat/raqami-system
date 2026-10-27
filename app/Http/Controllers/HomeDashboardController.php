@@ -9,8 +9,9 @@ use App\Utils\ModuleUtil;
 use Illuminate\Http\Request;
 
 /**
- * The redesigned home dashboard (Raqmi design system). It runs next to the
- * old home (HomeController@index) until it is approved as the main home.
+ * The home dashboard (Raqmi design system). HomeController@index (/home)
+ * serves it, unless the user switched back to the classic home for himself
+ * (users.use_classic_home).
  */
 class HomeDashboardController extends Controller
 {
@@ -167,7 +168,21 @@ class HomeDashboardController extends Controller
             $this->dashboardUtil->saveUserLayout($user, (array) $request->input('order', []), (array) $request->input('visible', []));
         }
 
-        return redirect()->to(url()->previous() ?: route('home.v2'))
+        return redirect()->to(url()->previous() ?: route('home'))
             ->with('status', ['success' => 1, 'msg' => __('home_v2.layout_saved')]);
+    }
+
+    /**
+     * Switches the current user between the new home and the classic one (for himself only).
+     */
+    public function switchHome(Request $request)
+    {
+        $data = $request->validate(['version' => ['required', 'in:new,classic']]);
+
+        $user = auth()->user();
+        $user->use_classic_home = $data['version'] == 'classic';
+        $user->save();
+
+        return redirect()->route('home');
     }
 }

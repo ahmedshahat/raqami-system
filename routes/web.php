@@ -112,9 +112,12 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
 
     Route::get('/sign-in-as-user/{id}', [ManageUserController::class, 'signInAsUser'])->name('sign-in-as-user');
 
+    // HomeController@index بيعرض الرئيسية الجديدة (HomeDashboardController)، إلا لليوزر اللي اختار الواجهة القديمة
     Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('/home/v2', [\App\Http\Controllers\HomeDashboardController::class, 'index'])->name('home.v2');
+    Route::post('/home/switch', [\App\Http\Controllers\HomeDashboardController::class, 'switchHome'])->name('home.switch');
     Route::post('/home/v2/layout', [\App\Http\Controllers\HomeDashboardController::class, 'saveLayout'])->name('home.v2.layout');
+    Route::post('/user/theme-mode', [\App\Http\Controllers\UserThemeController::class, 'update'])->name('user.theme-mode');
     Route::get('/dashboard-v2', [DashboardV2Controller::class, 'index'])->name('dashboard.v2');
     Route::get('/dashboard-v2/summary', [DashboardV2Controller::class, 'summary'])->name('dashboard.v2.summary');
     Route::get('/home/get-totals', [HomeController::class, 'getTotals']);

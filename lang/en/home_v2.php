@@ -76,7 +76,9 @@ return [
     'attention_pending_sales_orders_hint' => 'Orders not fully invoiced yet',
     'attention_pending_shipments' => 'Shipments in progress',
     'attention_pending_shipments_hint' => 'Ordered, packed or shipped',
-    'old_home' => 'Back to the old home page',
+    'old_home' => 'Back to the previous home page',
+    'classic_note' => 'A new home page is available with clearer indicators and analysis.',
+    'try_new_home' => 'Switch to the new home page',
 
     'aging' => 'Receivables aging',
     'aging_desc' => 'Open invoices by days past their due date (all time)',
