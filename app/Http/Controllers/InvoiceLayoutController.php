@@ -253,6 +253,7 @@ class InvoiceLayoutController extends Controller
     private function getDesigns()
     {
         return ['classic' => __('lang_v1.classic').' ('.__('lang_v1.for_normal_printer').')',
+            'raqmi' => __('sell_list.rqi_design').' ('.__('lang_v1.for_normal_printer').')',
             'modern' => 'عصري ملون - Modern Color ('.__('lang_v1.for_normal_printer').')',
             'elegant' => __('lang_v1.elegant').' ('.__('lang_v1.for_normal_printer').')',
             'detailed' => __('lang_v1.detailed').' ('.__('lang_v1.for_normal_printer').')',

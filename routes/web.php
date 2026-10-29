@@ -229,6 +229,9 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('/sells/convert-to-proforma/{id}', [SellPosController::class, 'convertToProforma']);
     Route::get('/sells/quotations', [SellController::class, 'getQuotations']);
     Route::get('/sells/draft-dt', [SellController::class, 'getDraftDatables']);
+    Route::get('/sells/v2', [SellController::class, 'indexV2'])->name('sells.v2');
+    Route::get('/sells/v2/summary', [SellController::class, 'listSummary'])->name('sells.v2.summary');
+    Route::get('/sells/v2/export', [SellController::class, 'exportList'])->name('sells.v2.export');
     Route::resource('sells', SellController::class)->except(['show']);
 
     Route::get('/import-sales', [ImportSalesController::class, 'index']);

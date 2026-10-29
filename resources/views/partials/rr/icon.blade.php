@@ -22,6 +22,8 @@
     @case('bars')<path d="M5 20v-8M12 20V5M19 20v-5M3 21h18"></path>@break
     @case('edit')<path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z"></path><path d="M14 8l3 3"></path>@break
     @case('print')<path d="M7 9V4h10v5"></path><path d="M7 17H5a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2"></path><path d="M7 14h10v6H7z"></path>@break
+    @case('share')<circle cx="18" cy="5" r="2.5"></circle><circle cx="6" cy="12" r="2.5"></circle><circle cx="18" cy="19" r="2.5"></circle><path d="M8.3 13.2l7.4 4.4M15.7 6.4l-7.4 4.4"></path>@break
+    @case('columns')<rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M10 4v16M15 4v16"></path>@break
     @case('trash')<path d="M4 7h16M10 11v6M14 11v6"></path><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"></path>@break
     @case('search')<circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path>@break
     @case('chevron-down')<path d="M6 9l6 6 6-6"></path>@break

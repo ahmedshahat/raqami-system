@@ -374,7 +374,7 @@
    القائمة مخفية افتراضيًا (position: fixed)، وسكريبت الشاشة يظهرها ويحدد مكانها.
    ========================================================================== */
 
-:is(.rr-page, .rr-scope) .rr-menu { display: none; position: fixed; z-index: var(--rr-z-menu); min-width: 200px; padding: var(--rr-space-1); background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); box-shadow: var(--rr-shadow-popover); }
+:is(.rr-page, .rr-scope) .rr-menu { display: none; position: fixed; z-index: var(--rr-z-menu); min-width: 200px; padding: var(--rr-space-1); background: var(--rr-surface); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-lg); box-shadow: var(--rr-shadow-popover); overflow-y: auto; overscroll-behavior: contain; }
 :is(.rr-page, .rr-scope) .rr-menu__item { display: flex; align-items: center; gap: var(--rr-space-2); width: 100%; min-height: 36px; padding: 0 var(--rr-space-3); border: 0; border-radius: var(--rr-radius-md); background: transparent; color: var(--rr-ink); font-family: inherit; font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); text-align: start; cursor: pointer; white-space: nowrap; }
 :is(.rr-page, .rr-scope) .rr-menu__item:hover, :is(.rr-page, .rr-scope) .rr-menu__item:focus-visible { background: var(--rr-surface-hover); color: var(--rr-ink); outline: none; }
 :is(.rr-page, .rr-scope) .rr-menu__item--danger { border-top: 0; color: var(--rr-danger); }
@@ -1757,3 +1757,217 @@ body.rr-landing--auth { background-color: var(--rr-brand-tint) !important; backg
     .rr-landing__main { gap: var(--rr-space-8); padding-block: var(--rr-space-6); }
     :is(.rr-page, .rr-scope) .rr-landing__title { font-size: 28px !important; line-height: 40px; }
 }
+
+
+/* ==========================================================================
+   40. شاشة قائمة (المبيعات /sells/v2): رأس + فترة + مؤشرات + جدول بتابات وأدوات
+   <main class="content rr-page rr-list-page">
+     <header class="rr-list-page__head"><div class="rr-list-page__titles">…</div><div class="rr-head__actions">…</div></header>
+     <section class="rr-table-wrap">
+       <nav class="rr-scope rr-tabs rr-tabs--inset"><button class="rr-tab">نص <span class="rr-tab__count">12</span></button></nav>
+       <div class="rr-table-head rr-table-head--toolbar"><div class="rr-table-tools rr-list-tools">…</div></div>
+       <div class="rr-list-more">فلاتر إضافية</div>
+       <div class="rr-filter-chips"><button class="rr-filter-chip">…×</button></div>
+       <div class="rr-bulkbar"><span class="rr-bulkbar__count">…</span>أزرار</div>
+       <table class="rr-table">…خلية بسطرين: <div class="rr-cell-stack"><span class="rr-cell-stack__main">…</span><span class="rr-cell-stack__sub">…</span></div>
+   ========================================================================== */
+
+.rr-list-page { gap: var(--rr-space-5); padding: var(--rr-space-6) var(--rr-space-6) var(--rr-space-10) !important; }
+@media (max-width: 767px) { .rr-list-page { padding-inline: var(--rr-space-4) !important; } }
+.rr-list-page__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--rr-space-4); }
+.rr-list-page__titles { min-width: 0; display: flex; flex-direction: column; gap: var(--rr-space-1); }
+.rr-list-page__head .rr-head__actions { padding-top: 0; }
+:is(.rr-page, .rr-scope) .rr-list-page__foot { text-align: end; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); }
+
+/* تابات جوه كارت الجدول (أزرار مش روابط) + عدّاد */
+nav.rr-tabs.rr-tabs--inset { max-width: none; margin: 0; padding-inline: var(--rr-space-3); }
+nav.rr-tabs button.rr-tab { font-family: inherit; cursor: pointer; }
+.rr-tab__count { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 20px; padding-inline: 6px; border-radius: var(--rr-radius-full); background: var(--rr-neutral-tint); color: var(--rr-ink-muted); font-size: var(--rr-fs-xs) !important; line-height: 20px; font-weight: var(--rr-fw-semibold); }
+.rr-tab__count:empty { display: none; }
+nav.rr-tabs .rr-tab[aria-current="page"] .rr-tab__count { background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); }
+
+/* أدوات التصفية: البحث بياخد المساحة الفاضية، والعميل select2 بارتفاع الحقل الصغير */
+.rr-table-tools.rr-list-tools { flex: 1 1 auto; justify-content: flex-start; }
+.rr-list-tools .rr-table-tools__search { flex: 1 1 260px; max-width: 360px; }
+.rr-list-tools__customer { flex: 0 1 220px; }
+:is(.rr-page, .rr-scope) .rr-list-tools__customer .select2-container--default .select2-selection--single { height: var(--rr-control-sm); min-height: var(--rr-control-sm); }
+:is(.rr-page, .rr-scope) .rr-list-tools__customer .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 30px; font-size: var(--rr-fs-sm) !important; }
+:is(.rr-page, .rr-scope) .rr-list-tools__customer .select2-container--default .select2-selection--single .select2-selection__arrow { height: 30px; }
+
+/* فلاتر أكثر: شبكة حقول على خلفية غامقة شوية تحت الأدوات */
+.rr-list-more { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); align-items: end; gap: var(--rr-space-3) var(--rr-space-4); padding: var(--rr-space-4); background: var(--rr-surface-sunken); border-bottom: 1px solid var(--rr-border); }
+.rr-list-more__toggle { min-height: var(--rr-control-sm); }
+
+/* الفلاتر المطبقة كشرائح تتشال بضغطة */
+.rr-filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-2); padding: var(--rr-space-2) var(--rr-space-4); border-bottom: 1px solid var(--rr-border); }
+:is(.rr-page, .rr-scope) .rr-filter-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding-inline: var(--rr-space-3) var(--rr-space-2); border: 1px solid var(--rr-border); border-radius: var(--rr-radius-full); background: var(--rr-brand-tint); color: var(--rr-brand-tint-ink); font-family: inherit; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); font-weight: var(--rr-fw-semibold); cursor: pointer; white-space: nowrap; }
+:is(.rr-page, .rr-scope) .rr-filter-chip:hover { border-color: var(--rr-brand); }
+:is(.rr-page, .rr-scope) .rr-filter-chip:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: 2px; }
+.rr-filter-chip__label { font-weight: var(--rr-fw-regular); }
+
+/* شريط التحديد فوق الجدول */
+.rr-bulkbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-2); padding: var(--rr-space-2) var(--rr-space-4); background: var(--rr-surface-selected); border-bottom: 1px solid var(--rr-border); }
+:is(.rr-page, .rr-scope) .rr-bulkbar__count { margin-inline-end: auto; font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-semibold); color: var(--rr-brand-tint-ink); }
+
+/* عمود التحديد + صف محدد + خلية بسطرين */
+.rr-th--check, .rr-td--check { width: 44px; padding-inline: var(--rr-space-3); text-align: center; }
+.rr-tr--selected .rr-td, .rr-tr--selected:hover .rr-td { background: var(--rr-surface-selected); }
+.rr-cell-stack { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-block: var(--rr-space-2); }
+.rr-cell-stack__main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+:is(.rr-page, .rr-scope) .rr-cell-stack__main .rr-code { color: var(--rr-ink); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-semibold); }
+:is(.rr-page, .rr-scope) .rr-cell-stack__sub { font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+.rr-table--sells tbody .rr-tr { cursor: pointer; }
+:is(.rr-page, .rr-scope) .rr-list-badge-link { display: inline-flex; border-radius: var(--rr-radius-sm); }
+:is(.rr-page, .rr-scope) .rr-list-badge-link:hover .rr-badge { border-color: currentColor; }
+:is(.rr-page, .rr-scope) .rr-list-badge-link:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: 2px; }
+
+/* الجدول بيعمل scroll عرضي لوحده والترقيم ثابت تحته؛ وعدد الصفوف جنب ملخص العدد */
+.rr-table-wrap .rr-table-scroll { overflow-x: auto; }
+.rr-table-wrap .rr-pager .rr-pager__sum { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-4); }
+.rr-table-wrap .rr-pager .dataTables_length { float: none; padding: 0; }
+:is(.rr-page, .rr-scope) .rr-table-wrap .rr-pager .dataTables_length label { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; }
+:is(.rr-page, .rr-scope) .rr-table-wrap .rr-pager .dataTables_length select { height: var(--rr-control-sm); margin: 0; padding: 0 var(--rr-space-2); border: 1px solid var(--rr-border-control); border-radius: var(--rr-radius-md); background: var(--rr-surface); color: var(--rr-ink); font-size: var(--rr-fs-sm) !important; }
+
+/* سطر ملاحظة وقائمة اختيارات (checkbox) جوه rr-menu */
+:is(.rr-page, .rr-scope) .rr-menu__note { margin: 0; padding: var(--rr-space-1) var(--rr-space-3); font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); white-space: normal; max-width: 260px; }
+:is(.rr-page, .rr-scope) .rr-menu__check { margin: 0; gap: var(--rr-space-2); font-weight: var(--rr-fw-medium); }
+
+/* صورة الفاتورة في نافذة المشاركة */
+.rr-list-share__img { align-self: center; max-width: 100%; height: auto; border: 1px solid var(--rr-border); border-radius: var(--rr-radius-md); }
+.rr-list-share__img:not([src]) { display: none; }
+
+
+/* ==========================================================================
+   41. الجدول كقائمة مضغوطة على الموبايل (تحت 768px)
+   <table class="rr-table rr-table--cards">: كل صف سطرين — rr-m-title (فوق) + rr-m-amount (على الجنب)،
+   rr-m-sub (تحت) + rr-m-status (على الجنب)، وrr-td--check في البداية. باقي الخلايا بتستخبى.
+   ========================================================================== */
+
+/* الصفوف بتتركّز بالكيبورد (Enter بيفتح الفاتورة) */
+:is(.rr-page, .rr-scope) .rr-tr:focus-visible { outline: 2px solid var(--rr-focus); outline-offset: -2px; }
+
+/* الجدول كقائمة مضغوطة على الموبايل: سطرين لكل صف، والخلايا التانية بتستخبى (التفاصيل جوه الفاتورة) */
+@media (max-width: 767px) {
+    .rr-table.rr-table--cards { min-width: 0; }
+    .rr-table--cards thead { display: none; }
+    .rr-table--cards, .rr-table--cards tbody { display: block; width: 100%; }
+    .rr-table--cards tbody .rr-tr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "check title amount" "check sub status"; align-items: center; gap: 2px var(--rr-space-3); padding: var(--rr-space-2) var(--rr-space-4); border-bottom: 1px solid var(--rr-border); }
+    .rr-table--cards tbody .rr-tr:last-child { border-bottom: 0; }
+    .rr-table--cards tbody .rr-td { display: none; height: auto; padding: 0; border: 0; background: transparent; min-width: 0; }
+    .rr-table--cards tbody .rr-tr:hover .rr-td, .rr-table--cards tbody .rr-tr--selected .rr-td { background: transparent; }
+    .rr-table--cards tbody .rr-tr:active, .rr-table--cards tbody .rr-tr--selected { background: var(--rr-surface-selected); }
+    .rr-table--cards tbody .rr-td--check { display: block; grid-area: check; width: auto; }
+    .rr-table--cards tbody .rr-m-title { display: block; grid-area: title; }
+    .rr-table--cards tbody .rr-m-sub { display: block; grid-area: sub; }
+    .rr-table--cards tbody .rr-m-amount { display: block; grid-area: amount; text-align: end; }
+    .rr-table--cards tbody .rr-m-status { display: block; grid-area: status; text-align: end; }
+    .rr-table--cards tbody .rr-m-title .rr-cell-stack { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0 var(--rr-space-2); padding-block: 0; }
+    .rr-table--cards tbody .rr-m-sub .rr-cell-stack { padding-block: 0; }
+    .rr-table--cards tbody .rr-m-sub .rr-cell-stack__main { font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+    .rr-table--cards tbody .rr-m-sub .rr-cell-stack__sub { display: none; }
+    :is(.rr-page, .rr-scope) .rr-table--cards tbody .rr-m-amount .rr-num { font-size: var(--rr-fs-md) !important; font-weight: var(--rr-fw-bold); }
+    .rr-table--cards tbody .dataTables_empty { display: block; }
+    .rr-table-wrap .rr-pager { justify-content: center; }
+    .rr-table-wrap .rr-pager .rr-pager__sum { flex-basis: 100%; justify-content: center; }
+    .rr-list-tools .rr-table-tools__select, .rr-list-tools__customer { flex: 1 1 100%; max-width: none; }
+    .rr-list-tools .rr-table-tools__search { flex: 1 1 0; max-width: none; }
+
+    /* الفلاتر متلمومة ورا زرار واحد، والبحث بس اللي ظاهر */
+    .rr-table-wrap:not(.is-filters-open) .rr-list-tools > :not(.rr-table-tools__search):not(.rr-sr):not(.rr-list-tools__fold),
+    .rr-table-wrap:not(.is-filters-open) .rr-list-more { display: none; }
+    .rr-list-tools [aria-controls="rr_sells_columns_menu"] { display: none; }
+    .rr-list-tools__fold { display: inline-flex; }
+
+    /* باقي الفاتورة مكان شارة الحالة */
+    .rr-table--cards tbody .rr-m-status .rr-m-status__badge { display: none; }
+    .rr-m-due { font-weight: var(--rr-fw-semibold); white-space: nowrap; }
+
+    /* عرض المزيد بدل أرقام الصفحات */
+    .rr-table-wrap .rr-pager .rr-pager__pages, .rr-table-wrap .rr-pager .dataTables_length { display: none; }
+    .rr-loadmore:not([hidden]) { display: flex; justify-content: center; padding: var(--rr-space-3) var(--rr-space-4); border-top: 1px solid var(--rr-border); }
+    .rr-loadmore .rr-btn { width: 100%; justify-content: center; }
+}
+
+/* عناصر الموبايل بس (القائمة المضغوطة) */
+@media (min-width: 768px) {
+    .rr-list-tools__fold, .rr-m-due, .rr-loadmore { display: none !important; }
+}
+.rr-list-tools__count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--rr-brand); color: var(--rr-on-brand); font-size: var(--rr-fs-xs) !important; line-height: 1; }
+.rr-loadmore__left { color: var(--rr-ink-muted); font-weight: var(--rr-fw-regular); }
+
+
+/* ==========================================================================
+   42. نافذة الفاتورة (sale_pos.show_v2): رأس بشارات + مؤشرات + عمودين + سجل مطوي
+   <div class="modal-dialog rr-modal-dialog rr-modal-dialog--xl"><div class="modal-content rr-modal rr-invoice">
+     … <div class="rr-invoice__grid"><div class="rr-invoice__main">…</div><aside class="rr-invoice__side">…</aside></div>
+   .view_modal بياخد rr-scope من سكريبت النافذة نفسها وبيتشال لما تتقفل.
+   ========================================================================== */
+
+:is(.rr-page, .rr-scope) .rr-modal-dialog--xl { max-width: 1120px; }
+.rr-invoice-modal .rr-modal { background: var(--rr-page-bg); }
+.rr-invoice .rr-modal__head, .rr-invoice .rr-modal__foot { background: var(--rr-surface); }
+.rr-invoice__title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-2); }
+:is(.rr-page, .rr-scope) .rr-invoice__title .rr-num { font-size: var(--rr-fs-2xl) !important; line-height: var(--rr-lh-2xl); font-weight: var(--rr-fw-bold); }
+:is(.rr-page, .rr-scope) .rr-invoice__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rr-space-1) var(--rr-space-4); margin: var(--rr-space-1) 0 0; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink-muted); }
+.rr-invoice__meta-item { display: inline-flex; align-items: center; gap: 6px; }
+.rr-invoice__body { container-type: inline-size; }
+
+.rr-invoice__grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; gap: var(--rr-space-4); }
+@container (max-width: 820px) { .rr-invoice__grid { grid-template-columns: minmax(0, 1fr); } }
+.rr-invoice__main, .rr-invoice__side { display: flex; flex-direction: column; gap: var(--rr-space-4); min-width: 0; }
+
+.rr-table.rr-invoice__lines { min-width: 620px; }
+.rr-table.rr-invoice__payments { min-width: 520px; }
+.rr-invoice__lines .rr-td--num .rr-cell-stack__sub { display: block; }
+:is(.rr-page, .rr-scope) .rr-invoice__subtotal { font-weight: var(--rr-fw-semibold); }
+.rr-invoice__modifier .rr-td { height: auto; padding-block: var(--rr-space-2); background: var(--rr-surface-sunken); }
+.rr-invoice__summary { border-top: 1px solid var(--rr-border); }
+.rr-invoice__summary .rr-deflist__item { padding-block: var(--rr-space-2); }
+.rr-invoice__summary-note dt, .rr-invoice__summary-note dd { opacity: .75; }
+.rr-invoice__sign { color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-invoice__empty { margin: 0; padding: var(--rr-space-5) var(--rr-space-4); text-align: center; color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; }
+
+.rr-invoice__contact { display: flex; flex-direction: column; gap: var(--rr-space-1); padding: var(--rr-space-4); }
+:is(.rr-page, .rr-scope) .rr-invoice__contact-name { margin: 0; font-size: var(--rr-fs-lg) !important; line-height: var(--rr-lh-lg); font-weight: var(--rr-fw-semibold); color: var(--rr-ink); }
+:is(.rr-page, .rr-scope) .rr-invoice__contact-line { margin: 0; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-invoice__contact-link { display: inline-flex; align-items: center; gap: 6px; width: fit-content; color: var(--rr-link); font-size: var(--rr-fs-sm) !important; }
+:is(.rr-page, .rr-scope) .rr-invoice__contact-link:hover { text-decoration: underline; }
+.rr-invoice__side .rr-card__head { padding: var(--rr-space-3) var(--rr-space-4); }
+.rr-invoice__side .rr-deflist__item { padding: var(--rr-space-2) var(--rr-space-4); }
+.rr-invoice__media, .rr-invoice__doc { padding: var(--rr-space-3) var(--rr-space-4); border-top: 1px solid var(--rr-border); overflow-x: auto; }
+.rr-invoice__note { padding: var(--rr-space-3) var(--rr-space-4); border-bottom: 1px solid var(--rr-border); }
+.rr-invoice__note:last-child { border-bottom: 0; }
+:is(.rr-page, .rr-scope) .rr-invoice__note-label { margin: 0 0 2px; font-size: var(--rr-fs-xs) !important; line-height: var(--rr-lh-xs); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-invoice__note-text { margin: 0; font-size: var(--rr-fs-sm) !important; line-height: var(--rr-lh-sm); color: var(--rr-ink); overflow-wrap: anywhere; }
+
+/* بيانات المستخلص (مقاولات) جوه callout */
+.rr-invoice__facts { display: flex; flex-wrap: wrap; gap: var(--rr-space-2) var(--rr-space-6); margin: 0; flex: 1; }
+:is(.rr-page, .rr-scope) .rr-invoice__facts dt { font-size: var(--rr-fs-xs) !important; font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); }
+:is(.rr-page, .rr-scope) .rr-invoice__facts dd { margin: 0; font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-semibold); }
+
+/* سجل النشاطات (جدول من الكود الأساسي) جوه الكارت المطوي */
+.rr-invoice__activity-log { overflow-x: auto; }
+.rr-invoice__activity-log .table { margin: 0; background: transparent; color: var(--rr-ink); }
+.rr-invoice__activity-log .table > thead > tr > th, .rr-invoice__activity-log .table > tbody > tr > td { border-color: var(--rr-border); }
+
+.rr-invoice__close { margin-inline-start: auto; }
+@media (max-width: 767px) { .rr-invoice__close { margin-inline-start: 0; } }
+
+/* نافذة الفاتورة مضغوطة: 4 أصناف على الأقل تبان من غير scroll في شاشة لابتوب عادية */
+:is(.rr-page, .rr-scope) .rr-modal-dialog--xl { margin: 24px auto; }
+.rr-modal-dialog--xl .rr-modal { max-height: calc(100vh - 48px); }
+.rr-invoice .rr-modal__head { padding: var(--rr-space-3) var(--rr-space-5); }
+.rr-invoice .rr-modal__body { gap: var(--rr-space-3); padding: var(--rr-space-3) var(--rr-space-5); }
+.rr-invoice .rr-modal__foot { padding: var(--rr-space-3) var(--rr-space-5); }
+:is(.rr-page, .rr-scope) .rr-invoice__title .rr-num { font-size: var(--rr-fs-xl) !important; line-height: var(--rr-lh-xl); }
+.rr-invoice .rr-stat { padding: var(--rr-space-2) var(--rr-space-4); gap: 0; }
+:is(.rr-page, .rr-scope) .rr-invoice .rr-stat__value { font-size: var(--rr-fs-xl) !important; line-height: var(--rr-lh-xl); }
+.rr-invoice__grid, .rr-invoice__main, .rr-invoice__side { gap: var(--rr-space-3); }
+.rr-invoice .rr-table-head { padding: var(--rr-space-2) var(--rr-space-4); }
+.rr-invoice .rr-th { height: 34px; }
+.rr-invoice__lines .rr-td, .rr-invoice__payments .rr-td { height: auto; padding-block: 6px; }
+.rr-invoice__lines .rr-cell-stack { padding-block: 0; gap: 0; }
+.rr-invoice__lines .rr-td--num .rr-cell-stack__sub { display: inline; margin-inline-start: 4px; }
+/* سطر توضيحي في ملخص الفاتورة (الضريبة الداخلة في أسعار الأصناف): أصغر ومزاح لجوه تحت المجموع */
+.rr-invoice__summary .rr-invoice__summary-note { padding-block: 2px var(--rr-space-2); padding-inline-start: var(--rr-space-8); border-bottom-style: dashed; }
+:is(.rr-page, .rr-scope) .rr-invoice__summary-note dt, :is(.rr-page, .rr-scope) .rr-invoice__summary-note dd, :is(.rr-page, .rr-scope) .rr-invoice__summary-note .rr-money { font-size: var(--rr-fs-xs) !important; font-weight: var(--rr-fw-regular); color: var(--rr-ink-muted); }
