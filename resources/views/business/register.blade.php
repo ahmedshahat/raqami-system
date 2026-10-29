@@ -37,10 +37,13 @@
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@25.10.6/build/js/intlTelInput.min.js"></script>
     <script type="text/javascript">
         $(document).ready(function() {
-            // رسائل التحقق تظهر تحت الحقل كله، مش جوه .rr-control
-            $('#simple_business_register_form').validate().settings.errorPlacement = function(error, element) {
-                error.addClass('rr-field__error').insertAfter(element.closest('.rr-control'));
-            };
+            // رسائل التحقق تظهر تحت الحقل كله، مش جوه .rr-control.
+            // السكربت ده بيشتغل قبل login.js، فبنستنى لحد ما login.js يعمل validate بقواعده وبعدين نغيّر مكان الرسالة
+            setTimeout(function() {
+                $('#simple_business_register_form').validate().settings.errorPlacement = function(error, element) {
+                    error.addClass('rr-field__error').insertAfter(element.closest('.rr-control'));
+                };
+            });
 
             const mobileInput = document.querySelector('#mobile');
             const mobileCountry = document.querySelector('#mobile_country');

@@ -42,9 +42,12 @@
         </div>
     </footer>
 
+    {{-- layouts.partials.javascripts بيعمل @yield('javascript') بنفسه، فما نكررهوش هنا وإلا سكربتات الصفحة تشتغل مرتين --}}
     @hasSection('with_scripts')
         @include('layouts.partials.javascripts')
         <script src="{{ asset('js/login.js?v=' . $asset_v) }}"></script>
+    @else
+        @yield('javascript')
     @endif
     <script>
         document.getElementById('rr_theme_toggle').addEventListener('click', function () {
@@ -54,6 +57,5 @@
             try { localStorage.setItem('rr-guest-theme', mode); } catch (e) {}
         });
     </script>
-    @yield('javascript')
 </body>
 </html>

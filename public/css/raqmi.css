@@ -1679,8 +1679,16 @@ body.rr-landing--auth { background-color: var(--rr-brand-tint) !important; backg
 /* حقل الهاتف مع intl-tel-input (التسجيل) */
 .rr-control--phone { overflow: visible; }
 .rr-control--phone .iti { flex: 1; width: 100%; height: 100%; direction: ltr; }
-.rr-control--phone .iti__selected-country { border-radius: var(--rr-radius-md) 0 0 var(--rr-radius-md); }
-.rr-control--phone .iti__selected-dial-code { color: var(--rr-ink-muted); }
+/* كود الدولة جزء منفصل داخل الحقل: خلفية مختلفة + خط فاصل، والمكتبة بتحسب مسافة الرقم من عرضه */
+.rr-control--phone .iti__country-container { padding: 0 !important; background: var(--rr-surface-sunken); }
+[dir="rtl"] .rr-control--phone .iti__country-container { border-left: 1px solid var(--rr-border); border-radius: 0 var(--rr-radius-md) var(--rr-radius-md) 0; }
+[dir="ltr"] .rr-control--phone .iti__country-container { border-right: 1px solid var(--rr-border); border-radius: var(--rr-radius-md) 0 0 var(--rr-radius-md); }
+.rr-control--phone .iti__selected-country { gap: var(--rr-space-1); padding: 0 var(--rr-space-2) !important; background: transparent !important; border-radius: inherit; }
+.rr-control--phone .iti__selected-country:hover { background: var(--rr-surface-hover) !important; }
+.rr-control--phone .iti__selected-country-primary { padding: 0 !important; }
+.rr-control--phone .iti__selected-dial-code { margin: 0 !important; color: var(--rr-ink-muted); font-size: var(--rr-fs-sm) !important; font-weight: var(--rr-fw-medium); }
+/* الحقل جوه .iti (مش flex)، فلازم ياخد العرض كله وإلا بيقف في نص الخانة في الشاشات العريضة */
+:is(.rr-page, .rr-scope) .rr-control--phone .iti__tel-input { width: 100%; padding-inline: var(--rr-space-3); }
 .iti__dropdown-content { font-family: var(--rr-font, inherit); }
 
 /* رسائل jQuery Validate تحت الحقل */
