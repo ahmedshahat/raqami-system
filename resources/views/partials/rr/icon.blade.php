@@ -37,6 +37,11 @@
     @case('info')<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path>@break
     @case('filter')<path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z"></path>@break
     @case('eye')<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle>@break
+    @case('eye-off')<path d="M3 3l18 18M10.6 6a9.7 9.7 0 0 1 1.4-.1c6 0 9.5 6.1 9.5 6.1a17 17 0 0 1-2.6 3.4M6.6 6.6A16.5 16.5 0 0 0 2.5 12S6 18.5 12 18.5a9.3 9.3 0 0 0 4.9-1.4"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path>@break
+    @case('mail')<rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3.5 6.5l8.5 6.5 8.5-6.5"></path>@break
+    @case('phone')<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"></path>@break
+    @case('cloud')<path d="M7 18a4.5 4.5 0 0 1-.6-9A6 6 0 0 1 18 9.5a4.3 4.3 0 0 1-.5 8.5H7z"></path>@break
+    @case('gift')<rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M5 12v8h14v-8M12 8v12M12 8S10.5 3.5 8 4.5 9 8 12 8zM12 8s1.5-4.5 4-3.5S15 8 12 8z"></path>@break
     @case('trend')<path d="M3 17l6-6 4 4 8-8"></path><path d="M15 7h6v6"></path>@break
     @case('coins')<ellipse cx="9" cy="7" rx="6" ry="3"></ellipse><path d="M3 7v4c0 1.7 2.7 3 6 3s6-1.3 6-3V7"></path><path d="M9 14v3c0 1.7 2.7 3 6 3s6-1.3 6-3v-4c0-1.7-2.7-3-6-3"></path>@break
     @case('wallet')<path d="M4 7a2 2 0 0 1 2-2h12v4"></path><rect x="4" y="7" width="17" height="13" rx="2"></rect><path d="M16 13.5h2"></path>@break

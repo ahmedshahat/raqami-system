@@ -1,54 +1,47 @@
-@extends('layouts.auth2')
+@extends('layouts.guest_rr')
 @section('title', __('lang_v1.register'))
+@section('with_scripts', true)
 
 @section('css')
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25.10.6/build/css/intlTelInput.css">
-    <link rel="stylesheet" href="{{ asset('css/register.css?v=' . $asset_v) }}">
 @endsection
 
 @section('content')
-    <div class="register-page" dir="rtl">
-        <div class="register-shell">
-            <section class="register-showcase">
-                <div class="brand-lockup">
-                    <img src="{{ asset('img/logo-small.png') }}" alt="{{ config('app.name') }}">
-                    <div><strong>{{ config('app.name', 'UltimatePOS') }}</strong><span>النظام المحاسبي السحابي في مصر</span></div>
-                </div>
-                <div class="showcase-copy">
-                    <h2>برنامج محاسبة سحابي<br><em>أسهل، أسرع، أدق</em></h2>
-                    <p>أدر أعمالك من أي مكان وفي أي وقت،<br>الفواتير، المخزون، الحسابات وأكثر من ذلك بكثير.</p>
-                </div>
-                <div class="showcase-photo" aria-hidden="true"></div>
-                <div class="showcase-benefits">
-                    <div><i class="fa fa-shield-alt"></i><strong>أمان عالي</strong><span>حماية كاملة لبياناتك</span></div>
-                    <div><i class="fa fa-cloud"></i><strong>تجربة سحابية</strong><span>الوصول من أي مكان</span></div>
-                    <div><i class="fa fa-rocket"></i><strong>تشغيل سريع</strong><span>ابدأ خلال دقائق</span></div>
-                </div>
-            </section>
-
-            <section class="register-card">
-                <div class="register-heading">
-                    <h1>إنشاء حساب جديد</h1>
-                    <p>ابدأ تجربتك المجانية الآن، بدون بطاقة ائتمان</p>
-                    <span></span>
-                </div>
+    <div class="rr-landing__wrap rr-auth">
+        <section class="rr-card rr-auth__panel">
+            <header class="rr-auth__head">
+                <h1 class="rr-auth__title">@lang('guest.register_title')</h1>
+                <p class="rr-auth__sub">@lang('guest.register_sub')</p>
+            </header>
             {!! Form::open([
                 'url' => route('business.postRegister'),
                 'method' => 'post',
                 'id' => 'simple_business_register_form',
+                'class' => 'rr-auth__form rr-form-wrap',
                 'files' => true,
             ]) !!}
             @include('business.partials.register_simple_form')
             {!! Form::hidden('package_id', $package_id) !!}
             {!! Form::close() !!}
-            </section>
-        </div>
+        </section>
+
+        @include('partials.rr.auth_aside', [
+            'title' => __('guest.register_showcase_title'),
+            'em' => __('guest.register_showcase_em'),
+            'desc' => __('guest.register_showcase_desc'),
+            'benefits' => [['icon' => 'shield', 'key' => 'secure'], ['icon' => 'cloud', 'key' => 'access'], ['icon' => 'clock', 'key' => 'fast']],
+        ])
     </div>
 @stop
 @section('javascript')
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@25.10.6/build/js/intlTelInput.min.js"></script>
     <script type="text/javascript">
         $(document).ready(function() {
+            // رسائل التحقق تظهر تحت الحقل كله، مش جوه .rr-control
+            $('#simple_business_register_form').validate().settings.errorPlacement = function(error, element) {
+                error.addClass('rr-field__error').insertAfter(element.closest('.rr-control'));
+            };
+
             const mobileInput = document.querySelector('#mobile');
             const mobileCountry = document.querySelector('#mobile_country');
 
@@ -107,19 +100,6 @@
                 $('#simple_business_register_form').on('submit', syncMobileCountry);
                 syncMobileCountry();
             }
-
-            $('.change_lang').click(function() {
-                const packageId = @json($package_id);
-                const params = new URLSearchParams({lang: $(this).attr('value')});
-                if (packageId) params.set('package', packageId);
-                window.location = "{{ route('business.getRegister') }}?" + params.toString();
-            });
-
-            $('.password-toggle').on('click', function() {
-                const input = $($(this).data('target'));
-                input.attr('type', input.attr('type') === 'password' ? 'text' : 'password');
-                $(this).find('i').toggleClass('fa-eye fa-eye-slash');
-            });
         })
     </script>
 @endsection

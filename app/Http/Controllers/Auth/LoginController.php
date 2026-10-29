@@ -131,6 +131,11 @@ class LoginController extends Controller
             return '/pos/create';
         }
 
+        // "وضع الكاشير" في شاشة الدخول: يفتح نقطة البيع مباشرة
+        if (request()->boolean('open_pos') && $user->can('sell.create')) {
+            return '/pos/create';
+        }
+
         if ($user->user_type == 'user_customer') {
             return 'contact/contact-dashboard';
         }

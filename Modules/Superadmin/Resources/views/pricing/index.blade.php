@@ -1,89 +1,83 @@
-@php($no_header = true)
-@extends('layouts.auth')
+@extends('layouts.guest_rr')
 @section('title', __('superadmin::lang.pricing'))
-
-@section('css')
-    <link rel="stylesheet" href="{{ asset('css/pricing.css?v=' . $asset_v) }}">
-@endsection
+@section('with_scripts', true)
 
 @section('content')
     @include('superadmin::layouts.partials.currency')
+    @php
+        $currency = \App\System::getCurrency();
+        $currency_label = $currency && \Lang::has('guest.currency_' . $currency->code)
+            ? __('guest.currency_' . $currency->code)
+            : ($currency->symbol ?? $currency->code ?? '');
+        // المدة ظاهرة في مفتاح ربع سنوي/سنوي، فبنشيلها من اسم الباقة لو مكتوبة جواه بين قوسين
+        $package_name = function ($name) {
+            return trim(preg_replace('/\s*\(\s*(ربع\s*سنو[يى]|سنو[يى]|شهر[يى]|quarterly|yearly|annual|monthly)\s*\)\s*/iu', ' ', $name));
+        };
+        $visible_packages = $packages->filter(function ($package) {
+            return is_null($package->businesses);
+        });
+    @endphp
 
-    <div class="pricing-page" dir="rtl">
-        <header class="pricing-header">
-            <a href="{{ url('/') }}" class="pricing-brand">
-                <img src="{{ asset('img/logo-small.png') }}" alt="{{ config('app.name') }}">
-                <span>{{ config('app.name', 'UltimatePOS') }}</span>
-            </a>
+    <div class="rr-landing__wrap rr-pricing">
+        <header class="rr-pricing__intro">
+            <h1 class="rr-landing__title">@lang('guest.pricing_title')</h1>
+            <p class="rr-landing__lead">@lang('guest.pricing_lead')</p>
 
-            <nav class="pricing-nav">
-                <a href="{{ action([\App\Http\Controllers\Auth\LoginController::class, 'login']) }}{{ request()->lang ? '?lang=' . request()->lang : '' }}">تسجيل الدخول</a>
-                @if(config('constants.allow_registration'))
-                    <a href="{{ route('business.getRegister', array_filter(['lang' => request()->lang])) }}" class="pricing-nav-register">تسجيل</a>
-                @endif
-                <button type="button" class="pricing-language change_lang" value="{{ app()->getLocale() === 'ar' ? 'en' : 'ar' }}">
-                    <i class="fa fa-globe"></i>
-                    {{ app()->getLocale() === 'ar' ? 'العربية' : 'English' }}
-                    <i class="fa fa-chevron-down"></i>
-                </button>
-            </nav>
+            <div class="rr-segmented" role="group" aria-label="@lang('guest.pricing_duration')" id="rr_pricing_duration">
+                <button type="button" class="rr-segmented__item" data-duration="months" aria-pressed="true">@lang('guest.pricing_quarterly')</button>
+                <button type="button" class="rr-segmented__item" data-duration="years" aria-pressed="false">@lang('guest.pricing_yearly')</button>
+            </div>
+            <span class="rr-badge rr-badge--success" id="rr_pricing_saving">@lang('guest.pricing_saving')</span>
         </header>
 
-        <main class="pricing-main">
-            <section class="pricing-intro">
-                <h1>باقات التسعير</h1>
-                <p>اختر الباقة التي تناسب احتياجاتك وميزانيتك</p>
-                <span class="pricing-title-line"></span>
+        @foreach ($visible_packages->where('price', 0) as $package)
+            @include('superadmin::pricing.partials.trial_strip')
+        @endforeach
 
-                <div class="pricing-duration" role="group" aria-label="مدة الاشتراك">
-                    <button type="button" class="duration-option active" data-duration="months">ربع سنوى</button>
-                    <button type="button" class="duration-option" data-duration="years">سنوي</button>
+        <section class="rr-pricing__grid">
+            @php($pricing_index = 0)
+            @foreach ($visible_packages->where('price', '!=', 0) as $package)
+                @php($pricing_index++)
+                @include('superadmin::pricing.partials.package_card', ['card_index' => $pricing_index])
+            @endforeach
+        </section>
+
+        <section class="rr-landing__features rr-pricing__assurances">
+            @foreach ([['shield', 'no_card'], ['users', 'support'], ['calendar', 'trial'], ['gift', 'updates']] as [$icon, $key])
+                <div class="rr-pricing__assurance">
+                    <span class="rr-landing__feature-icon">@include('partials.rr.icon', ['name' => $icon, 'size' => 20])</span>
+                    <span><strong>@lang('guest.assurance_' . $key)</strong><small>@lang('guest.assurance_' . $key . '_desc')</small></span>
                 </div>
-                <div class="pricing-saving">وفر 15% عند اختيار الدفع سنويًا</div>
-            </section>
+            @endforeach
+        </section>
 
-            <section class="pricing-grid">
-                @php($pricing_index = 0)
-                @foreach($packages as $package)
-                    @if(!is_null($package->businesses))
-                        @continue
-                    @endif
-                    @php($pricing_index++)
-                    @include('superadmin::pricing.partials.package_card', ['card_index' => $pricing_index])
-                @endforeach
-            </section>
-
-            <section class="pricing-assurances">
-                <div><i class="fa fa-shield-alt"></i><p><strong>بدون بطاقة ائتمان</strong><span>لا نطلب بيانات البطاقة</span></p></div>
-                <div><i class="fa fa-headset"></i><p><strong>دعم فني مميز</strong><span>فريق دعم جاهز لمساعدتك</span></p></div>
-                <div><i class="fa fa-calendar-check"></i><p><strong>تجربة مجانية</strong><span>جرّب النظام قبل الاشتراك</span></p></div>
-                <div><i class="fa fa-gift"></i><p><strong>تحديثات مستمرة</strong><span>مزايا جديدة باستمرار</span></p></div>
-            </section>
-
-            <p class="pricing-tax-note"><i class="fa fa-shield-alt"></i> جميع الأسعار شاملة ضريبة القيمة المضافة</p>
-        </main>
+        <p class="rr-pricing__note">@include('partials.rr.icon', ['name' => 'info', 'size' => 16]) @lang('guest.pricing_tax_note')</p>
     </div>
 @stop
 
 @section('javascript')
     <script>
         $(function() {
-            $('.change_lang').on('click', function() {
-                window.location = "{{ route('pricing') }}?lang=" + $(this).val();
+            var $packages = $('.rr-package');
+            var hasMonths = $packages.filter('.months').length > 0;
+            var hasYears = $packages.filter('.years').length > 0;
+
+            function showDuration(duration) {
+                $('#rr_pricing_duration .rr-segmented__item').each(function() {
+                    $(this).attr('aria-pressed', $(this).data('duration') === duration ? 'true' : 'false');
+                });
+                $packages.filter('.months, .years').prop('hidden', true);
+                $packages.filter('.' + duration).prop('hidden', false);
+            }
+
+            $('#rr_pricing_duration').on('click', '.rr-segmented__item', function() {
+                showDuration($(this).data('duration'));
             });
 
-            $('.duration-option').on('click', function() {
-                const duration = $(this).data('duration');
-                $('.duration-option').removeClass('active');
-                $(this).addClass('active');
-                $('.pricing-package.months, .pricing-package.years').hide();
-                $('.pricing-package.' + duration).fadeIn(180);
-            });
-
-            const initialDuration = $('.pricing-package.months').length ? 'months' : 'years';
-            $('.duration-option[data-duration="' + initialDuration + '"]').trigger('click');
-            if (!$('.pricing-package.years').length || !$('.pricing-package.months').length) {
-                $('.pricing-duration, .pricing-saving').hide();
+            if (hasMonths && hasYears) {
+                showDuration('months');
+            } else {
+                $('#rr_pricing_duration, #rr_pricing_saving').prop('hidden', true);
             }
         });
     </script>
