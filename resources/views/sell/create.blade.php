@@ -117,6 +117,16 @@
 @endsection
 
 @section('content')
+{{-- الشاشة القديمة بتظهر بس لليوزر اللي رجع لها؛ الشريط ده بيرجّعه للجديدة --}}
+<div class="rr-scope rr-classic-note no-print">
+	<span>@lang('sell_form.classic_note')</span>
+	<form method="POST" action="{{ route('sells.create.switch') }}" class="rr-inline-form">
+		@csrf
+		<input type="hidden" name="version" value="new">
+		<input type="hidden" name="query" value="{{ request()->getQueryString() }}">
+		<button type="submit" class="rr-btn rr-btn--primary rr-btn--sm">@lang('sell_form.try_new_screen')</button>
+	</form>
+</div>
 <!-- Content Header (Page header) -->
 <section class="content-header">
     <h1 class="tw-text-xl md:tw-text-3xl tw-font-bold tw-text-black">{{$title}}</h1>

@@ -71,37 +71,56 @@
                 </button>
             </form>
 
+            {{-- حجم الخط: بيتحفظ على الجهاز ده بس (localStorage) وبيكبّر البرنامج كله، والاختيار بيتطبق من الـ head قبل ما الصفحة ترسم --}}
+            <details class="rr-appbar__menu rr-appbar__font">
+                <summary class="rr-btn rr-btn--secondary rr-btn--icon" title="@lang('display.font_size')" aria-label="@lang('display.font_size')">
+                    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19l5.5-14L14 19M5.2 14h6.6M15 19l3-7.5 3 7.5M16.1 16.5h3.8" /></svg>
+                </summary>
+                <div class="rr-appbar__dropdown rr-appbar__dropdown--end" role="menu" aria-label="@lang('display.font_size')">
+                    @foreach (['md' => 'font_normal', 'lg' => 'font_large', 'xl' => 'font_xlarge'] as $rrFont => $rrFontLabel)
+                        <button type="button" class="rr-appbar__item rr-appbar__font-opt" role="menuitemradio" data-rr-font="{{ $rrFont }}" aria-checked="false">
+                            <span class="rr-appbar__font-a rr-appbar__font-a--{{ $rrFont }}" aria-hidden="true">أ</span>
+                            @lang('display.' . $rrFontLabel)
+                        </button>
+                    @endforeach
+                </div>
+            </details>
+            <script>
+                (function() {
+                    var root = document.documentElement, opts = document.querySelectorAll('.rr-appbar__font-opt');
+                    var mark = function() {
+                        var cur = root.getAttribute('data-rr-font') || 'md';
+                        opts.forEach(function(b) { b.setAttribute('aria-checked', b.getAttribute('data-rr-font') === cur ? 'true' : 'false'); });
+                    };
+                    opts.forEach(function(b) {
+                        b.addEventListener('click', function() {
+                            var size = b.getAttribute('data-rr-font');
+                            if (size === 'md') root.removeAttribute('data-rr-font'); else root.setAttribute('data-rr-font', size);
+                            try { localStorage.setItem('rr-font', size); } catch (e) {}
+                            mark();
+                            b.closest('details').removeAttribute('open');
+                        });
+                    });
+                    mark();
+                })();
+            </script>
+
             @include('layouts.partials.header-notifications')
 
-            <details class="rr-appbar__menu">
-                <summary class="rr-btn rr-btn--secondary rr-btn--icon" aria-label="@lang('lang_v1.calendar')">
-                    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 12h6M12 9v6" /></svg>
-                </summary>
-                <div class="rr-appbar__dropdown rr-appbar__dropdown--end" role="menu">
-                    <a href="{{ route('calendar') }}" class="rr-appbar__item" role="menuitem">
-                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M8 3v4M16 3v4" /></svg>
-                        @lang('lang_v1.calendar')
-                    </a>
-                    @if (Module::has('Essentials'))
+            {{-- الحاسبة والتقويم وجولة البرنامج اتشالوا عشان الشريط يبقى أخف (من غير زرار الجولة، الجولة مابتفتحش لوحدها كمان) --}}
+            @if (Module::has('Essentials'))
+                <details class="rr-appbar__menu">
+                    <summary class="rr-btn rr-btn--secondary rr-btn--icon" aria-label="@lang('essentials::lang.add_to_do')">
+                        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 12h6M12 9v6" /></svg>
+                    </summary>
+                    <div class="rr-appbar__dropdown rr-appbar__dropdown--end" role="menu">
                         <a href="#" data-href="{{ action([\Modules\Essentials\Http\Controllers\ToDoController::class, 'create']) }}" data-container="#task_modal" class="btn-modal rr-appbar__item" role="menuitem">
                             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 12l2 2 4-4" /></svg>
                             @lang('essentials::lang.add_to_do')
                         </a>
-                    @endif
-                    @if (auth()->user()->hasRole('Admin#' . auth()->user()->business_id))
-                        <a href="#" id="start_tour" class="rr-appbar__item" role="menuitem">
-                            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 17v.01M12 13.5a1.5 1.5 0 0 1 1-1.5 2.6 2.6 0 1 0-3-4" /></svg>
-                            @lang('lang_v1.application_tour')
-                        </a>
-                    @endif
-                </div>
-            </details>
-
-            <button id="btnCalculator" title="@lang('lang_v1.calculator')" aria-label="@lang('lang_v1.calculator')" data-content='@include('layouts.partials.calculator')'
-                type="button" data-trigger="click" data-html="true" data-placement="bottom"
-                class="rr-btn rr-btn--secondary rr-btn--icon rr-show-md">
-                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><rect x="8" y="7" width="8" height="3" rx="1" /><path d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01M16 17h.01" /></svg>
-            </button>
+                    </div>
+                </details>
+            @endif
 
             @can('profit_loss_report.view')
                 <button type="button" id="view_todays_profit" title="{{ __('home.todays_profit') }}" aria-label="{{ __('home.todays_profit') }}"

@@ -581,7 +581,99 @@ class SellController extends Controller
             return $datatable->make(true);
         }
 
-        return view('sell.index')->with($this->sellListViewData($business_id));
+        // الشاشة الافتراضية هي الجديدة (نظام رقمي)؛ القديمة لليوزر اللي اختار يرجع لها بس
+        $view = auth()->user()->use_classic_sells ? 'sell.index' : 'sell.index_v2';
+
+        return view($view)->with($this->sellListViewData($business_id));
+    }
+
+    /**
+     * Switches the current user between the new create/edit sale screens and the classic ones (for himself only).
+     * Keeps the query string (sale_type, status) so the user lands on the same kind of document,
+     * or goes back to the invoice being edited (edit_id).
+     */
+    public function switchCreate()
+    {
+        $data = request()->validate(['version' => ['required', 'in:new,classic'], 'query' => ['nullable', 'string', 'max:500'], 'edit_id' => ['nullable', 'integer']]);
+
+        $user = auth()->user();
+        $user->use_classic_sell_create = $data['version'] == 'classic';
+        $user->save();
+
+        // من شاشة التعديل: يرجع لنفس الفاتورة
+        if (! empty($data['edit_id'])) {
+            return redirect()->action([self::class, 'edit'], [$data['edit_id']]);
+        }
+
+        parse_str($data['query'] ?? '', $query);
+        $query = array_intersect_key($query, array_flip(['sale_type', 'status']));
+
+        return redirect()->to(action([self::class, 'create']).($query ? '?'.http_build_query($query) : ''));
+    }
+
+    /**
+     * Customer card on the new create/edit invoice screens: phone, balance due, credit limit
+     * (with what is still available, computed like TransactionUtil::isCustomerCreditLimitExeeded)
+     * and the last final invoice. `exclude` skips the invoice being edited.
+     */
+    public function customerSummary($contact_id)
+    {
+        if (! auth()->user()->can('direct_sell.access') && ! auth()->user()->can('direct_sell.update') && ! auth()->user()->can('so.create')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $business_id = request()->session()->get('user.business_id');
+        $contact = Contact::where('business_id', $business_id)->findOrFail($contact_id);
+        $exclude = (int) request()->input('exclude');
+
+        $credit = Transaction::where('business_id', $business_id)->where('contact_id', $contact->id)
+            ->where('type', 'sell')->where('status', 'final')
+            ->when($exclude, fn ($q) => $q->where('id', '!=', $exclude))
+            ->select(
+                DB::raw('SUM(final_total) as total_invoice'),
+                DB::raw('SUM((SELECT SUM(IF(is_return = 1, -1 * amount, amount)) FROM transaction_payments WHERE transaction_payments.transaction_id = transactions.id)) as invoice_paid')
+            )->first();
+        $credit_used = (float) ($credit->total_invoice ?? 0) - (float) ($credit->invoice_paid ?? 0);
+
+        $last = Transaction::where('business_id', $business_id)->where('contact_id', $contact->id)
+            ->where('type', 'sell')->where('status', 'final')
+            ->when($exclude, fn ($q) => $q->where('id', '!=', $exclude))
+            ->latest('transaction_date')->first(['id', 'invoice_no', 'transaction_date', 'final_total']);
+
+        $due = (float) $this->transactionUtil->getContactDue($contact->id, $business_id);
+        $limit = is_null($contact->credit_limit) ? null : (float) $contact->credit_limit;
+
+        return response()->json([
+            'name' => $contact->name,
+            'mobile' => $contact->mobile,
+            'is_default' => (bool) $contact->is_default,
+            'due' => $due,
+            'due_text' => $this->transactionUtil->num_f($due, true),
+            'credit_limit' => $limit,
+            'credit_limit_text' => is_null($limit) ? null : $this->transactionUtil->num_f($limit, true),
+            'credit_available' => is_null($limit) ? null : $limit - $credit_used,
+            'credit_available_text' => is_null($limit) ? null : $this->transactionUtil->num_f($limit - $credit_used, true),
+            'last_invoice' => $last ? [
+                'invoice_no' => $last->invoice_no,
+                'date' => $this->transactionUtil->format_date($last->transaction_date),
+                'total_text' => $this->transactionUtil->num_f($last->final_total, true),
+            ] : null,
+            'url' => auth()->user()->can('customer.view') || auth()->user()->can('customer.view_own') ? action([\App\Http\Controllers\ContactController::class, 'show'], [$contact->id]) : null,
+        ]);
+    }
+
+    /**
+     * Switches the current user between the new sells list and the classic one (for himself only).
+     */
+    public function switchList()
+    {
+        $data = request()->validate(['version' => ['required', 'in:new,classic']]);
+
+        $user = auth()->user();
+        $user->use_classic_sells = $data['version'] == 'classic';
+        $user->save();
+
+        return redirect()->action([self::class, 'index']);
     }
 
     /**
@@ -913,7 +1005,10 @@ class SellController extends Controller
 
         $change_return = $this->dummyPaymentLine;
 
-        return view('sell.create')
+        // شاشة الإنشاء الافتراضية هي الجديدة (نظام رقمي)؛ القديمة لليوزر اللي اختار يرجع لها بس
+        $create_view = auth()->user()->use_classic_sell_create ? 'sell.create' : 'sell.create_v2';
+
+        return view($create_view)
             ->with(compact(
                 'business_details',
                 'taxes',
@@ -1201,6 +1296,7 @@ class SellController extends Controller
                             'units.id as unit_id',
                             'transaction_sell_lines.sub_unit_id',
                             'transaction_sell_lines.so_line_id',
+                            'variations.default_purchase_price',
                             DB::raw('vld.qty_available + transaction_sell_lines.quantity AS qty_available')
                         )
                         ->get();
@@ -1401,7 +1497,9 @@ class SellController extends Controller
         //Added check because $users is of no use if enable_contact_assign if false
         $users = config('constants.enable_contact_assign') ? User::forDropdown($business_id, false, false, false, true) : [];
 
-        return view('sell.edit')
+        $edit_view = auth()->user()->use_classic_sell_create ? 'sell.edit' : 'sell.edit_v2';
+
+        return view($edit_view)
             ->with(compact('business_details', 'taxes', 'sell_details', 'transaction', 'commission_agent', 'types', 'customer_groups', 'pos_settings', 'waiters', 'invoice_schemes', 'default_invoice_schemes', 'redeem_details', 'edit_discount', 'edit_price', 'shipping_statuses', 'warranties', 'statuses', 'sales_orders', 'payment_types', 'accounts', 'payment_lines', 'change_return', 'is_order_request_enabled', 'customer_due', 'users'));
     }
 

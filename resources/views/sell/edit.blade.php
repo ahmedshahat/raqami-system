@@ -12,6 +12,15 @@
 </section>
 <!-- Main content -->
 <section class="content">
+<div class="rr-scope rr-classic-note no-print">
+	<span>@lang('sell_form.classic_note')</span>
+	<form method="POST" action="{{ route('sells.create.switch') }}" class="rr-inline-form">
+		@csrf
+		<input type="hidden" name="version" value="new">
+		<input type="hidden" name="edit_id" value="{{ $transaction->id }}">
+		<button type="submit" class="rr-btn rr-btn--primary rr-btn--sm">@lang('sell_form.try_new_screen')</button>
+	</form>
+</div>
 <input type="hidden" id="amount_rounding_method" value="{{$pos_settings['amount_rounding_method'] ?? ''}}">
 <input type="hidden" id="amount_rounding_method" value="{{$pos_settings['amount_rounding_method'] ?? 'none'}}">
 @if(!empty($pos_settings['allow_overselling']))

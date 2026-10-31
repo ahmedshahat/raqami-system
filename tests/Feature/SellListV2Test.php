@@ -294,4 +294,23 @@ class SellListV2Test extends TestCase
 
         $this->get('/sells')->assertOk()->assertSee('id="sell_table"', false);
     }
+
+    public function test_sells_opens_the_new_list_and_each_user_can_switch_back(): void
+    {
+        $this->user->forceFill(['use_classic_sells' => 0])->save();
+
+        $this->get('/sells')->assertOk()
+            ->assertSee('id="rr_sells_kpis"', false)
+            ->assertSee(route('sells.switch'), false);
+
+        $this->post(route('sells.switch'), ['version' => 'classic'])->assertRedirect();
+        $this->assertTrue((bool) $this->user->fresh()->use_classic_sells);
+        $this->get('/sells')->assertOk()
+            ->assertDontSee('id="rr_sells_kpis"', false)
+            ->assertSee(__('sell_list.try_new_screen'));
+
+        $this->post(route('sells.switch'), ['version' => 'new'])->assertRedirect();
+        $this->assertFalse((bool) $this->user->fresh()->use_classic_sells);
+        $this->post(route('sells.switch'), ['version' => 'other'])->assertSessionHasErrors('version');
+    }
 }

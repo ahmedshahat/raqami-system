@@ -232,6 +232,9 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('/sells/v2', [SellController::class, 'indexV2'])->name('sells.v2');
     Route::get('/sells/v2/summary', [SellController::class, 'listSummary'])->name('sells.v2.summary');
     Route::get('/sells/v2/export', [SellController::class, 'exportList'])->name('sells.v2.export');
+    Route::post('/sells/switch', [SellController::class, 'switchList'])->name('sells.switch');
+    Route::post('/sells/create/switch', [SellController::class, 'switchCreate'])->name('sells.create.switch');
+    Route::get('/sells/customer-summary/{contact_id}', [SellController::class, 'customerSummary'])->name('sells.customer_summary');
     Route::resource('sells', SellController::class)->except(['show']);
 
     Route::get('/import-sales', [ImportSalesController::class, 'index']);

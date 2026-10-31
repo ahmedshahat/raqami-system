@@ -23,6 +23,19 @@
 <![endif]-->
 
 <script src="{{ asset('js/vendor.js?v=' . $asset_v) }}"></script>
+<script>
+    // حجم الخط (zoom على الـ body): offset() بيقرا getBoundingClientRect اللي راجع متكبّر، والقوايم المنسدلة (select2،
+    // البحث عن صنف، ...) بتتحط جوه الـ body المتكبّر فبتتزق مرتين. بنرجّع الإحداثيات لمقياس الـ body
+    (function($) {
+        var getOffset = $.fn.offset;
+        $.fn.offset = function() {
+            var result = getOffset.apply(this, arguments);
+            if (arguments.length || !result) return result;
+            var zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+            return zoom === 1 ? result : {top: result.top / zoom, left: result.left / zoom};
+        };
+    })(jQuery);
+</script>
 
 @if (file_exists(public_path('js/lang/' . session()->get('user.language', config('app.locale')) . '.js')))
     <script src="{{ asset('js/lang/' . session()->get('user.language', config('app.locale')) . '.js?v=' . $asset_v) }}">

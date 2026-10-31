@@ -23,6 +23,15 @@
 @endsection
 
 @section('content')
+    {{-- الشاشة القديمة بتظهر بس لليوزر اللي رجع لها؛ الشريط ده بيرجّعه للجديدة --}}
+    <div class="rr-scope rr-classic-note no-print">
+        <span>@lang('sell_list.classic_note')</span>
+        <form method="POST" action="{{ route('sells.switch') }}" class="rr-inline-form">
+            @csrf
+            <input type="hidden" name="version" value="new">
+            <button type="submit" class="rr-btn rr-btn--primary rr-btn--sm">@lang('sell_list.try_new_screen')</button>
+        </form>
+    </div>
 
     <!-- Content Header (Page header) -->
     <section class="content-header no-print">

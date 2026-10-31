@@ -85,7 +85,17 @@ return [
     'col_added_by' => 'Added by',
     'col_sell_note' => 'Sell note',
     'col_staff_note' => 'Staff note',
+    'col_shipping_details' => 'Shipping details',
+    'col_service_type' => 'Service type',
+    'col_service_field' => 'Service field',
+    'col_table' => 'Table',
+    'col_waiter' => 'Service staff',
     'col_actions' => 'Actions',
+
+    // Switching between the new and the classic screen (per user)
+    'old_screen' => 'Back to the previous sales screen',
+    'classic_note' => 'A new sales screen with clearer KPIs and filters is available.',
+    'try_new_screen' => 'Go to the new screen',
 
     // Rows
     'select_row' => 'Select invoice :number',

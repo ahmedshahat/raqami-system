@@ -33,6 +33,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
     <title>@yield('title') - {{ Session::get('business.name') }}</title>
+    {{-- حجم الخط المحفوظ على الجهاز (اختياره من شريط التطبيق) --}}
+    <script>try { var rrFont = localStorage.getItem('rr-font'); if (rrFont === 'lg' || rrFont === 'xl') document.documentElement.setAttribute('data-rr-font', rrFont); } catch (e) {}</script>
 
     @include('layouts.partials.css')
     

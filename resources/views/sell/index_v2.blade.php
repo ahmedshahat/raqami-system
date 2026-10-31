@@ -15,7 +15,31 @@
         'added_by' => __('sell_list.col_added_by'),
         'additional_notes' => __('sell_list.col_sell_note'),
         'staff_note' => __('sell_list.col_staff_note'),
+        'shipping_details' => __('sell_list.col_shipping_details'),
     ];
+    // أعمدة الموديولات والحقول المخصصة بتظهر في قائمة الأعمدة بس لو مفعلة، زي الشاشة القديمة
+    $custom_labels = json_decode(session('business.custom_labels'), true) ?: [];
+    $extra_columns = [];
+    if (! empty($is_types_service_enabled)) {
+        $extra_columns['types_of_service_name'] = ['data' => 'types_of_service_name', 'name' => 'tos.name', 'label' => __('sell_list.col_service_type')];
+        $extra_columns['service_custom_field_1'] = ['data' => 'service_custom_field_1', 'name' => 'service_custom_field_1', 'label' => $custom_labels['types_of_service']['custom_field_1'] ?? __('sell_list.col_service_field')];
+    }
+    foreach (['custom_field_1', 'custom_field_2', 'custom_field_3', 'custom_field_4'] as $field) {
+        if (! empty($custom_labels['sell'][$field])) {
+            $extra_columns[$field] = ['data' => $field, 'name' => 'transactions.'.$field, 'label' => $custom_labels['sell'][$field]];
+        }
+    }
+    if (! empty($is_tables_enabled)) {
+        $extra_columns['table_name'] = ['data' => 'table_name', 'name' => 'tables.name', 'label' => __('sell_list.col_table')];
+    }
+    if (! empty($is_service_staff_enabled)) {
+        $extra_columns['waiter'] = ['data' => 'waiter', 'name' => 'ss.first_name', 'label' => __('sell_list.col_waiter')];
+    }
+    $optional_columns += array_map(fn ($c) => $c['label'], $extra_columns);
+    $extra_columns_js = [];
+    foreach ($extra_columns as $key => $c) {
+        $extra_columns_js[] = ['key' => $key, 'data' => $c['data'], 'name' => $c['name']];
+    }
 @endphp
 
 @section('css')
@@ -47,6 +71,12 @@
         <div class="rr-list-page__titles">
             <h1 id="rr_sells_title" class="rr-head__title">@lang('sell_list.title')</h1>
             <p class="rr-head__sub" id="rr_sells_range" aria-live="polite"></p>
+            {{-- الرجوع للشاشة القديمة لليوزر ده بس (users.use_classic_sells) --}}
+            <form method="POST" action="{{ route('sells.switch') }}" class="rr-inline-form">
+                @csrf
+                <input type="hidden" name="version" value="classic">
+                <button type="submit" class="rr-linkbtn">@lang('sell_list.old_screen')</button>
+            </form>
         </div>
         <div class="rr-head__actions">
             @can('direct_sell.access')
@@ -685,6 +715,14 @@
                     render: function(d, t) { return t === 'display' ? d : textOf(d); } },
                 { key: 'staff_note', data: 'staff_note', name: 'staff_note', searchable: false, orderable: false, className: 'rr-td rr-td--wrap', visible: false,
                     render: function(d, t) { return t === 'display' ? d : textOf(d); } },
+                { key: 'shipping_details', data: 'shipping_details', name: 'shipping_details', searchable: false, orderable: false, className: 'rr-td rr-td--wrap', visible: false,
+                    render: function(d) { return esc(textOf(d)); } },
+            );
+            $.each(@json($extra_columns_js), function(i, col) {
+                columns.push({ key: col.key, data: col.data, name: col.name, searchable: false, className: 'rr-td', visible: false,
+                    render: function(d, t) { return t === 'display' ? d : textOf(d); } });
+            });
+            columns.push(
                 { data: 'action', orderable: false, searchable: false, className: 'rr-td rr-td--actions rr-noexport',
                     render: function(d, t, row) { return t === 'display' ? buildActions(row) : ''; } },
                 // أعمدة مخفية: الترتيب الافتراضي بالتاريخ، والبحث برقم الهاتف

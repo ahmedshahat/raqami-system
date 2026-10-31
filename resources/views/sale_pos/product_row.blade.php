@@ -297,6 +297,8 @@
 		<input type="hidden" class="base_unit_multiplier" name="products[{{$row_count}}][base_unit_multiplier]" value="{{$multiplier}}">
 
 		<input type="hidden" class="hidden_base_unit_sell_price" value="{{$product->default_sell_price / $multiplier}}">
+		{{-- شاشة المبيعات الجديدة: المتاح بالوحدة الأساسية (لتنبيه المخزون) والتكلفة لمن يملك صلاحية رؤيتها (لتنبيه البيع بخسارة) --}}
+		<input type="hidden" class="rr_sf_line_check" value="{{ !empty($product->enable_stock) ? $product->qty_available : '' }}" data-cost="{{ auth()->user()->can('view_purchase_price') && isset($product->default_purchase_price) ? $product->default_purchase_price : '' }}">
 		
 		{{-- Hidden fields for combo products --}}
 		@if($product->product_type == 'combo'&& !empty($product->combo_products))
