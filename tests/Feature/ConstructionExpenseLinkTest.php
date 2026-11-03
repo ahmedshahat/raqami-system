@@ -1,0 +1,415 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Business;
+use App\BusinessLocation;
+use App\Contact;
+use App\Transaction;
+use App\Unit;
+use App\User;
+use App\Utils\ModuleUtil;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Mockery;
+use Modules\Accounting\Entities\AccountingAccount;
+use Modules\Accounting\Entities\AccountingAccountsTransaction;
+use Modules\Construction\Entities\ConstructionExpenseCancellation;
+use Modules\Construction\Support\AccountingReconciliationReport;
+use Modules\Construction\Entities\ConstructionProject;
+use Modules\Construction\Entities\ConstructionSubcontract;
+use Modules\Construction\Entities\ConstructionSubcontractCertificate;
+use Tests\TestCase;
+
+class ConstructionExpenseLinkTest extends TestCase
+{
+    use DatabaseTransactions;
+
+    public function test_expenses_can_optionally_link_to_a_project_and_one_of_its_items(): void
+    {
+        [$business, $user, $customer, $locationId] = $this->context();
+        $this->actingAs($user);
+
+        [$projectA, $itemA] = $this->projectWithItem($business->id, $user->id, $customer->id, 'A');
+        [$projectB, $itemB] = $this->projectWithItem($business->id, $user->id, $customer->id, 'B');
+
+        $this->get(route('expenses.create'))->assertOk()
+            ->assertSee(__('expense.construction_project'))
+            ->assertSee(__('expense.construction_project_item'));
+
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-PLAIN', 100))
+            ->assertRedirect('expenses');
+        $plain = Transaction::where('business_id', $business->id)->where('ref_no', 'EXP-PLAIN')->firstOrFail();
+        $this->assertNull($plain->construction_project_id);
+        $this->assertNull($plain->construction_boq_item_id);
+
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-PROJECT', 200) + [
+            'construction_project_id' => $projectA->id,
+        ])->assertRedirect('expenses');
+        $general = Transaction::where('business_id', $business->id)->where('ref_no', 'EXP-PROJECT')->firstOrFail();
+        $this->assertSame($projectA->id, $general->construction_project_id);
+        $this->assertNull($general->construction_boq_item_id);
+
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-ITEM', 300) + [
+            'construction_project_id' => $projectA->id,
+            'construction_boq_item_id' => $itemA->id,
+        ])->assertRedirect('expenses');
+        $itemExpense = Transaction::where('business_id', $business->id)->where('ref_no', 'EXP-ITEM')->firstOrFail();
+        $this->assertSame($projectA->id, $itemExpense->constructionProject->id);
+        $this->assertSame($itemA->id, $itemExpense->constructionProjectItem->id);
+
+        $this->from(route('expenses.create'))->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-INVALID', 400) + [
+            'construction_project_id' => $projectA->id,
+            'construction_boq_item_id' => $itemB->id,
+        ])->assertRedirect(route('expenses.create'))->assertSessionHasErrors('construction_boq_item_id');
+        $this->assertDatabaseMissing('transactions', ['business_id' => $business->id, 'ref_no' => 'EXP-INVALID']);
+
+        $this->put(route('expenses.update', $itemExpense->id), $this->expensePayload($locationId, 'EXP-ITEM', 300) + [
+            'construction_project_id' => $projectB->id,
+            'construction_boq_item_id' => '',
+        ])->assertRedirect('expenses');
+        $itemExpense->refresh();
+        $this->assertSame($projectB->id, $itemExpense->construction_project_id);
+        $this->assertNull($itemExpense->construction_boq_item_id);
+
+        $items = $this->getJson(route('expenses.construction-project-items', $projectA->id))
+            ->assertOk()->json();
+        $this->assertSame([$itemA->id], collect($items)->pluck('id')->all());
+
+        $projectPage = $this->get(route('construction.projects.show', $projectA->id))->assertOk();
+        $projectPage->assertSee(__('construction::lang.project_cost_summary'))
+            ->assertSee(__('construction::lang.recent_project_expenses'))
+            ->assertSee('EXP-PROJECT')
+            ->assertSee('Construction expense test')
+            ->assertSee('200');
+        $this->assertSame(1, substr_count($projectPage->getContent(), 'ct-project-expense-note'));
+
+        $this->assertEquals(200.0, (float) $projectA->expenses()->sum('final_total'));
+        $this->assertNull($plain->fresh()->construction_project_id);
+
+        $this->post(route('expenses.store'), array_merge(
+            $this->expensePayload($locationId, 'EXP-WITHOUT-NOTES', 75),
+            ['construction_project_id' => $projectA->id, 'additional_notes' => '']
+        ))->assertRedirect('expenses');
+        $projectPageWithoutEmptyNote = $this->get(route('construction.projects.show', $projectA->id))->assertOk();
+        $projectPageWithoutEmptyNote->assertSee('EXP-WITHOUT-NOTES');
+        $this->assertSame(1, substr_count($projectPageWithoutEmptyNote->getContent(), 'ct-project-expense-note'));
+    }
+
+    public function test_project_item_cannot_be_selected_without_a_project(): void
+    {
+        [$business, $user, $customer, $locationId] = $this->context();
+        $this->actingAs($user);
+        [, $item] = $this->projectWithItem($business->id, $user->id, $customer->id, 'ONLY');
+
+        $this->from(route('expenses.create'))->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-NO-PROJECT', 50) + [
+            'construction_boq_item_id' => $item->id,
+        ])->assertRedirect(route('expenses.create'))->assertSessionHasErrors('construction_boq_item_id');
+    }
+
+    public function test_costs_overview_uses_project_linked_expenses_and_supports_project_filtering(): void
+    {
+        [$business, $user, $customer, $locationId] = $this->context();
+        $this->actingAs($user);
+        [$projectA] = $this->projectWithItem($business->id, $user->id, $customer->id, 'COST-A');
+        [$projectB] = $this->projectWithItem($business->id, $user->id, $customer->id, 'COST-B');
+
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-COST-A', 250) + [
+            'construction_project_id' => $projectA->id,
+        ])->assertRedirect('expenses');
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-COST-B', 400) + [
+            'construction_project_id' => $projectB->id,
+        ])->assertRedirect('expenses');
+
+        $overview = $this->get(route('construction.costs.index'))->assertOk();
+        $overview->assertSee(__('construction::lang.costs_overview_title'))
+            ->assertSee(__('construction::lang.total_recorded_costs'))
+            ->assertSee(__('construction::lang.cost_materials'))
+            ->assertSee(__('construction::lang.cost_labor'))
+            ->assertSee('EXP-COST-A')
+            ->assertSee('EXP-COST-B');
+
+        $filtered = $this->get(route('construction.costs.index', ['project_id' => $projectA->id]))->assertOk();
+        $filtered->assertSee('data-expense-reference="EXP-COST-A"', false)
+            ->assertDontSee('data-expense-reference="EXP-COST-B"', false);
+        $this->assertStringContainsString(
+            route('expenses.index', ['construction_only' => 1, 'construction_project_id' => $projectA->id]),
+            html_entity_decode($filtered->getContent())
+        );
+    }
+
+    public function test_project_expense_uses_the_expense_module_accounting_entry_once(): void
+    {
+        [$business, $user, $customer, $locationId] = $this->context();
+        $this->actingAs($user);
+        [$project] = $this->projectWithItem($business->id, $user->id, $customer->id, 'ACCOUNTING');
+
+        $expenseAccount = AccountingAccount::create([
+            'business_id' => $business->id, 'name' => 'Test project general expense '.uniqid(),
+            'account_primary_type' => 'expenses', 'status' => 'active', 'created_by' => $user->id,
+        ]);
+        $cashAccount = AccountingAccount::create([
+            'business_id' => $business->id, 'name' => 'Test project expense cash '.uniqid(),
+            'account_primary_type' => 'asset', 'account_sub_type_id' => 3,
+            'status' => 'active', 'created_by' => $user->id,
+        ]);
+        $location = BusinessLocation::where('business_id', $business->id)->findOrFail($locationId);
+        $location->accounting_default_map = json_encode([
+            'expense' => ['deposit_to' => $expenseAccount->id, 'payment_account' => $cashAccount->id],
+        ]);
+        $location->save();
+
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-ACCOUNTING-ONCE', 275) + [
+            'construction_project_id' => $project->id,
+        ])->assertRedirect('expenses');
+        $expense = Transaction::where('business_id', $business->id)->where('ref_no', 'EXP-ACCOUNTING-ONCE')->firstOrFail();
+        $lines = AccountingAccountsTransaction::where('transaction_id', $expense->id)
+            ->whereNull('transaction_payment_id')->get()->keyBy('map_type');
+        $this->assertCount(2, $lines);
+        $this->assertTrue($lines->every(fn ($line) => (int) $line->construction_project_id === $project->id));
+        $this->assertSame('debit', $lines['deposit_to']->type);
+        $this->assertSame($expenseAccount->id, (int) $lines['deposit_to']->accounting_account_id);
+        $this->assertSame('credit', $lines['payment_account']->type);
+        $this->assertSame($cashAccount->id, (int) $lines['payment_account']->accounting_account_id);
+        $this->assertEquals(275, (float) $lines['deposit_to']->amount);
+        $this->assertEquals(275, (float) $project->expenses()->sum('final_total'));
+
+        $this->put(route('expenses.update', $expense->id), $this->expensePayload($locationId, 'EXP-ACCOUNTING-ONCE', 325) + [
+            'construction_project_id' => $project->id,
+        ])->assertStatus(422);
+        $updatedLines = AccountingAccountsTransaction::where('transaction_id', $expense->id)
+            ->whereNull('transaction_payment_id')->get();
+        $this->assertCount(2, $updatedLines, 'A posted project expense must preserve its original entry.');
+        $this->assertEquals(275, (float) $updatedLines->firstWhere('map_type', 'deposit_to')->amount);
+        $this->assertEquals(275, (float) $project->expenses()->sum('final_total'));
+        $this->get(route('accounting.projectProfitLoss', [
+            'construction_project_id' => $project->id,
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->toDateString(),
+        ]))->assertOk()->assertSee($project->code)->assertSee($expenseAccount->name)->assertSee('275');
+    }
+
+    public function test_posted_project_expense_is_cancelled_with_a_reversing_entry(): void
+    {
+        [$business, $user, $customer, $locationId] = $this->context();
+        $user->update(['password' => Hash::make('Test-pass-123')]);
+        $this->actingAs($user);
+        [$project] = $this->projectWithItem($business->id, $user->id, $customer->id, 'REVERSAL');
+        $expenseAccount = AccountingAccount::create([
+            'business_id' => $business->id, 'name' => 'Reversal expense '.uniqid(),
+            'account_primary_type' => 'expenses', 'status' => 'active', 'created_by' => $user->id,
+        ]);
+        $cashAccount = AccountingAccount::create([
+            'business_id' => $business->id, 'name' => 'Reversal cash '.uniqid(),
+            'account_primary_type' => 'asset', 'account_sub_type_id' => 3, 'status' => 'active', 'created_by' => $user->id,
+        ]);
+        $location = BusinessLocation::where('business_id', $business->id)->findOrFail($locationId);
+        $location->update(['accounting_default_map' => json_encode([
+            'expense' => ['deposit_to' => $expenseAccount->id, 'payment_account' => $cashAccount->id],
+        ])]);
+
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-REVERSE', 450) + [
+            'construction_project_id' => $project->id,
+        ])->assertRedirect('expenses');
+        $expense = Transaction::where('business_id', $business->id)->where('ref_no', 'EXP-REVERSE')->firstOrFail();
+        $beforeCancellation = app(AccountingReconciliationReport::class)->build($business->id);
+        $expenseTotalBeforeCancellation = (float) app(\App\Utils\TransactionUtil::class)
+            ->getExpenseReport($business->id, [], 'total')->total_expense;
+        $this->assertFalse($beforeCancellation['issues']->contains(fn ($issue) => $issue['source_type'] === 'project_expense' && $issue['source_id'] === $expense->id));
+        $this->get(route('construction.settings.accounting.reconciliation'))
+            ->assertOk()->assertSee(__('construction::lang.accounting_reconciliation'));
+
+        $this->post(route('construction.costs.expenses.cancel', $expense->id), [
+            'current_password' => 'Test-pass-123',
+            'cancellation_reason' => 'Duplicate supplier expense',
+        ])->assertRedirect();
+
+        $cancellation = ConstructionExpenseCancellation::where('expense_transaction_id', $expense->id)->firstOrFail();
+        $refund = Transaction::findOrFail($cancellation->refund_transaction_id);
+        $this->assertSame('expense_refund', $refund->type);
+        $this->assertSame('construction_expense_cancellation', $refund->source);
+        $this->assertEquals(450, (float) $refund->final_total);
+        $this->assertNull($refund->construction_project_id);
+        $this->assertSame(0, AccountingAccountsTransaction::where('transaction_id', $refund->id)->count());
+        $reversal = AccountingAccountsTransaction::where('acc_trans_mapping_id', $cancellation->accounting_mapping_id)->get();
+        $this->assertCount(2, $reversal);
+        $this->assertEquals(450, (float) $reversal->where('type', 'debit')->sum('amount'));
+        $this->assertEquals(450, (float) $reversal->where('type', 'credit')->sum('amount'));
+        $this->assertEquals(0, (float) $project->expenses()->sum('final_total'));
+        $this->assertDatabaseHas('transactions', ['id' => $expense->id, 'final_total' => 450]);
+        $expenseTotalAfterCancellation = (float) app(\App\Utils\TransactionUtil::class)
+            ->getExpenseReport($business->id, [], 'total')->total_expense;
+        $this->assertEquals($expenseTotalBeforeCancellation - 450, $expenseTotalAfterCancellation);
+        $this->get(action([\App\Http\Controllers\ExpenseController::class, 'edit'], $refund->id))
+            ->assertStatus(422);
+        $afterCancellation = app(AccountingReconciliationReport::class)->build($business->id);
+        $this->assertFalse($afterCancellation['issues']->contains(fn ($issue) => $issue['source_type'] === 'project_expense_reversal' && $issue['source_id'] === $cancellation->id));
+    }
+
+    public function test_expenses_remain_independent_when_construction_is_not_in_the_company_subscription(): void
+    {
+        [$business, $user, $customer, $locationId] = $this->context();
+        $this->actingAs($user);
+        [$project, $item] = $this->projectWithItem($business->id, $user->id, $customer->id, 'DISABLED');
+
+        $moduleUtil = Mockery::mock(ModuleUtil::class)->makePartial();
+        $moduleUtil->shouldReceive('isModuleInstalled')->with('Construction')->andReturnTrue();
+        $moduleUtil->shouldReceive('hasThePermissionInSubscription')
+            ->with($business->id, 'construction_module')->andReturnFalse();
+        $this->app->instance(ModuleUtil::class, $moduleUtil);
+
+        $constructionQueries = [];
+        DB::listen(function ($query) use (&$constructionQueries) {
+            if (str_contains(strtolower($query->sql), 'construction_projects')
+                || str_contains(strtolower($query->sql), 'construction_boq_items')) {
+                $constructionQueries[] = $query->sql;
+            }
+        });
+
+        $this->get(route('expenses.create'))->assertOk()
+            ->assertDontSee(__('expense.construction_project'))
+            ->assertDontSee(__('expense.construction_project_item'));
+
+        $this->post(route('expenses.store'), $this->expensePayload($locationId, 'EXP-MODULE-OFF', 125) + [
+            'construction_project_id' => $project->id,
+            'construction_boq_item_id' => $item->id,
+        ])->assertRedirect('expenses');
+
+        $expense = Transaction::where('business_id', $business->id)
+            ->where('ref_no', 'EXP-MODULE-OFF')->firstOrFail();
+        $this->assertNull($expense->construction_project_id);
+        $this->assertNull($expense->construction_boq_item_id);
+
+        $this->get(route('expenses.edit', $expense->id))->assertOk()
+            ->assertDontSee(__('expense.construction_project'))
+            ->assertDontSee(__('expense.construction_project_item'));
+        $this->put(route('expenses.update', $expense->id), $this->expensePayload($locationId, 'EXP-MODULE-OFF', 150) + [
+            'construction_project_id' => $project->id,
+            'construction_boq_item_id' => $item->id,
+        ])->assertRedirect('expenses');
+        $expense->refresh();
+        $this->assertEquals(150.0, (float) $expense->final_total);
+        $this->assertNull($expense->construction_project_id);
+        $this->assertNull($expense->construction_boq_item_id);
+
+        $this->getJson(route('expenses.construction-project-items', $project->id))->assertNotFound();
+        $this->assertSame([], $constructionQueries, 'Disabled integration must not query Construction project or item tables.');
+    }
+
+    public function test_costs_include_only_approved_subcontract_certificates_and_respect_project_filtering(): void
+    {
+        [$business, $user, $contact] = $this->context();
+        $this->actingAs($user);
+        [$projectA] = $this->projectWithItem($business->id, $user->id, $contact->id, 'SUBCOST-A');
+        [$projectB] = $this->projectWithItem($business->id, $user->id, $contact->id, 'SUBCOST-B');
+
+        $subcontractA = ConstructionSubcontract::create([
+            'business_id' => $business->id,
+            'project_id' => $projectA->id,
+            'subcontractor_id' => $contact->id,
+            'number' => 'SC-COST-A-'.uniqid(),
+            'title' => 'Approved subcontract cost A',
+            'total_value' => 1500,
+            'status' => 'approved',
+            'created_by' => $user->id,
+        ]);
+        $subcontractB = ConstructionSubcontract::create([
+            'business_id' => $business->id,
+            'project_id' => $projectB->id,
+            'subcontractor_id' => $contact->id,
+            'number' => 'SC-COST-B-'.uniqid(),
+            'title' => 'Approved subcontract cost B',
+            'total_value' => 800,
+            'status' => 'approved',
+            'created_by' => $user->id,
+        ]);
+
+        $this->subcontractCertificate($subcontractA, $user->id, 'SC-IP-A1', 600, 'approved');
+        $this->subcontractCertificate($subcontractA, $user->id, 'SC-IP-A2', 900, 'draft');
+        $this->subcontractCertificate($subcontractB, $user->id, 'SC-IP-B1', 400, 'approved');
+
+        $filteredA = $this->get(route('construction.costs.index', ['project_id' => $projectA->id]))->assertOk();
+        $filteredA->assertSee('data-cost-source="subcontracts" data-cost-value="600" data-document-count="1"', false)
+            ->assertDontSee('data-cost-value="900"', false);
+
+        $filteredB = $this->get(route('construction.costs.index', ['project_id' => $projectB->id]))->assertOk();
+        $filteredB->assertSee('data-cost-source="subcontracts" data-cost-value="400" data-document-count="1"', false);
+
+        $projectPage = $this->get(route('construction.projects.show', $projectA->id))->assertOk();
+        $projectPage->assertSee('data-cost-source="subcontracts" data-cost-value="600"', false);
+    }
+
+    private function subcontractCertificate(ConstructionSubcontract $subcontract, int $userId, string $number, float $grossValue, string $status): ConstructionSubcontractCertificate
+    {
+        return ConstructionSubcontractCertificate::create([
+            'business_id' => $subcontract->business_id,
+            'project_id' => $subcontract->project_id,
+            'subcontract_id' => $subcontract->id,
+            'number' => $number.'-'.uniqid(),
+            'certificate_date' => now()->toDateString(),
+            'gross_value' => $grossValue,
+            'net_value' => $grossValue,
+            'status' => $status,
+            'created_by' => $userId,
+            'approved_by' => $status === 'approved' ? $userId : null,
+            'approved_at' => $status === 'approved' ? now() : null,
+        ]);
+    }
+
+    private function context(): array
+    {
+        $business = Business::whereHas('locations')->whereIn('id', Unit::select('business_id'))->firstOrFail();
+        $user = User::findOrFail($business->owner_id);
+        $customer = Contact::where('business_id', $business->id)->whereIn('type', ['customer', 'both'])->firstOrFail();
+        $locationId = $business->locations()->value('id');
+        $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+        $_SERVER['HTTP_USER_AGENT'] = 'PHPUnit';
+
+        return [$business, $user, $customer, $locationId];
+    }
+
+    private function projectWithItem(int $businessId, int $userId, int $customerId, string $suffix): array
+    {
+        $project = ConstructionProject::create([
+            'business_id' => $businessId,
+            'code' => 'EXP-'.$suffix.'-'.uniqid(),
+            'name' => 'Expense project '.$suffix,
+            'customer_id' => $customerId,
+            'status' => 'draft',
+            'created_by' => $userId,
+        ]);
+        $boq = $project->boqVersions()->create([
+            'business_id' => $businessId,
+            'version_number' => 1,
+            'name' => 'Project items',
+            'status' => 'draft',
+            'sales_total' => 1000,
+            'created_by' => $userId,
+        ]);
+        $item = $boq->items()->create([
+            'business_id' => $businessId,
+            'project_id' => $project->id,
+            'row_type' => 'item',
+            'code' => 'ITEM-'.$suffix,
+            'description' => 'Expense item '.$suffix,
+            'unit' => 'وحدة',
+            'contract_quantity' => 1,
+            'sales_unit_price' => 1000,
+            'sales_total' => 1000,
+            'item_kind' => 'standard',
+        ]);
+
+        return [$project, $item];
+    }
+
+    private function expensePayload(int $locationId, string $reference, float $total): array
+    {
+        return [
+            'location_id' => $locationId,
+            'ref_no' => $reference,
+            'final_total' => (string) $total,
+            'additional_notes' => 'Construction expense test',
+        ];
+    }
+}

@@ -69,6 +69,11 @@ class HomeController extends Controller
             return redirect()->action([\Modules\Crm\Http\Controllers\DashboardController::class, 'index']);
         }
 
+        // الرئيسية الافتراضية هي الجديدة (نظام رقمي)؛ الواجهة دي لليوزر اللي اختار يرجع لها بس
+        if (! $user->use_classic_home) {
+            return app(HomeDashboardController::class)->index(request());
+        }
+
         $business_id = request()->session()->get('user.business_id');
 
         $is_admin = $this->businessUtil->is_admin(auth()->user());

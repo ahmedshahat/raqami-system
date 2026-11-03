@@ -3,6 +3,8 @@
 /public/storage
 /storage/*.key
 /storage/
+/betasolu_v612.sql
+/deployment-backups/
 /vendor
 /.idea
 /.vagrant

@@ -1,26 +1,14 @@
-<?php
-
-return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Unit Language Lines
-    |--------------------------------------------------------------------------
-    |
-    | The following language lines are used for Units CRUD operations.
-    |
-    */
-
-    'units' => 'الوحدات',
-    'manage_your_units' => 'إدارة الوحدات الخاصة بك',
-    'all_your_units' => 'جميع الوحدات الخاصة بك',
-    'name' => 'الاسم',
-    'short_name' => 'الاسم المختصر',
-    'allow_decimal' => 'السماح بالأرقام العشرية',
-    'added_success' => 'تمت إضافة الوحدة بنجاح',
-    'updated_success' => 'تم تحديث الوحدة بنجاح',
-    'deleted_success' => 'تم حذف الوحدة بنجاح',
-    'add_unit' => 'إضافة وحدة',
-    'edit_unit' => 'تعديل الوحدة',
-
+<?php 
+ return [ 
+"units" => "وحدات البيع ",
+"manage_your_units" => "ادارة وحدات البيع الخاصة بك ",
+"all_your_units" => "كل الوحدات الخاصة بك",
+"name" => "الإسم",
+"short_name" => "اسم مختصر",
+"allow_decimal" => "تفعيل استخدام الكسور ",
+"added_success" => "تم اضافة وحدة بيه بنجاح ",
+"updated_success" => "تم تحديث وحدة البيع بنجاح ",
+"deleted_success" => "تم حذف الوحدة بنجاح",
+"add_unit" => "اضافة وحدة بيع ",
+"edit_unit" => "تعديل",
 ];

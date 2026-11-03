@@ -1,5 +1,55 @@
 <!-- business information here -->
 
+<style>
+.classic-receipt-print .classic-products-table tbody > tr > td {
+	border-top: 0 !important;
+	border-bottom: 1px solid #d9dde3 !important;
+}
+
+.classic-receipt-print .classic-products-table tbody > tr:last-child > td {
+	border-bottom: 0 !important;
+}
+
+@media print {
+	.print_section .classic-receipt-print,
+	.print_section .classic-receipt-print * {
+		color: #000 !important;
+		-webkit-text-fill-color: #000 !important;
+		opacity: 1 !important;
+		text-shadow: none !important;
+		filter: none !important;
+	}
+
+	.print_section .classic-receipt-print table,
+	.print_section .classic-receipt-print thead,
+	.print_section .classic-receipt-print tbody,
+	.print_section .classic-receipt-print tfoot,
+	.print_section .classic-receipt-print tr,
+	.print_section .classic-receipt-print th,
+	.print_section .classic-receipt-print td {
+		background: #fff !important;
+		background-color: #fff !important;
+		border-color: #374151 !important;
+	}
+
+	.print_section .classic-receipt-print th,
+	.print_section .classic-receipt-print td {
+		font-weight: 500;
+	}
+
+	.print_section .classic-receipt-print .classic-products-table tbody > tr > td {
+		border-top: 0 !important;
+		border-bottom: 1px solid #d9dde3 !important;
+	}
+
+	.print_section .classic-receipt-print .classic-products-table tbody > tr:last-child > td {
+		border-bottom: 0 !important;
+	}
+}
+</style>
+
+<div class="classic-receipt-print">
+
 <div class="row" style="color: #000000 !important;">
 		<!-- Logo -->
 		@if(empty($receipt_details->letter_head))
@@ -287,7 +337,7 @@
 				$p_width -= 10;
 			@endphp
 		@endif
-		<table class="table table-responsive table-slim">
+		<table class="table table-responsive table-slim classic-products-table">
 			<thead>
 				<tr>
 					<th width="{{$p_width}}%">{{$receipt_details->table_product_label}}</th>
@@ -398,6 +448,13 @@
 	</div>
 </div>
 
+@php
+	$classic_total_quantity = collect($receipt_details->lines ?? [])->sum(function ($line) {
+		return (float) ($line['quantity_uf'] ?? 0);
+	});
+	$classic_total_quantity = rtrim(rtrim(number_format($classic_total_quantity, 2, '.', ','), '0'), '.');
+@endphp
+
 <div class="row" style="color: #000000 !important;">
 	<div class="col-md-12"><hr/></div>
 	<div class="col-xs-6">
@@ -464,16 +521,10 @@
         <div class="table-responsive">
           	<table class="table table-slim">
 				<tbody>
-					@if(!empty($receipt_details->total_quantity_label))
-						<tr>
-							<th style="width:70%">
-								{!! $receipt_details->total_quantity_label !!}
-							</th>
-							<td class="text-right">
-								{{$receipt_details->total_quantity}}
-							</td>
-						</tr>
-					@endif
+					<tr>
+						<th style="width:70%">إجمالي الكميات</th>
+						<td class="text-right">{{$classic_total_quantity}}</td>
+					</tr>
 
 					@if(!empty($receipt_details->total_items_label))
 						<tr>
@@ -662,4 +713,5 @@
 			@endif
 		</div>
 	@endif
+</div>
 </div>

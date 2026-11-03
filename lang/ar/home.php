@@ -1,32 +1,21 @@
-<?php
-
+<?php 
 return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Home Language Lines
-    |--------------------------------------------------------------------------
-    |
-    | The following language lines are used in home page.
-    |
-    */
-    'home' => 'الصفحة الرئيسية',
-    'welcome_message' => 'مرحبا :name 👋',
-    'total_sell' => 'إجمالي المبيعات',
-    'total_purchase' => 'إجمالي المشتريات',
-    'invoice_due' => 'فواتير مستحقة السداد',
-    'purchase_due' => 'مشتريات مستحقة السداد',
-    'today' => 'اليوم',
-    'this_week' => 'هذا الأسبوع',
-    'this_month' => 'هذا الشهر',
-    'this_fy' => 'هذه السنة المالية',
-    'sells_last_30_days' => 'إجمالي مبيعات أخر 30 يوم',
-    'sells_current_fy' => 'إجمالي مبيعات السنة المالية الحالية',
-    'total_sells' => 'إجمالي المبيعات (:currency)',
-    'product_stock_alert' => 'تنبيه مخزون المنتجات',
-    'payment_dues' => 'مدفوعات مستحقة',
-    'due_amount' => 'المبلغ المستحق',
-    'stock_expiry_alert' => 'تنبيه انتهاء تاريخ صلاحية المخزون',
-    'todays_profit' => "أرباح اليوم",
-    'dashboard' => 'لوحة المعلومات',
+"home" => "الرئيسية",
+"welcome_message" => ",:name مرحبا",
+"total_sell" => "اجمالي المبيعات",
+"total_purchase" => "المشتريات ",
+"invoice_due" => " مبيعات غير مدفوعة",
+"purchase_due" => "المشتريات غير مدفوعة",
+"today" => "اليوم",
+"this_week" => "هذا الأسبوع",
+"this_month" => "هذا الشهر",
+"this_fy" => "هذه السنة المالية",
+"sells_last_30_days" => "المبيعات في آخر 30 يومًا",
+"sells_current_fy" => "السنة المالية الحالية",
+"total_sells" => "(:currency) إجمالي المبيعات",
+"product_stock_alert" => "منتجات اوشكت على الانتهاء",
+"payment_dues" => "الديون",
+"due_amount" => "المبلغ المستحق",
+"stock_expiry_alert" => "تنبيه انتهاء الصلاحية", 
+"todays_profit" => "تقرير الارباح اليومى ", 
 ];

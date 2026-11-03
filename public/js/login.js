@@ -4,8 +4,15 @@ $(document).ready(function() {
     $('[data-toggle="tooltip"]').tooltip();
 
     // registration form steps start
-    if ($('#business_register_form').length) {
-        var form = $('#business_register_form').show();
+    if ($('#business_register_form, #simple_business_register_form').length) {
+        var form = $('#business_register_form, #simple_business_register_form').first().show();
+        if (!form.hasClass('registration-wizard') && !recaptchaRendered && $('#recaptcha-container').length && typeof grecaptcha !== 'undefined') {
+            grecaptcha.render('recaptcha-container', {
+                'sitekey': window.RECAPTCHA_SITE_KEY
+            });
+            recaptchaRendered = true;
+        }
+        if (form.hasClass('registration-wizard')) {
         form.steps({
             headerTag: 'h3',
             bodyTag: 'fieldset',
@@ -51,6 +58,7 @@ $(document).ready(function() {
         form.find('a[href="#previous"]').addClass('tw-dw-btn');
         form.find('a[href="#next"]').addClass('tw-dw-btn tw-dw-btn-primary');
         form.find('a[href="#finish"]').addClass('tw-dw-btn tw-dw-btn-primary');
+        }
     }
     // registration form steps end
 
@@ -60,7 +68,7 @@ $(document).ready(function() {
         endDate: 'today',
     });
 
-    $('form#business_register_form').validate({
+    $('form#business_register_form, form#simple_business_register_form').validate({
         errorPlacement: function(error, element) {
             if (element.parent('.input-group').length) {
                 error.insertAfter(element.parent());
@@ -102,7 +110,7 @@ $(document).ready(function() {
             },
             password: {
                 required: true,
-                minlength: 5,
+                minlength: 4,
             },
             confirm_password: {
                 equalTo: '#password',

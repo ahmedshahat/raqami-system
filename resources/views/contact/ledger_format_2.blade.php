@@ -2,7 +2,7 @@
 @if(!empty($for_pdf))
 	<link rel="stylesheet" href="{{ asset('css/app.css?v='.$asset_v) }}">
 @endif
-<div class="col-md-6 col-sm-6 col-xs-6 @if(!empty($for_pdf)) width-50 f-left @endif" style="margin-top: 20px;">
+<div class="rr-cs__doc-head col-md-6 col-sm-6 col-xs-6 @if(!empty($for_pdf)) width-50 f-left @endif" style="margin-top: 20px;">
 	<p><strong>{{$contact->business->name}}</strong><br>
 		@if(!empty($location))
     		{!! $location->location_address !!}
@@ -25,7 +25,7 @@
 		</tr>
 	</table>	
 </div>
-<div class="col-md-6 col-sm-6 col-xs-6 @if(!empty($for_pdf)) width-50 f-right @endif" style="margin-top: 20px;">
+<div class="rr-cs__doc-head col-md-6 col-sm-6 col-xs-6 @if(!empty($for_pdf)) width-50 f-right @endif" style="margin-top: 20px;">
 		
 	<table style="margin: auto;">
 		<tr><th class="text-center" style="border-top:hidden; font-size: 22px;">{{__('lang_v1.statement')}}</th></tr>
@@ -45,6 +45,7 @@
 	@if(!empty($for_pdf))
 	<br>
 	@endif
+	@include('contact.partials.ledger_pending_cheques')
 	<table class="table table-striped @if(!empty($for_pdf)) table-pdf td-border @endif" id="ledger_table">
 		<thead>
 			<tr class="row-border">

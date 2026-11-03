@@ -1,28 +1,17 @@
-<?php
-
-return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | Brand Language Lines
-    |--------------------------------------------------------------------------
-    |
-    | The following language lines are used for Brand CRUD operations.
-    |
-    */
-
-    'categories' => 'الفئات',
-    'manage_your_categories' => 'ادارة الفئات الخاصة بك',
-    'all_your_categories' => 'جميع الفئات الخاصة بك',
-    'category' => 'الفئة',
-    'category_name' => 'اسم الفئة',
-    'code' => 'رمز الفئة',
-    'add_as_sub_category' => 'إضافة كفئة فرعية',
-    'select_parent_category' => 'حدد الفئة الرئيسية',
-    'added_success' => 'تمت إضافة الفئة بنجاح',
-    'updated_success' => 'تم تحديث الفئة بنجاح',
-    'deleted_success' => 'تم حذف الفئة بنجاح',
-    'add_category' => 'إضافة فئة',
-    'edit_category' => 'تعديل الفئة',
-
+<?php 
+ return [ 
+"categories" => "الاقسام الداخلية ",
+"manage_your_categories" => "الاقسام الداخلية لنشاطك ",
+"all_your_categories" => "جميع الاقسام ",
+"category" => "القسم ",
+"category_name" => "اسم القسم ",
+"code" => "رمز القسم ",
+"add_as_sub_category" => "اضافة الى قسم فرعى ",
+"select_parent_category" => "اختر القسم الرئيسي",
+"added_success" => "تم اضافة القسم بنجاح ",
+"updated_success" => "تم تحديث القسم بنجاح ",
+"deleted_success" => "تم حذف القسم بنجاح ",
+"add_category" => " اضافة قسم ",
+"edit_category" => " تعديل القسم ",
+"category-stok" => "فئة المصروف",
 ];

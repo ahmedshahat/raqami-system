@@ -1,7 +1,7 @@
 {
     "name": "Superadmin",
     "alias": "superadmin",
-    "description": "Turn your POS to SaaS application and start earning by selling subscriptions. Direct install by AnNguyen",
+    "description": "يقوم هذا الموديول بتحويل نظام نقاط البيع (POS) الخاص بك إلى منصة سحابية (SaaS) متكاملة، مما يتيح لك تأجير النظام لمتاجر أخرى وبيع باقات اشتراك دورية",
     "keywords": [],
     "active": 1,
     "order": 0,

@@ -51,11 +51,13 @@ class LedgerDiscountController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorizeDiscount();
+
         try {
             $business_id = $request->session()->get('user.business_id');
             $input = $request->only(['date', 'amount', 'note', 'contact_id']);
 
-            $contact = Contact::find($input['contact_id']);
+            $contact = Contact::where('business_id', $business_id)->findOrFail($input['contact_id']);
 
             $sub_type = 'sell_discount';
             if ($contact->type == 'customer') {
@@ -111,19 +113,15 @@ class LedgerDiscountController extends Controller
      */
     public function edit($id)
     {
-        $is_admin = $this->commonUtil->is_admin(auth()->user());
-
-        if (! $is_admin) {
-            abort(403, 'Unauthorized action.');
-        }
+        $this->authorizeDiscount();
 
         $business_id = request()->session()->get('user.business_id');
 
         $discount = Transaction::where('business_id', $business_id)
                     ->where('type', 'ledger_discount')
-                    ->find($id);
+                    ->findOrFail($id);
 
-        $contact = Contact::find($discount->contact_id);
+        $contact = Contact::where('business_id', $business_id)->findOrFail($discount->contact_id);
 
         return view('ledger_discount.edit')->with(compact('discount', 'contact'));
     }
@@ -137,6 +135,8 @@ class LedgerDiscountController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $this->authorizeDiscount();
+
         try {
             $business_id = $request->session()->get('user.business_id');
             $input = $request->only(['date', 'amount', 'note', 'contact_id']);
@@ -177,11 +177,7 @@ class LedgerDiscountController extends Controller
      */
     public function destroy($id)
     {
-        $is_admin = $this->commonUtil->is_admin(auth()->user());
-
-        if (! $is_admin) {
-            abort(403, 'Unauthorized action.');
-        }
+        $this->authorizeDiscount();
 
         $business_id = request()->session()->get('user.business_id');
 
@@ -201,5 +197,17 @@ class LedgerDiscountController extends Controller
         }
 
         return $output;
+    }
+
+    /**
+     * The admin passes through Gate::before in AuthServiceProvider.
+     *
+     * @return void
+     */
+    private function authorizeDiscount()
+    {
+        if (! auth()->user()->can('contact.ledger_discount')) {
+            abort(403, 'Unauthorized action.');
+        }
     }
 }

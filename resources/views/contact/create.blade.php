@@ -351,6 +351,7 @@
                 </div>
             </div>
           </div>
+          @include('bostashipping::contacts.address_fields')
           <div class="col-md-4">
             <div class="form-group">
                 {!! Form::label('land_mark', __('business.land_mark') . ':') !!}
@@ -595,3 +596,5 @@
   
   </div><!-- /.modal-content -->
 </div><!-- /.modal-dialog -->
+
+@include('contact.partials.zatca_address_rule')

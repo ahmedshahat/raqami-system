@@ -60,6 +60,7 @@
 	</tr>
 	</table>
 </div>
+@include('contact.partials.ledger_pending_cheques')
 <div class="col-md-12 col-sm-12 @if(!empty($for_pdf)) width-100 @endif">
 	<p class="text-center" style="text-align: center;"><strong>@lang('lang_v1.ledger_table_heading', ['start_date' => $ledger_details['start_date'], 'end_date' => $ledger_details['end_date']])</strong></p>
 	<div class="table-responsive">
@@ -98,7 +99,7 @@
 					<td>
 						{!! $data['others'] !!}
 
-						@if(!empty($is_admin) && !empty($data['transaction_id']) && $data['transaction_type'] == 'ledger_discount')
+						@if(!empty($can_manage_discount) &&!empty($data['transaction_id']) && $data['transaction_type'] == 'ledger_discount')
 							<br>
 							<button type="button" class="tw-dw-btn tw-dw-btn-outline tw-dw-btn-xs tw-dw-btn-error delete_ledger_discount" data-href="{{action([\App\Http\Controllers\LedgerDiscountController::class, 'destroy'], ['ledger_discount' => $data['transaction_id']])}}"><i class="fas fa-trash"></i></button>
 							<button type="button" class="tw-dw-btn tw-dw-btn-xs tw-dw-btn-outline tw-dw-btn-primary btn-modal" data-href="{{action([\App\Http\Controllers\LedgerDiscountController::class, 'edit'], ['ledger_discount' => $data['transaction_id']])}}" data-container="#edit_ledger_discount_modal"><i class="fas fa-edit"></i></button>

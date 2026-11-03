@@ -1000,6 +1000,14 @@
               </label>
             </div>
           </div>
+          <div class="col-md-12">
+            <div class="checkbox">
+              <label>
+                {!! Form::checkbox('permissions[]', 'contact.ledger_discount', false, ['class' => 'input-icheck']); !!}
+                {{ __('ledger_discount.permission') }}
+              </label>
+            </div>
+          </div>
           @if(in_array('types_of_service', $enabled_modules))
           <div class="col-md-12">
             <div class="checkbox">

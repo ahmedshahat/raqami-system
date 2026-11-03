@@ -2022,9 +2022,65 @@ function pos_each_row(row_obj) {
     __write_number(row_obj.find('input.item_tax'), unit_price_inc_tax - discounted_unit_price);
 }
 
+    function apply_tier_discount(price_total) {
+        if ($('#tier_discount_enabled').val() != '1') {
+            return;
+        }
+    
+        var rangesElement = document.getElementById('tier_discount_ranges_json');
+    
+        if (!rangesElement) {
+            return;
+        }
+    
+        var ranges = [];
+    
+        try {
+            ranges = JSON.parse(rangesElement.textContent || '[]');
+        } catch (error) {
+            console.error('Invalid tier discount settings:', error);
+            return;
+        }
+    
+        var discountPercentage = 0;
+    
+        for (var i = 0; i < ranges.length; i++) {
+            var fromAmount = parseFloat(
+                String(ranges[i].from || 0).replace(/,/g, '')
+            );
+    
+            var toAmount = parseFloat(
+                String(ranges[i].to || 0).replace(/,/g, '')
+            );
+    
+            var discount = parseFloat(
+                String(ranges[i].discount || 0).replace(/,/g, '')
+            );
+    
+            if (
+                !isNaN(fromAmount) &&
+                !isNaN(toAmount) &&
+                !isNaN(discount) &&
+                price_total >= fromAmount &&
+                price_total <= toAmount
+            ) {
+                discountPercentage = discount;
+                break;
+            }
+        }
+    
+        $('#discount_type').val('percentage');
+    
+        __write_number(
+            $('#discount_amount'),
+            discountPercentage
+        );
+    }
+
 function pos_total_row() {
     var total_quantity = 0;
     var price_total = get_subtotal();
+    apply_tier_discount(price_total);
     $('table#pos_table tbody tr').each(function() {
         total_quantity = total_quantity + __read_number($(this).find('input.pos_quantity'));
     });
@@ -2816,7 +2872,25 @@ $(document).on('change', '.payment_types_dropdown', function(e) {
         }
     }
 
-    //Validate max amount and disable account if advance 
+    //Cheque with no amount: the cheque covers what is left on the invoice
+    if (payment_type == 'cheque' && $('input#final_total_input').length) {
+        var cheque_amount_el = payment_row.find('.payment-amount');
+        if (cheque_amount_el.length && !(__read_number(cheque_amount_el) > 0)) {
+            var other_paid = 0;
+            $('.payment-amount').not(cheque_amount_el).each(function() {
+                if ($(this).closest('.payment_row').find('.payment_types_dropdown').length) {
+                    other_paid += __read_number($(this));
+                }
+            });
+            var cheque_remaining = __read_number($('input#final_total_input')) - other_paid;
+            if (cheque_remaining > 0) {
+                __write_number(cheque_amount_el, cheque_remaining);
+                cheque_amount_el.change();
+            }
+        }
+    }
+
+    //Validate max amount and disable account if advance
     amount_element = payment_row.find('.payment-amount');
     account_dropdown = payment_row.find('.account-dropdown');
     if (payment_type == 'advance') {

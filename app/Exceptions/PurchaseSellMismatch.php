@@ -30,10 +30,10 @@ class PurchaseSellMismatch extends Exception
             'msg' => $this->getMessage(),
         ];
 
-        if ($request->ajax()) {
-            return $output;
-        } else {
-            throw new Exception($this->getMessage());
+        if ($request->ajax() || $request->expectsJson()) {
+            return response()->json($output, 422);
         }
+
+        return redirect()->back()->withInput()->with('status', $output);
     }
 }

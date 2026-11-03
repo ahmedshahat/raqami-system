@@ -190,6 +190,11 @@ class Transaction extends Model
             if (! empty($addresses['shipping_address']['shipping_zip_code'])) {
                 $shipping_address['zipcode'] = $addresses['shipping_address']['shipping_zip_code'];
             }
+            foreach (['bosta_city_id', 'bosta_city_name', 'bosta_district_id', 'bosta_district_name', 'bosta_zone_id'] as $bosta_field) {
+                if (! empty($addresses['shipping_address'][$bosta_field])) {
+                    $shipping_address[$bosta_field] = $addresses['shipping_address'][$bosta_field];
+                }
+            }
         }
 
         if ($array) {

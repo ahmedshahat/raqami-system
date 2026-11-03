@@ -1,4 +1,4 @@
-<div class="modal-dialog modal-xl no-print" role="document">
+<div class="modal-dialog modal-xl no-print sale-view-modal" role="document">
   <div class="modal-content">
     <div class="modal-header">
     <button type="button" class="close no-print" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -6,6 +6,18 @@
     </h4>
 </div>
 <div class="modal-body">
+    @if($constructionCertificate && $constructionCertificate->project)
+    <div class="panel panel-info" dir="rtl" style="border-radius:12px;overflow:hidden;box-shadow:0 5px 18px rgba(23,66,99,.08)">
+      <div class="panel-heading" style="font-weight:700"><i class="fa fa-building"></i> @lang('construction::lang.project_details')</div>
+      <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+        <div><small>@lang('construction::lang.project_name')</small><br><a href="{{ route('construction.projects.show', $constructionCertificate->project_id) }}">{{ $constructionCertificate->project->name }}</a></div>
+        <div><small>@lang('construction::lang.project_code')</small><br><strong>{{ $constructionCertificate->project->code }}</strong></div>
+        @if($constructionCertificate->contract)<div><small>@lang('construction::lang.contract_number')</small><br><a href="{{ route('construction.projects.contracts.show', [$constructionCertificate->project_id, $constructionCertificate->contract_id]) }}">{{ $constructionCertificate->contract->contract_number }}</a></div>@endif
+        <div><small>@lang('construction::lang.certificate_number')</small><br><a href="{{ route('construction.projects.certificates.show', [$constructionCertificate->project_id, $constructionCertificate->id]) }}">{{ $constructionCertificate->number }}</a></div>
+        @if($constructionCertificate->measurement)<div><small>@lang('construction::lang.measurement_number')</small><br><a href="{{ route('construction.projects.measurements.show', [$constructionCertificate->project_id, $constructionCertificate->measurement_id]) }}">{{ $constructionCertificate->measurement->number }}</a></div>@endif
+      </div>
+    </div>
+    @endif
     <div class="row">
       <div class="col-xs-12">
           <p class="pull-right"><b>@lang('messages.date'):</b> {{ @format_date($sell->transaction_date) }}</p>

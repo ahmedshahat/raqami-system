@@ -68,6 +68,10 @@ Route::middleware('web', 'SetSessionData', 'auth', 'language', 'timezone', 'Admi
 
     Route::get('/subscription/{subcription_id}/force-active', [Modules\Superadmin\Http\Controllers\SubscriptionController::class, 'forceActive'])->name('force-active');
     Route::get('/myfatoorah-callback', [Modules\Superadmin\Http\Controllers\SubscriptionController::class, 'myfatoorahcallback'])->name('myfatoorah_callback');
+    
+    // Kashier Routes
+    Route::get('/kashier/pay/{package_id}', [Modules\Superadmin\Http\Controllers\SubscriptionController::class, 'kashierPay'])->name('kashier.pay');
+    Route::get('/kashier/callback', [Modules\Superadmin\Http\Controllers\SubscriptionController::class, 'kashierCallback'])->name('kashier.callback');
 
 });
 

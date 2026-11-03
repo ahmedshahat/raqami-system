@@ -183,6 +183,34 @@
             @lang('superadmin::lang.fatoorah_step_4')<br/>
             @lang('superadmin::lang.fatoorah_step_5')<br/>
         </div>
+        
+        <div class="clearfix"></div>
+        
+        <h4>Kashier: </h4>
+        <div class="col-xs-3">
+            <div class="form-group">
+                {!! Form::label('KASHIER_MERCHANT_ID', 'Merchant ID:') !!}
+                {!! Form::text('KASHIER_MERCHANT_ID', $default_values['KASHIER_MERCHANT_ID'] ?? '', ['class' => 'form-control']); !!}
+            </div>
+        </div>
+        <div class="col-xs-3">
+            <div class="form-group">
+                {!! Form::label('KASHIER_API_KEY', 'API Key:') !!}
+                {!! Form::text('KASHIER_API_KEY', $default_values['KASHIER_API_KEY'] ?? '', ['class' => 'form-control']); !!}
+            </div>
+        </div>
+        <div class="col-xs-3">
+            <div class="form-group">
+                {!! Form::label('KASHIER_SECRET_KEY', 'Secret Key:') !!}
+                {!! Form::text('KASHIER_SECRET_KEY', $default_values['KASHIER_SECRET_KEY'] ?? '', ['class' => 'form-control']); !!}
+            </div>
+        </div>
+        <div class="col-xs-3">
+            <div class="form-group">
+                {!! Form::label('KASHIER_MODE', 'Mode:') !!}
+                {!! Form::select('KASHIER_MODE',['sandbox' => 'Sandbox', 'live' => 'Live'], $default_values['KASHIER_MODE'] ?? 'sandbox', ['class' => 'form-control']); !!}
+            </div>
+        </div>
         <div class="col-xs-12">
             <br/>
             <p class="help-block"><i>@lang('superadmin::lang.payment_gateway_help')</i></p>

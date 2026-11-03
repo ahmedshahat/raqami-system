@@ -285,7 +285,7 @@ class SubscriptionController extends BaseController
             }
 
             //Confirm for pesapal payment gateway
-            if (isset($this->_payment_gateways()['pesapal']) && (strpos($request->merchant_reference, 'PESAPAL') !== false)) {
+            if (isset($this->_payment_gateways()['pesapal']) && ! empty($request->merchant_reference) && (strpos($request->merchant_reference, 'PESAPAL') !== false)) {
                 $package_id = request()->session()->get('pesapal.package_id');
                 return $this->confirm_pesapal($package_id, $request);
             }
@@ -296,16 +296,37 @@ class SubscriptionController extends BaseController
             $business_name = request()->session()->get('business.name');
             $user_id = request()->session()->get('user.id');
             $package = Package::active()->find($package_id);
-           
+
+            if (empty($package)) {
+                throw new \Exception('الباقة غير موجودة أو غير مفعلة');
+            }
+
             //Call the payment method
             $pay_function = 'pay_'.request()->gateway;
 
             $payment_transaction_id = null;
             if (method_exists($this, $pay_function)) {
                 $payment_transaction_id = $this->$pay_function($business_id, $business_name, $package, $request);
+            } else {
+                throw new \Exception('طريقة الدفع المختارة غير متاحة');
             }
-            //Add subscription details after payment is succesful
-            $this->_add_subscription(request()->coupon_code, request()->price,$business_id, $package_id, request()->gateway, $payment_transaction_id, $user_id);
+
+            // رابط إيصال التحويل الذي تم حفظه داخل pay_offline
+            $payment_receipt_path = $request->attributes->get('payment_receipt_path');
+
+            //Add subscription details after payment is successful
+            $this->_add_subscription(
+                request()->coupon_code,
+                request()->price,
+                $business_id,
+                $package_id,
+                request()->gateway,
+                $payment_transaction_id,
+                $user_id,
+                false,
+                $payment_receipt_path
+            );
+
             DB::commit();
 
             $msg = __('lang_v1.success');
@@ -316,9 +337,17 @@ class SubscriptionController extends BaseController
         } catch (\Exception $e) {
             DB::rollBack();
 
+            // حذف صورة الإيصال إذا تم رفعها ثم فشل تسجيل الاشتراك
+            $payment_receipt_path = $request->attributes->get('payment_receipt_path');
+            if (! empty($payment_receipt_path)) {
+                $absolute_receipt_path = public_path($payment_receipt_path);
+                if (is_file($absolute_receipt_path)) {
+                    @unlink($absolute_receipt_path);
+                }
+            }
+
             \Log::emergency('File:'.$e->getFile().'Line:'.$e->getLine().'Message:'.$e->getMessage());
-            echo 'File:'.$e->getFile().'Line:'.$e->getLine().'Message:'.$e->getMessage();
-            exit;
+
             $output = ['success' => 0, 'msg' => $e->getMessage()];
         }
 
@@ -401,11 +430,58 @@ class SubscriptionController extends BaseController
 
         //Disable in demo
         if (config('app.env') == 'demo') {
-            $output = ['success' => 0,
-                'msg' => 'Feature disabled in demo!!',
-            ];
+            throw new \Exception('Feature disabled in demo!!');
+        }
 
-            return back()->with('status', $output);
+        // التحقق من وجود صورة إشعار التحويل
+        if (! $request->hasFile('payment_receipt')) {
+            throw new \Exception('يرجى إرفاق صورة إشعار التحويل قبل إرسال الطلب');
+        }
+
+        $receipt_file = $request->file('payment_receipt');
+
+        // التحقق من سلامة الملف
+        if (! $receipt_file->isValid()) {
+            throw new \Exception('تعذر رفع صورة إشعار التحويل، يرجى المحاولة مرة أخرى');
+        }
+
+        // السماح بالصور فقط وبحد أقصى 5 ميجابايت
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'webp'];
+        $receipt_extension = strtolower($receipt_file->getClientOriginalExtension());
+
+        if (! in_array($receipt_extension, $allowed_extensions)) {
+            throw new \Exception('صيغة الصورة غير مسموحة. الصيغ المتاحة: JPG, JPEG, PNG, WEBP');
+        }
+
+        if ($receipt_file->getSize() > 5 * 1024 * 1024) {
+            throw new \Exception('حجم صورة التحويل يجب ألا يتجاوز 5 ميجابايت');
+        }
+
+        // حفظ صورة الإيصال داخل public/uploads/offline_payment_receipts
+        try {
+            $receipt_dir = public_path('uploads/offline_payment_receipts');
+
+            if (! file_exists($receipt_dir)) {
+                if (! mkdir($receipt_dir, 0755, true) && ! is_dir($receipt_dir)) {
+                    throw new \Exception('تعذر إنشاء مجلد إيصالات التحويل');
+                }
+            }
+
+            if (! is_writable($receipt_dir)) {
+                throw new \Exception('مجلد إيصالات التحويل غير قابل للكتابة');
+            }
+
+            $receipt_filename = time().'_'.Str::random(16).'.'.$receipt_extension;
+            $receipt_file->move($receipt_dir, $receipt_filename);
+
+            // المسار النسبي الذي يتم حفظه مع الاشتراك
+            $receipt_path = 'uploads/offline_payment_receipts/'.$receipt_filename;
+
+            // تمرير المسار إلى دالة confirm ليتم حفظه في جدول subscriptions
+            $request->attributes->set('payment_receipt_path', $receipt_path);
+        } catch (\Exception $e) {
+            \Log::error('Failed to store offline payment receipt. File:'.$e->getFile().' Line:'.$e->getLine().' Message:'.$e->getMessage());
+            throw new \Exception('تعذر حفظ صورة التحويل، يرجى المحاولة مرة أخرى');
         }
 
         //Send notification
@@ -415,11 +491,29 @@ class SubscriptionController extends BaseController
         if (! $this->moduleUtil->IsMailConfigured()) {
             return null;
         }
-        $system_currency = System::getCurrency();
-        $package->price = $system_currency->symbol.number_format($package->price, 2, $system_currency->decimal_separator, $system_currency->thousand_separator);
 
-        Notification::route('mail', $email)
-            ->notify(new SubscriptionOfflinePaymentActivationConfirmation($business, $package));
+        $system_currency = System::getCurrency();
+        $notification_package = clone $package;
+        $notification_package->price = $system_currency->symbol.number_format(
+            $package->price,
+            2,
+            $system_currency->decimal_separator,
+            $system_currency->thousand_separator
+        );
+
+        // لو فشل البريد يظل طلب الاشتراك محفوظًا وينتظر الموافقة
+        try {
+            $notification = new SubscriptionOfflinePaymentActivationConfirmation($business, $notification_package);
+
+            if (! empty($receipt_path) && property_exists($notification, 'receiptPath')) {
+                $notification->receiptPath = public_path($receipt_path);
+            }
+
+            Notification::route('mail', $email)
+                ->notify($notification);
+        } catch (\Exception $e) {
+            \Log::error('Offline payment notification failed. File:'.$e->getFile().' Line:'.$e->getLine().' Message:'.$e->getMessage());
+        }
 
         return null;
     }
@@ -888,5 +982,146 @@ class SubscriptionController extends BaseController
         }
 
         return $end_date;
+    }
+    
+    /**
+     * تجهيز الدفع وتوجيه العميل لبوابة كاشير (الإصدار الثالث V3 - Payment Sessions)
+     */
+    public function kashierPay(Request $request, $package_id)
+    {
+        try {
+            $business_id = $request->session()->get('user.business_id');
+            $user = auth()->user(); 
+            $package = \Modules\Superadmin\Entities\Package::find($package_id);
+            
+            if (!$package) {
+                return back()->with('status', ['success' => 0, 'msg' => 'الباقة غير موجودة']);
+            }
+
+            $amount = $request->get('price', $package->price);
+            $amount = number_format((float)$amount, 2, '.', ''); 
+            $orderId = 'KSH_' . $business_id . '_' . time(); 
+            
+            $mid = env('KASHIER_MERCHANT_ID');
+            $apiKey = env('KASHIER_API_KEY');       
+            $secretKey = env('KASHIER_SECRET_KEY'); 
+            $mode = strtolower(env('KASHIER_MODE', 'sandbox'));
+            
+            $callbackUrl = route('kashier.callback') . "?pkg_id={$package_id}&amt={$amount}"; 
+
+            $apiUrl = ($mode == 'live' || $mode == 'production') 
+                ? 'https://api.kashier.io/v3/payment/sessions' 
+                : 'https://test-api.kashier.io/v3/payment/sessions';
+
+            $customerEmail = $user ? $user->email : 'admin@raqmycloud.com';
+            $customerRef = $user ? (string)$user->id : (string)$business_id;
+
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => $secretKey,
+                'api-key' => $apiKey,
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json'
+            ])->post($apiUrl, [
+                'merchantId' => $mid,
+                'order' => $orderId,
+                'amount' => $amount,
+                'currency' => 'EGP',
+                'merchantRedirect' => $callbackUrl,
+                'display' => 'ar', 
+                'type' => 'one-time',
+                'allowedMethods' => 'card,wallet', 
+                'expireAt' => gmdate("Y-m-d\TH:i:s.000\Z", strtotime("+1 hour")),
+                'customer' => [
+                    'email' => $customerEmail,
+                    'reference' => $customerRef
+                ]
+            ]);
+
+            if ($response->successful()) {
+                $responseData = $response->json();
+                $sessionUrl = $responseData['sessionUrl'] ?? null;
+
+                if ($sessionUrl) {
+                    return redirect()->away($sessionUrl);
+                }
+            }
+
+            return back()->with('status', ['success' => 0, 'msg' => 'Error: ' . $response->body()]);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File:" . $e->getFile() . "Line:" . $e->getLine() . "Message:" . $e->getMessage());
+            return back()->with('status', ['success' => 0, 'msg' => __('messages.something_went_wrong')]);
+        }
+    }
+
+    /**
+     * استلام الرد من كاشير بعد الدفع وتفعيل الباقة (الإصدار الثالث V3)
+     */
+
+    public function kashierCallback(Request $request)
+    {
+        try {
+            $secretKey = env('KASHIER_SECRET_KEY'); 
+            
+            // قراءة المتغيرات بالأسماء الجديدة من كاشير V3
+            $paymentStatus = $request->query('paymentStatus');
+            $merchantOrderId = $request->query('merchantOrderId');
+            $transactionId = $request->query('transactionId');
+            $amount = $request->query('amount');
+            $currency = $request->query('currency');
+            $receivedSignature = $request->query('signature'); // هنا السر! (signature بدل hash)
+            
+            // المتغيرات الخاصة بنظامنا
+            $package_id = $request->query('pkg_id');
+            $originalAmount = $request->query('amt', $amount);
+
+            // بناء مسار التشفير للمطابقة
+            $path = "/?payment={$merchantOrderId}.{$amount}.{$currency}.{$transactionId}";
+            $calculatedSignature = hash_hmac('sha256', $path, $secretKey);
+
+            // التحقق من نجاح العملية (كاشير رجعت SUCCESS ومعاها رقم معاملة حقيقي)
+            if ($paymentStatus === 'SUCCESS' && !empty($transactionId)) {
+                
+                $business_id = $request->session()->get('user.business_id');
+                $user_id = $request->session()->get('user.id');
+                
+                // حماية خارقة: لو العميل متصفحه مسح الجلسة، هنجيب رقمه من رقم الطلب (KSH_1_178...)
+                if (empty($business_id) && !empty($merchantOrderId)) {
+                    $parts = explode('_', $merchantOrderId); 
+                    if (isset($parts[1])) {
+                        $business_id = $parts[1];
+                        $user_id = 1; // تعيين لمدير النظام لتفادي أي أخطاء
+                    }
+                }
+                // التحقق من أن رقم المعاملة لم يُستخدم من قبل
+                $transactionExists = Subscription::where('payment_transaction_id', $transactionId)->exists();
+                
+                if ($transactionExists) {
+                    return redirect()
+                        ->action([\Modules\Superadmin\Http\Controllers\SubscriptionController::class, 'index'])
+                        ->with('status', ['success' => 0, 'msg' => 'هذه العملية تم تفعيلها مسبقاً!']);
+                }
+
+                // تفعيل الباقة فوراً
+                if ($business_id) {
+                    $this->_add_subscription(null, $originalAmount, $business_id, $package_id, 'Kashier', $transactionId, $user_id);
+
+                    return redirect()
+                        ->action([\Modules\Superadmin\Http\Controllers\SubscriptionController::class, 'index'])
+                        ->with('status', ['success' => 1, 'msg' => 'تم الدفع وتفعيل الاشتراك بنجاح!']);
+                }
+            }
+
+            // لو الدفع مرفوض من البنك
+            return redirect()
+                ->action([\Modules\Superadmin\Http\Controllers\SubscriptionController::class, 'pay'], [$package_id])
+                ->with('status', ['success' => 0, 'msg' => 'تم الدفع ولكن فشل توثيق العملية من النظام.']);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File:" . $e->getFile() . "Line:" . $e->getLine() . "Message:" . $e->getMessage());
+            return redirect()
+                ->action([\Modules\Superadmin\Http\Controllers\SubscriptionController::class, 'pay'], [$request->query('pkg_id')])
+                ->with('status', ['success' => 0, 'msg' => __('messages.something_went_wrong')]);
+        }
     }
 }

@@ -8,6 +8,8 @@ use App\BusinessLocation;
 use App\CashDenomination;
 use App\Contact;
 use App\Currency;
+use App\Events\OpeningBalanceCreatedOrModified;
+use App\Events\SellCreatedOrModified;
 use App\Events\TransactionPaymentAdded;
 use App\Events\TransactionPaymentDeleted;
 use App\Events\TransactionPaymentUpdated;
@@ -730,6 +732,37 @@ class TransactionUtil extends Util
                 if ($payment['method'] == 'advance' && $payment_amount > $contact_balance) {
                     throw new AdvanceBalanceNotAvailable(__('lang_v1.required_advance_balance_not_available'));
                 }
+                //Cheques on sells / purchases go to the cheques register, not to payments, until collected.
+                $cheque_type = \App\Cheque::typeForTransaction($transaction->type);
+                //A credit invoice paid by cheque is often saved with amount 0: the cheque then covers what is left on the invoice.
+                if ($payment_amount == 0 && $payment['method'] == 'cheque' && ! empty($cheque_type) && empty($payment['is_return']) && ! empty($payment['cheque_number'])) {
+                    $other_payments = 0;
+                    foreach ($payments as $other) {
+                        if ($other !== $payment && empty($other['is_return']) && empty($other['payment_id']) && ! empty($other['amount'])) {
+                            $other_payments += $uf_data ? $this->num_uf($other['amount']) : $other['amount'];
+                        }
+                    }
+                    $payment_amount = max(0, round($transaction->final_total - $this->getTotalPaid($transaction->id) - $other_payments, 4));
+                }
+                if ($payment_amount > 0 && $payment['method'] == 'cheque' && ! empty($cheque_type) && empty($payment['is_return'])) {
+                    if (! empty($payment['paid_on'])) {
+                        $cheque_received_on = $uf_data ? $this->uf_date($payment['paid_on'], true) : $payment['paid_on'];
+                    } else {
+                        $cheque_received_on = \Carbon::now()->toDateTimeString();
+                    }
+                    \App\Cheque::register($transaction->business_id, $cheque_type, $transaction->contact_id, $transaction, [
+                        'amount' => $payment_amount,
+                        'cheque_number' => $payment['cheque_number'] ?? null,
+                        'cheque_bank_name' => $payment['cheque_bank_name'] ?? null,
+                        'cheque_due_date' => $payment['cheque_due_date'] ?? null,
+                        'paid_on' => $cheque_received_on,
+                        'account_id' => $payment['account_id'] ?? null,
+                        'note' => $payment['note'] ?? null,
+                    ], $user_id);
+
+                    continue;
+                }
+
                 //If amount is 0 then skip.
                 if ($payment_amount != 0) {
                     $prefix_type = 'sell_payment';
@@ -1667,20 +1700,59 @@ class TransactionUtil extends Util
                 $output['qr_code_text'] = $qr_code_text;
             }
         // add this seprate for sell retuen qr text of zatca
-        }else if(in_array($transaction_type, ['sell_return'])){
-
-            $output['show_qr_code'] = ! empty($il->show_qr_code) ? true : false;
-            $zatca_qr = ! empty($il->common_settings['zatca_qr']) ? true : false;
-            if ($zatca_qr) {
-                $total_order_tax = $transaction->tax_amount + $total_line_taxes;
-                $zatca_phase = ! empty($il->common_settings['zatca_phase']) ? $il->common_settings['zatca_phase'] : '';
-                $qr_code_text = $this->_zatca_qr_text($business_details->name, $business_details->tax_number_1, $transaction, $total_order_tax, $zatca_phase);
-            } 
-
-            if ($transaction->status == 'final') {
-                $output['qr_code_text'] = $qr_code_text;
-            }
+        }elseif ($transaction_type === 'sell_return') {
+    
+        $output['show_qr_code'] = ! empty($il->show_qr_code);
+        $output['qr_code_text'] = '';
+    
+        $zatca_qr = ! empty($il->common_settings['zatca_qr']);
+    
+        if ($transaction->status === 'final' && $zatca_qr) {
+    
+            $total_order_tax =
+                ($transaction->tax_amount ?? 0) +
+                ($total_line_taxes ?? 0);
+    
+            $zatca_phase =
+                $il->common_settings['zatca_phase'] ?? '';
+    
+            $output['qr_code_text'] = $this->_zatca_qr_text(
+                $business_details->name,
+                $business_details->tax_number_1,
+                $transaction,
+                $total_order_tax,
+                $zatca_phase
+            );
         }
+    }
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        // else if(in_array($transaction_type, ['sell_return'])){
+
+        //     $output['show_qr_code'] = ! empty($il->show_qr_code) ? true : false;
+        //     $zatca_qr = ! empty($il->common_settings['zatca_qr']) ? true : false;
+        //     if ($zatca_qr) {
+        //         $total_order_tax = $transaction->tax_amount + $total_line_taxes;
+        //         $zatca_phase = ! empty($il->common_settings['zatca_phase']) ? $il->common_settings['zatca_phase'] : '';
+        //         $qr_code_text = $this->_zatca_qr_text($business_details->name, $business_details->tax_number_1, $transaction, $total_order_tax, $zatca_phase);
+        //     } 
+
+        //     if ($transaction->status == 'final') {
+        //         $output['qr_code_text'] = $qr_code_text;
+        //     }
+        // }
+        
+        
+        
+        
+        
         //Module related information.
         $il->module_info = ! empty($il->module_info) ? json_decode($il->module_info, true) : [];
         if (! empty($il->module_info['tables']) && $this->isModuleEnabled('tables')) {
@@ -3150,7 +3222,7 @@ class TransactionUtil extends Util
         //Get all unpaid transaction for the contact
         $types = ['opening_balance', $type];
 
-        if ($type == 'purchase_return') {
+        if (in_array($type, ['purchase_return', 'sell_return'])) {
             $types = [$type];
         }
 
@@ -3542,19 +3614,27 @@ class TransactionUtil extends Util
                     )
                     ->get();
 
+
+
+
             $deleted_sell_lines = [];
             $new_sell_lines = [];
             $processed_sell_lines = [];
 
             foreach ($sell_purchases as $line) {
                 if (empty($line->slpl_id)) {
-                    $new_sell_lines[] = $line;
+                    // Prevent the same new sell line from being added more than once
+                    if (! in_array($line->id, $processed_sell_lines, true)) {
+                        $new_sell_lines[] = $line;
+                        $processed_sell_lines[] = $line->id;
+                    }
                 } else {
-                    //Skip if already processed.
-                    if (in_array($line->slpl_id, $processed_sell_lines)) {
+                    // Process each sell line only once, even if it has multiple purchase mappings
+                    if (in_array($line->id, $processed_sell_lines, true)) {
                         continue;
                     }
-                    $processed_sell_lines[] = $line->slpl_id;
+
+                    $processed_sell_lines[] = $line->id;
 
                     $total_sold_entry = TransactionSellLinesPurchaseLines::where('sell_line_id', $line->id)
                         ->select(DB::raw('SUM(quantity) AS quantity'))
@@ -3562,7 +3642,7 @@ class TransactionUtil extends Util
 
                     if ($total_sold_entry->quantity != $line->quantity) {
                         if ($line->quantity > $total_sold_entry->quantity) {
-                            //If quantity is increased add it to new sell lines by decreasing tsp_quantity
+                            // If quantity is increased, map only the difference
                             $line_temp = $line;
                             $line_temp->quantity = $line_temp->quantity - $total_sold_entry->quantity;
                             $new_sell_lines[] = $line_temp;
@@ -3575,12 +3655,15 @@ class TransactionUtil extends Util
                 }
             }
 
-            //Add mapping for new sell lines and for incremented quantity
+            // Add mapping for new sell lines and for incremented quantity
             if (! empty($new_sell_lines)) {
                 $this->mapPurchaseSell($business, $new_sell_lines);
             }
         }
     }
+
+
+
 
     /**
      * Decrease the purchase quantity from
@@ -3597,23 +3680,23 @@ class TransactionUtil extends Util
                                 ->get();
 
         foreach ($sell_purchase_line as $row) {
-            if ($row->quantity > $decrement_qty) {
-                PurchaseLine::where('id', $row->purchase_line_id)
-                    ->decrement('quantity_sold', $decrement_qty);
-
-                $row->quantity = $row->quantity - $decrement_qty;
-                $row->save();
-                $decrement_qty = 0;
-            } else {
-                PurchaseLine::where('id', $row->purchase_line_id)
-                    ->decrement('quantity_sold', $decrement_qty);
-                $row->delete();
-            }
-
-            $decrement_qty = $decrement_qty - $row->quantity;
             if ($decrement_qty <= 0) {
                 break;
             }
+
+            $qty_to_decrement = min($row->quantity, $decrement_qty);
+
+            PurchaseLine::where('id', $row->purchase_line_id)
+                ->decrement('quantity_sold', $qty_to_decrement);
+
+            if ($row->quantity > $qty_to_decrement) {
+                $row->quantity = $row->quantity - $qty_to_decrement;
+                $row->save();
+            } else {
+                $row->delete();
+            }
+
+            $decrement_qty = $decrement_qty - $qty_to_decrement;
         }
     }
 
@@ -4226,7 +4309,10 @@ class TransactionUtil extends Util
         //Generate reference number
         $ob_data['ref_no'] = $this->generateReferenceNumber('opening_balance', $ob_ref_count, $business_id);
         //Create opening balance transaction
-        Transaction::create($ob_data);
+        $transaction = Transaction::create($ob_data);
+        event(new OpeningBalanceCreatedOrModified($transaction));
+
+        return $transaction;
     }
 
     /**
@@ -4564,8 +4650,8 @@ class TransactionUtil extends Util
 
         if (in_array('stock_adjustment', $transaction_types)) {
             $query->addSelect(
-                DB::raw("SUM(IF(transactions.type='stock_adjustment', final_total, 0)) as total_adjustment"),
-                DB::raw("SUM(IF(transactions.type='stock_adjustment', total_amount_recovered, 0)) as total_recovered")
+                DB::raw("SUM(IF(transactions.type='stock_adjustment' AND transactions.construction_material_document_id IS NULL, final_total, 0)) as total_adjustment"),
+                DB::raw("SUM(IF(transactions.type='stock_adjustment' AND transactions.construction_material_document_id IS NULL, total_amount_recovered, 0)) as total_recovered")
             );
         }
 
@@ -4664,6 +4750,21 @@ class TransactionUtil extends Util
 
     public function getGrossProfit($business_id, $start_date = null, $end_date = null, $location_id = null, $user_id = null, $permitted_locations)
     {
+        $gross_profit_obj = $this->grossProfitQuery($business_id, $start_date, $end_date, $location_id, $user_id, $permitted_locations)->first();
+
+        $gross_profit = ! empty($gross_profit_obj->gross_profit) ? $gross_profit_obj->gross_profit : 0;
+
+        //KNOWS ISSUE: If products are returned then also the discount gets applied for it.
+
+        return $gross_profit;
+    }
+
+    /**
+     * Builds the gross profit query used by getGrossProfit(); callers can add
+     * a select + groupBy on sale columns to get gross profit per day/month.
+     */
+    public function grossProfitQuery($business_id, $start_date = null, $end_date = null, $location_id = null, $user_id = null, $permitted_locations = null)
+    {
         $query = TransactionSellLine::join('transactions as sale', 'transaction_sell_lines.transaction_id', '=', 'sale.id')
             ->leftjoin('transaction_sell_lines_purchase_lines as TSPL', 'transaction_sell_lines.id', '=', 'TSPL.sell_line_id')
             ->leftjoin(
@@ -4712,13 +4813,7 @@ class TransactionUtil extends Util
             $query->where('sale.created_by', $user_id);
         }
 
-        $gross_profit_obj = $query->first();
-
-        $gross_profit = ! empty($gross_profit_obj->gross_profit) ? $gross_profit_obj->gross_profit : 0;
-
-        //KNOWS ISSUE: If products are returned then also the discount gets applied for it.
-
-        return $gross_profit;
+        return $query;
     }
 
     /**
@@ -4951,6 +5046,11 @@ class TransactionUtil extends Util
                     event(new TransactionPaymentDeleted($payment));
                 }
             }
+
+            // Dispatch deletion from the central sale deletion path so every
+            // caller (POS, direct sales and import rollback) removes the
+            // related accounting-module entries.
+            SellCreatedOrModified::dispatch($transaction, true);
         }
 
         $output = [
@@ -5132,6 +5232,7 @@ class TransactionUtil extends Util
                 )
                 ->select(
                     'transactions.id',
+                    'transactions.source',
                     'transactions.transaction_date',
                     'transactions.type',
                     'transactions.is_direct_sale',
@@ -5899,7 +6000,8 @@ class TransactionUtil extends Util
     {
         $transaction_data = $request->only(['ref_no', 'transaction_date',
             'location_id', 'final_total', 'expense_for', 'additional_notes',
-            'expense_category_id', 'tax_id', 'contact_id', ]);
+            'expense_category_id', 'tax_id', 'contact_id',
+            'construction_project_id', 'construction_boq_item_id', ]);
 
         $transaction_data['business_id'] = $business_id;
         $transaction_data['created_by'] = $user_id;
@@ -5990,6 +6092,10 @@ class TransactionUtil extends Util
 
         if ($request->has('expense_category_id')) {
             $transaction_data['expense_category_id'] = $request->input('expense_category_id');
+        }
+        if ($request->exists('construction_project_id')) {
+            $transaction_data['construction_project_id'] = $request->input('construction_project_id') ?: null;
+            $transaction_data['construction_boq_item_id'] = $request->input('construction_boq_item_id') ?: null;
         }
         $final_total = $request->has('final_total') ? $request->input('final_total') : $transaction->final_total;
         if ($request->has('final_total')) {

@@ -270,9 +270,6 @@ class Contact extends Authenticatable
         if (auth()->check() && auth()->user()->can('customer.create')) {
             $types['customer'] = __('report.customer');
         }
-        if (auth()->check() && auth()->user()->can('supplier.create') && auth()->user()->can('customer.create')) {
-            $types['both'] = __('lang_v1.both_supplier_customer');
-        }
 
         return $types;
     }

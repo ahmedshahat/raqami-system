@@ -23,6 +23,19 @@
 <![endif]-->
 
 <script src="{{ asset('js/vendor.js?v=' . $asset_v) }}"></script>
+<script>
+    // حجم الخط (zoom على الـ body): offset() بيقرا getBoundingClientRect اللي راجع متكبّر، والقوايم المنسدلة (select2،
+    // البحث عن صنف، ...) بتتحط جوه الـ body المتكبّر فبتتزق مرتين. بنرجّع الإحداثيات لمقياس الـ body
+    (function($) {
+        var getOffset = $.fn.offset;
+        $.fn.offset = function() {
+            var result = getOffset.apply(this, arguments);
+            if (arguments.length || !result) return result;
+            var zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+            return zoom === 1 ? result : {top: result.top / zoom, left: result.left / zoom};
+        };
+    })(jQuery);
+</script>
 
 @if (file_exists(public_path('js/lang/' . session()->get('user.language', config('app.locale')) . '.js')))
     <script src="{{ asset('js/lang/' . session()->get('user.language', config('app.locale')) . '.js?v=' . $asset_v) }}">
@@ -214,7 +227,31 @@
         // $('.date_range').on('show.daterangepicker', function (ev, picker) {
         //     $(picker.container).insertAfter($(this));
         // });
-   
+
+    });
+
+    // رابط فيه ?rr_from=YYYY-MM-DD&rr_to=YYYY-MM-DD (من كروت الرئيسية الجديدة) بيضبط فلتر الفترة
+    // في الشاشة على نفس الفترة، بعد ما الشاشة تجهّز الـ daterangepicker والجداول بتاعتها
+    $(window).on('load', function() {
+        var params = new URLSearchParams(window.location.search);
+        var from = params.get('rr_from'), to = params.get('rr_to');
+        if (!from || !to || !moment(from, 'YYYY-MM-DD', true).isValid() || !moment(to, 'YYYY-MM-DD', true).isValid()) {
+            return;
+        }
+        setTimeout(function() {
+            $('input, div, span').filter(function() {
+                var picker = $(this).data('daterangepicker');
+                return picker && !picker.singleDatePicker;
+            }).each(function() {
+                var $el = $(this), picker = $el.data('daterangepicker');
+                picker.setStartDate(moment(from, 'YYYY-MM-DD'));
+                picker.setEndDate(moment(to, 'YYYY-MM-DD'));
+                if ($el.is('input')) {
+                    $el.val(picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format));
+                }
+                picker.callback(picker.startDate, picker.endDate, picker.chosenLabel);
+            });
+        }, 0);
     });
 </script>
 

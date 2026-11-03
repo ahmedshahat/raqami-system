@@ -345,6 +345,7 @@
             </div>
         </div>
       </div>
+      @include('bostashipping::contacts.address_fields', ['contact' => $contact])
 
       
       <div class="col-md-4">

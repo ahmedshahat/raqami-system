@@ -116,7 +116,19 @@ class TransactionPaymentController extends Controller
                     throw new AdvanceBalanceNotAvailable(__('lang_v1.required_advance_balance_not_available'));
                 }
 
-                if (! empty($inputs['amount'])) {
+                $cheque_type = \App\Cheque::typeForTransaction($transaction->type);
+                if (! empty($inputs['amount']) && $inputs['method'] == 'cheque' && ! empty($cheque_type)) {
+                    //Cheque goes to the cheques register; it becomes a payment when collected.
+                    \App\Cheque::register($transaction->business_id, $cheque_type, $transaction->contact_id, $transaction, [
+                        'amount' => $inputs['amount'],
+                        'cheque_number' => $inputs['cheque_number'] ?? null,
+                        'cheque_bank_name' => $request->input('cheque_bank_name'),
+                        'cheque_due_date' => $request->input('cheque_due_date'),
+                        'paid_on' => $inputs['paid_on'],
+                        'account_id' => $inputs['account_id'] ?? null,
+                        'note' => $inputs['note'] ?? null,
+                    ]);
+                } elseif (! empty($inputs['amount'])) {
                     $tp = TransactionPayment::create($inputs);
 
                     if (! empty($request->input('denominations'))) {
@@ -442,8 +454,12 @@ class TransactionPaymentController extends Controller
         if (request()->ajax()) {
             $business_id = request()->session()->get('user.business_id');
 
+            //The totals below always return a row, so an unknown contact must stop here.
+            Contact::where('business_id', $business_id)->findOrFail($contact_id);
+
             $due_payment_type = request()->input('type');
             $query = Contact::where('contacts.id', $contact_id)
+                            ->where('contacts.business_id', $business_id)
                             ->leftjoin('transactions AS t', 'contacts.id', '=', 't.contact_id');
             if ($due_payment_type == 'purchase') {
                 $query->select(
@@ -504,11 +520,11 @@ class TransactionPaymentController extends Controller
                                     $contact_details->total_return_paid;
             }
 
-            //If opening balance due exists add to payment amount
+            //If opening balance due exists add to payment amount (a return is not settled against it)
             $contact_details->opening_balance = ! empty($contact_details->opening_balance) ? $contact_details->opening_balance : 0;
             $contact_details->opening_balance_paid = ! empty($contact_details->opening_balance_paid) ? $contact_details->opening_balance_paid : 0;
             $ob_due = $contact_details->opening_balance - $contact_details->opening_balance_paid;
-            if ($ob_due > 0) {
+            if ($ob_due > 0 && in_array($due_payment_type, ['purchase', 'sell'])) {
                 $payment_line->amount += $ob_due;
             }
 
@@ -545,6 +561,27 @@ class TransactionPaymentController extends Controller
             DB::beginTransaction();
 
             $business_id = request()->session()->get('business.id');
+
+            //Cheque paid against a customer / supplier due goes to the cheques register until collected.
+            $due_payment_type = $request->input('due_payment_type');
+            $cheque_type = \App\Cheque::typeForTransaction($due_payment_type);
+            if ($request->input('method') == 'cheque' && ! empty($cheque_type) && $request->input('is_reverse') != 1) {
+                $contact = Contact::where('business_id', $business_id)->findOrFail($request->input('contact_id'));
+                \App\Cheque::register($business_id, $cheque_type, $contact->id, null, [
+                    'amount' => $this->transactionUtil->num_uf($request->input('amount')),
+                    'cheque_number' => $request->input('cheque_number'),
+                    'cheque_bank_name' => $request->input('cheque_bank_name'),
+                    'cheque_due_date' => $request->input('cheque_due_date'),
+                    'paid_on' => $this->transactionUtil->uf_date($request->input('paid_on', \Carbon::now()->toDateTimeString()), true),
+                    'account_id' => $request->input('account_id'),
+                    'note' => $request->input('note'),
+                ]);
+
+                DB::commit();
+
+                return redirect()->back()->with(['status' => ['success' => true, 'msg' => __('purchase.payment_added_success')]]);
+            }
+
             $tp = $this->transactionUtil->payContact($request);
 
             $pos_settings = ! empty(session()->get('business.pos_settings')) ? json_decode(session()->get('business.pos_settings'), true) : [];

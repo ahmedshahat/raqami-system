@@ -555,13 +555,15 @@ $(document).ready(function() {
     });
 
     //Purchase table
+    // In the contact page tab one plain table scrolls as a whole, so the header can't drift from the rows
+    var purchase_plain_table = $('#purchase_table').closest('.rr-cs__dt-tab').length > 0;
     purchase_table = $('#purchase_table').DataTable({
         processing: true,
         serverSide: true,
         fixedHeader:false,
-        scrollY: "75vh",
-        scrollX:        true,
-        scrollCollapse: true,
+        scrollY: purchase_plain_table ? '' : "75vh",
+        scrollX:        ! purchase_plain_table,
+        scrollCollapse: ! purchase_plain_table,
         ajax: {
             url: '/purchases',
             data: function(d) {
@@ -639,9 +641,7 @@ $(document).ready(function() {
             $('.footer_payment_status_count').html(__count_status(data, 'payment_status'));
         },
         createdRow: function(row, data, dataIndex) {
-            $(row)
-                .find('td:eq(5)')
-                .attr('class', 'clickable_td');
+            $(this.api().cell(dataIndex, 5).node()).attr('class', 'clickable_td');
         },
     });
 

@@ -383,39 +383,50 @@ function __sum_stock(table, class_name, label_direction = 'right') {
 }
 
 function __print_receipt(section_id = null) {
-    if (section_id) {
-        var imgs = document.getElementById(section_id).getElementsByTagName("img");
-    } else {
-        var imgs = document.images;
-    }
-    
-    img_len = imgs.length;
-    if (img_len) {
-        img_counter = 0;
+    var section = section_id ? document.getElementById(section_id) : document;
+    var imgs = section ? section.getElementsByTagName('img') : [];
+    var pending_images = 0;
+    var print_started = false;
+    var fallback_timer;
 
-        [].forEach.call( imgs, function( img ) {
-            img.addEventListener( 'load', incrementImageCounter, false );
-        } );
-    } else {
+    function start_print() {
+        if (print_started) {
+            return;
+        }
+
+        print_started = true;
+        clearTimeout(fallback_timer);
         setTimeout(function() {
             window.print();
-
-            // setTimeout(function() {
-            //     $('#receipt_section').html('');
-            // }, 5000);
-            
         }, 1000);
     }
-}
 
-function incrementImageCounter() {
-    img_counter++;
-    if ( img_counter === img_len ) {
-        window.print();
-        
-        // setTimeout(function() {
-        //     $('#receipt_section').html('');
-        // }, 5000);
+    [].forEach.call(imgs, function(img) {
+        // Cached images are already complete and will not fire another load event.
+        if (img.complete) {
+            return;
+        }
+
+        pending_images++;
+        var image_finished = function() {
+            img.removeEventListener('load', image_finished, false);
+            img.removeEventListener('error', image_finished, false);
+            pending_images--;
+
+            if (pending_images === 0) {
+                start_print();
+            }
+        };
+
+        img.addEventListener('load', image_finished, false);
+        img.addEventListener('error', image_finished, false);
+    });
+
+    if (pending_images === 0) {
+        start_print();
+    } else {
+        // Do not leave printing blocked forever because of a slow external image.
+        fallback_timer = setTimeout(start_print, 5000);
     }
 }
 

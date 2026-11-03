@@ -11,6 +11,7 @@ use App\Utils\TransactionUtil;
 use Datatables;
 use DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Activitylog\Models\Activity;
 use App\Events\StockAdjustmentCreatedOrModified;
 
@@ -62,6 +63,7 @@ class StockAdjustmentController extends Controller
                 ->leftJoin('users as u', 'transactions.created_by', '=', 'u.id')
                     ->where('transactions.business_id', $business_id)
                     ->where('transactions.type', 'stock_adjustment')
+                    ->whereNull('transactions.construction_material_document_id')
                     ->select(
                         'transactions.id',
                         'transaction_date',
@@ -343,6 +345,16 @@ class StockAdjustmentController extends Controller
                                     ->where('type', 'stock_adjustment')
                                     ->with(['stock_adjustment_lines'])
                                     ->first();
+
+                if (Schema::hasTable('construction_material_documents')
+                    && DB::table('construction_material_documents')->where('stock_adjustment_transaction_id', $stock_adjustment->id)->exists()) {
+                    DB::rollBack();
+
+                    return [
+                        'success' => 0,
+                        'msg' => __('construction::lang.material_adjustment_delete_blocked'),
+                    ];
+                }
 
                 //Add deleted product quantity to available quantity
                 $stock_adjustment_lines = $stock_adjustment->stock_adjustment_lines;

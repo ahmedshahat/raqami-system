@@ -40,8 +40,10 @@
                 @endif
             </div>
         @endif
-        <div class="col-sm-12">
-            <button type="button" class="tw-dw-btn tw-dw-btn-primary tw-text-white tw-dw-btn-sm pull-right tw-m-2" data-toggle="modal" data-target="#add_discount_modal">@lang('lang_v1.add_discount')</button>
-        </div>
+        @can('contact.ledger_discount')
+            <div class="col-sm-12">
+                <button type="button" class="tw-dw-btn tw-dw-btn-primary tw-text-white tw-dw-btn-sm pull-right tw-m-2" data-toggle="modal" data-target="#add_discount_modal">@lang('lang_v1.add_discount')</button>
+            </div>
+        @endcan
     </div>
 </div>

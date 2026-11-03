@@ -1,251 +1,153 @@
-@extends('layouts.auth2')
+@extends('layouts.guest_rr')
 @section('title', __('lang_v1.login'))
-@inject('request', 'Illuminate\Http\Request')
+@section('with_scripts', true)
+@section('body_class', 'rr-landing--auth')
+
 @section('content')
-    @php
-        $username = old('username');
-        $password = null;
-        if (config('app.env') == 'demo') {
-            $username = 'admin';
-            $password = '123456';
+@php
+    $username = old('username');
+    $password = null;
+    if (config('app.env') == 'demo') {
+        $username = 'admin';
+        $password = '123456';
+    }
+@endphp
 
-            $demo_types = [
-                'all_in_one' => 'admin',
-                'super_market' => 'admin',
-                'pharmacy' => 'admin-pharmacy',
-                'electronics' => 'admin-electronics',
-                'services' => 'admin-services',
-                'restaurant' => 'admin-restaurant',
-                'superadmin' => 'superadmin',
-                'woocommerce' => 'woocommerce_user',
-                'essentials' => 'admin-essentials',
-                'manufacturing' => 'manufacturer-demo',
-            ];
+<div class="rr-landing__wrap rr-auth rr-auth--single">
+    <section class="rr-card rr-auth__panel">
+        <img class="rr-auth__logo" src="https://raqmycloud.com/wp-content/uploads/2026/06/هوية-رقمى-سيستم.png" alt="{{ config('app.name') }}">
+        <header class="rr-auth__head">
+            <h1 class="rr-auth__title" data-rr-greeting>@lang('guest.welcome_back')</h1>
+            <p class="rr-auth__sub">@lang('guest.login_sub')</p>
+        </header>
 
-            if (!empty($_GET['demo_type']) && array_key_exists($_GET['demo_type'], $demo_types)) {
-                $username = $demo_types[$_GET['demo_type']];
-            }
-        }
-    @endphp
-    <div class="row">
-        <div class="col-md-4">
-        @if (config('app.env') == 'demo')
-        
-                @component('components.widget', [
-                    'class' => 'box-primary',
-                    'header' =>
-                        '<h4 class="text-center">Demo Shops <small><i> <br/>Demos are for example purpose only, this application <u>can be used in many other similar businesses.</u></i> <br/><b>Click button to login that business</b></small></h4>',
-                ])
-                    <a href="?demo_type=all_in_one" class="btn btn-app bg-olive demo-login" data-toggle="tooltip"
-                        title="Showcases all feature available in the application."
-                        data-admin="{{ $demo_types['all_in_one'] }}"> <i class="fas fa-star"></i> All In One</a>
+        @if (session('status') && empty(session('status.success')) && !empty(session('status.msg')))
+            <div class="rr-alert rr-alert--danger" role="alert">{{ session('status.msg') }}</div>
+        @endif
 
-                    <a href="?demo_type=pharmacy" class="btn bg-maroon btn-app demo-login" data-toggle="tooltip"
-                        title="Shops with products having expiry dates." data-admin="{{ $demo_types['pharmacy'] }}"><i
-                            class="fas fa-medkit"></i>Pharmacy</a>
+        <form method="POST" action="{{ route('login') }}" id="login-form" class="rr-auth__form" novalidate>
+            {{ csrf_field() }}
 
-                    <a href="?demo_type=services" class="btn bg-orange btn-app demo-login" data-toggle="tooltip"
-                        title="For all service providers like Web Development, Restaurants, Repairing, Plumber, Salons, Beauty Parlors etc."
-                        data-admin="{{ $demo_types['services'] }}"><i class="fas fa-wrench"></i>Multi-Service Center</a>
-
-                    <a href="?demo_type=electronics" class="btn bg-purple btn-app demo-login" data-toggle="tooltip"
-                        title="Products having IMEI or Serial number code." data-admin="{{ $demo_types['electronics'] }}"><i
-                            class="fas fa-laptop"></i>Electronics & Mobile Shop</a>
-
-                    <a href="?demo_type=super_market" class="btn bg-navy btn-app demo-login" data-toggle="tooltip"
-                        title="Super market & Similar kind of shops." data-admin="{{ $demo_types['super_market'] }}"><i
-                            class="fas fa-shopping-cart"></i> Super Market</a>
-
-                    <a href="?demo_type=restaurant" class="btn bg-red btn-app demo-login" data-toggle="tooltip"
-                        title="Restaurants, Salons and other similar kind of shops."
-                        data-admin="{{ $demo_types['restaurant'] }}"><i class="fas fa-utensils"></i> Restaurant</a>
-                    <hr>
-
-                    <i class="icon fas fa-plug"></i> Premium optional modules:<br><br>
-
-                    <a href="?demo_type=superadmin" class="btn bg-red-active btn-app demo-login" data-toggle="tooltip"
-                        title="SaaS & Superadmin extension Demo" data-admin="{{ $demo_types['superadmin'] }}"><i
-                            class="fas fa-university"></i> SaaS / Superadmin</a>
-
-                    <a href="?demo_type=woocommerce" class="btn bg-woocommerce btn-app demo-login" data-toggle="tooltip"
-                        title="WooCommerce demo user - Open web shop in minutes!!" style="color:white !important"
-                        data-admin="{{ $demo_types['woocommerce'] }}"> <i class="fab fa-wordpress"></i> WooCommerce</a>
-
-                    <a href="?demo_type=essentials" class="btn bg-navy btn-app demo-login" data-toggle="tooltip"
-                        title="Essentials & HRM (human resource management) Module Demo" style="color:white !important"
-                        data-admin="{{ $demo_types['essentials'] }}">
-                        <i class="fas fa-check-circle"></i>
-                        Essentials & HRM</a>
-
-                    <a href="?demo_type=manufacturing" class="btn bg-orange btn-app demo-login" data-toggle="tooltip"
-                        title="Manufacturing module demo" style="color:white !important"
-                        data-admin="{{ $demo_types['manufacturing'] }}">
-                        <i class="fas fa-industry"></i>
-                        Manufacturing Module</a>
-
-                    <a href="?demo_type=superadmin" class="btn bg-maroon btn-app demo-login" data-toggle="tooltip"
-                        title="Project module demo" style="color:white !important"
-                        data-admin="{{ $demo_types['superadmin'] }}">
-                        <i class="fas fa-project-diagram"></i>
-                        Project Module</a>
-
-                    <a href="?demo_type=services" class="btn btn-app demo-login" data-toggle="tooltip"
-                        title="Advance repair module demo" style="color:white !important; background-color: #bc8f8f"
-                        data-admin="{{ $demo_types['services'] }}">
-                        <i class="fas fa-wrench"></i>
-                        Advance Repair Module</a>
-
-                    <a href="{{ url('docs') }}" target="_blank" class="btn btn-app" data-toggle="tooltip"
-                        title="Advance repair module demo" style="color:white !important; background-color: #2dce89">
-                        <i class="fas fa-network-wired"></i>
-                        Connector Module / API Documentation</a>
-                @endcomponent
-            
-            
-        
-    @endif
-        </div>
-        <div class="col-md-4">
-            <div
-                class="tw-p-5 md:tw-p-6 tw-mb-4 tw-rounded-2xl tw-transition-all tw-duration-200 tw-bg-white tw-shadow-sm tw-ring-1 tw-ring-gray-200">
-                <div class="tw-flex tw-flex-col tw-gap-4 tw-dw-rounded-box tw-dw-p-6 tw-dw-max-w-md">
-                    <div class="tw-flex tw-items-center tw-flex-col">
-                        <h1 class="tw-text-lg md:tw-text-xl tw-font-semibold tw-text-[#1e1e1e]">
-                            @lang('lang_v1.welcome_back')
-                        </h1>
-                        <h2 class="tw-text-sm tw-font-medium tw-text-gray-500">
-                            @lang('lang_v1.login_to_your') {{ config('app.name', 'ultimatePOS') }}
-                        </h2>
-                    </div>
-
-                    <form method="POST" action="{{ route('login') }}" id="login-form">
-                        {{ csrf_field() }}
-                        <div class="form-group has-feedback {{ $errors->has('username') ? ' has-error' : '' }}">
-                            <label class="tw-dw-form-control">
-                                <div class="tw-dw-label">
-                                    <span
-                                        class="tw-text-xs md:tw-text-sm tw-font-medium tw-text-black">@lang('lang_v1.username')</span>
-                                </div>
-
-                                <input
-                                    class="tw-border tw-border-[#D1D5DA] tw-outline-none tw-h-12 tw-bg-transparent tw-rounded-lg tw-px-3 tw-font-medium tw-text-black placeholder:tw-text-gray-500 placeholder:tw-font-medium"
-                                    name="username" required autofocus placeholder="@lang('lang_v1.username')"
-                                    data-last-active-input="" id="username" type="text" name="username"
-                                    value="{{ $username }}" />
-                                @if ($errors->has('username'))
-                                    <span class="help-block">
-                                        <strong>{{ $errors->first('username') }}</strong>
-                                    </span>
-                                @endif
-                            </label>
-                        </div>
-
-                        <div class="form-group has-feedback {{ $errors->has('password') ? ' has-error' : '' }}">
-                            <label class="tw-dw-form-control">
-                                <div class="tw-dw-label">
-                                    <span
-                                        class="tw-text-xs md:tw-text-sm tw-font-medium tw-text-black">@lang('lang_v1.password')</span>
-                                    @if (config('app.env') != 'demo')
-                                        <a href="{{ route('password.request') }}"
-                                            class="tw-text-xs md:tw-text-sm tw-font-medium tw-bg-gradient-to-r tw-from-indigo-500 tw-to-blue-500 tw-inline-block tw-text-transparent tw-bg-clip-text hover:tw-text-[#467BF5]"
-                                            tabindex="-1">@lang('lang_v1.forgot_your_password')</a>
-                                    @endif
-                                </div>
-
-                                <input
-                                    class="tw-border tw-border-[#D1D5DA] tw-outline-none tw-h-12 tw-bg-transparent tw-rounded-lg tw-px-3 tw-font-medium tw-text-black placeholder:tw-text-gray-500 placeholder:tw-font-medium"
-                                    id="password" type="password" name="password" value="{{ $password }}" required
-                                    placeholder="@lang('lang_v1.password')" />
-                                <button type="button" id="show_hide_icon" class="show_hide_icon"
-                                    style="position: absolute; top:48px;right:5px;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye tw-w-6" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                        <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                                        <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
-                                    </svg>
-                                </button>
-                            </label>
-                            @if ($errors->has('password'))
-                                <span class="help-block">
-                                    <strong>{{ $errors->first('password') }}</strong>
-                                </span>
-                            @endif
-                        </div>
-
-
-                        <div class="tw-dw-form-control">
-                            <label class="tw-dw-cursor-pointer tw-dw-label tw-self-start tw-gap-2">
-                                <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}
-                                    class="tw-dw-checkbox">
-                                <span
-                                    class="tw-text-xs md:tw-text-sm tw-font-medium tw-text-black tw-mt-[0.2rem]">@lang('lang_v1.remember_me')</span>
-                            </label>
-                        </div>
-                        @if(config('constants.enable_recaptcha'))
-                        <div class="row">
-                            <div class="col-md-12">
-                                <div class="form-group">
-                                    <div class="g-recaptcha" data-sitekey="{{ config('constants.google_recaptcha_key') }}"></div>
-                                        @if ($errors->has('g-recaptcha-response'))
-                                            <span class="text-danger">{{ $errors->first('g-recaptcha-response') }}</span>
-                                        @endif
-                                </div>  
-                            </div>
-                        </div>
-                        @endif
-                        <button type="submit"
-                            class="tw-bg-gradient-to-r tw-from-indigo-500 tw-to-blue-500 tw-h-12 tw-rounded-xl tw-text-sm md:tw-text-base tw-text-white tw-font-semibold tw-w-full tw-max-w-full mt-2 hover:tw-from-indigo-600 hover:tw-to-blue-600 focus:tw-outline-none focus:tw-ring-2 focus:tw-ring-blue-500 focus:tw-ring-offset-2 active:tw-from-indigo-700 active:tw-to-blue-700">
-                            @lang('lang_v1.login')
-                        </button>
-                    </form>
-
-                    <div class="tw-flex tw-items-center tw-flex-col">
-                        <!-- Register Url -->
-
-                        @if (!($request->segment(1) == 'business' && $request->segment(2) == 'register'))
-                            <!-- Register Url -->
-                            @if (config('constants.allow_registration'))
-                                <a href="{{ route('business.getRegister') }}@if (!empty(request()->lang)) {{ '?lang=' . request()->lang }} @endif"
-                                    class="tw-text-sm tw-font-medium tw-text-gray-500 hover:tw-text-gray-500 tw-mt-2">{{ __('business.not_yet_registered') }}
-                                    <span
-                                        class="tw-text-sm tw-font-medium tw-bg-gradient-to-r tw-from-indigo-500 tw-to-blue-500 tw-inline-block tw-text-transparent tw-bg-clip-text hover:tw-text-[#467BF5] hover:tw-underline">{{ __('business.register_now') }}</span></a>
-                            @endif
-                        @endif
-                    </div>
-                </div>
+            {{-- آخر مستخدم دخل من الجهاز ده (يظهر بالـ JS لو محفوظ) --}}
+            <div class="rr-auth__user" id="rr_last_user" hidden>
+                <span class="rr-auth__avatar" id="rr_last_user_initial" aria-hidden="true"></span>
+                <span class="rr-auth__user-text">
+                    <small>@lang('guest.continue_as')</small>
+                    <strong class="rr-num" id="rr_last_user_name"></strong>
+                </span>
+                <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm" id="rr_switch_user">@lang('guest.switch_user')</button>
             </div>
-        </div>
-        <div class="col-md-4"></div>
-    </div>
 
+            <div class="rr-field" id="rr_username_field">
+                <label class="rr-field__label" for="username">@lang('lang_v1.username')</label>
+                <div class="rr-control rr-control--lg @if ($errors->has('username')) rr-control--invalid @endif">
+                    <span class="rr-control__lead">@include('partials.rr.icon', ['name' => 'user', 'size' => 18])</span>
+                    <input class="rr-control__input" id="username" type="text" name="username" value="{{ $username }}" required autofocus autocomplete="username" placeholder="@lang('lang_v1.username')">
+                </div>
+                @if ($errors->has('username'))<span class="rr-field__error">{{ $errors->first('username') }}</span>@endif
+            </div>
+
+            <div class="rr-field">
+                <label class="rr-field__label" for="password">@lang('lang_v1.password')</label>
+                <div class="rr-control rr-control--lg @if ($errors->has('password')) rr-control--invalid @endif">
+                    <span class="rr-control__lead">@include('partials.rr.icon', ['name' => 'lock', 'size' => 18])</span>
+                    <input class="rr-control__input" id="password" type="password" name="password" value="{{ $password }}" required autocomplete="current-password" placeholder="@lang('lang_v1.password')">
+                    @include('partials.rr.password_toggle', ['target' => '#password'])
+                </div>
+                <span class="rr-field__hint rr-auth__caps" id="rr_caps" hidden>
+                    @include('partials.rr.icon', ['name' => 'info', 'size' => 14]) @lang('guest.caps_lock_on')
+                </span>
+                @if ($errors->has('password'))<span class="rr-field__error">{{ $errors->first('password') }}</span>@endif
+            </div>
+
+            <div class="rr-auth__row">
+                <label class="rr-auth__check"><input type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }}> @lang('lang_v1.remember_me')</label>
+                @if (config('app.env') != 'demo')
+                    <a class="rr-auth__link" href="{{ route('password.request') }}">@lang('lang_v1.forgot_your_password')</a>
+                @endif
+            </div>
+
+            <label class="rr-auth__check" title="@lang('guest.cashier_mode_desc')">
+                <input type="checkbox" name="open_pos" value="1" id="open_pos" {{ old('open_pos') ? 'checked' : '' }}>
+                @lang('guest.cashier_mode') <span class="rr-auth__check-hint">— @lang('guest.cashier_mode_desc')</span>
+            </label>
+
+            @if (config('constants.enable_recaptcha'))
+                <div class="rr-auth__captcha"><div class="g-recaptcha" data-sitekey="{{ config('constants.google_recaptcha_key') }}"></div></div>
+                @if ($errors->has('g-recaptcha-response'))<span class="rr-field__error">{{ $errors->first('g-recaptcha-response') }}</span>@endif
+            @endif
+
+            <button type="submit" class="rr-btn rr-btn--primary rr-btn--lg rr-auth__submit">
+                <span class="rr-auth__submit-idle">@lang('lang_v1.login')</span>
+                <span class="rr-auth__submit-busy"><span class="rr-auth__spinner" aria-hidden="true"></span>@lang('guest.signing_in')</span>
+            </button>
+        </form>
+    </section>
+
+    @if (config('constants.allow_registration'))
+        <p class="rr-auth__below">
+            @lang('guest.new_here')
+            <a class="rr-auth__link" href="{{ route('business.getRegister') }}?package=3">@lang('guest.trial_title')</a>
+            <span aria-hidden="true">·</span>
+            <a class="rr-auth__link" href="{{ url('/pricing') }}">@lang('guest.packages')</a>
+        </p>
+    @endif
+</div>
 @stop
+
+@section('footer_extra')
+    <img class="rr-landing__footer-badge" src="https://raqmycloud.com/wp-content/uploads/2026/07/zatca-approved.png" alt="@lang('guest.zatca_alt')" title="@lang('guest.zatca_alt')">
+@endsection
+
 @section('javascript')
-    <script type="text/javascript">
-        $(document).ready(function() {
-            $('#show_hide_icon').off('click');
-            $('.change_lang').click(function() {
-                window.location = "{{ route('login') }}?lang=" + $(this).attr('value');
-            });
-            $('a.demo-login').click(function(e) {
-                e.preventDefault();
-                $('#username').val($(this).data('admin'));
-                $('#password').val("{{ $password }}");
-                $('form#login-form').submit();
-            });
+<script>
+$(function () {
+    var KEY_USER = 'rr-last-user', KEY_POS = 'rr-open-pos';
+    var store = {
+        get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+        set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+        del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
+    };
+    var $username = $('#username'), $password = $('#password');
 
-            $('#show_hide_icon').on('click', function(e) {
-            e.preventDefault();
-            const passwordInput = $('#password');
+    // تحية حسب الوقت
+    var hour = new Date().getHours();
+    $('[data-rr-greeting]').text(hour < 12 ? @json(__('guest.good_morning')) : @json(__('guest.good_evening')));
 
-            if (passwordInput.attr('type') === 'password') {
-                passwordInput.attr('type', 'text');
-                $('#show_hide_icon').html('<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye-off tw-w-6" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.585 10.587a2 2 0 0 0 2.829 2.828"/><path d="M16.681 16.673a8.717 8.717 0 0 1 -4.681 1.327c-3.6 0 -6.6 -2 -9 -6c1.272 -2.12 2.712 -3.678 4.32 -4.674m2.86 -1.146a9.055 9.055 0 0 1 1.82 -.18c3.6 0 6.6 2 9 6c-.666 1.11 -1.379 2.067 -2.138 2.87"/><path d="M3 3l18 18"/></svg>');
-            }
-            else if (passwordInput.attr('type') === 'text') {
-                passwordInput.attr('type', 'password');
-                $('#show_hide_icon').html('<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye tw-w-6" viewBox="0 0 24 24" stroke-width="1.5" stroke="#000000" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></svg>');
-            }
-        });
-        })
-    </script>
+    // آخر مستخدم: بيتحفظ اسم المستخدم بس، ولما يختار "تذكرني"
+    var lastUser = store.get(KEY_USER);
+    if (lastUser && !$username.val() && !$('#username').closest('.rr-control').hasClass('rr-control--invalid')) {
+        $username.val(lastUser);
+        $('#rr_last_user_name').text(lastUser);
+        $('#rr_last_user_initial').text(lastUser.charAt(0).toUpperCase());
+        $('#rr_last_user').prop('hidden', false);
+        $('#rr_username_field').prop('hidden', true);
+        $('#remember').prop('checked', true);
+        $password.trigger('focus');
+    }
+    $('#rr_switch_user').on('click', function () {
+        store.del(KEY_USER);
+        $username.val('');
+        $('#rr_last_user').prop('hidden', true);
+        $('#rr_username_field').prop('hidden', false);
+        $username.trigger('focus');
+    });
+
+    // وضع الكاشير: الاختيار بيتفضل محفوظ على الجهاز
+    if (store.get(KEY_POS) === '1') $('#open_pos').prop('checked', true);
+    $('#open_pos').on('change', function () { this.checked ? store.set(KEY_POS, '1') : store.del(KEY_POS); });
+
+    // تنبيه Caps Lock
+    $password.on('keydown keyup', function (e) {
+        if (e.originalEvent && e.originalEvent.getModifierState) {
+            $('#rr_caps').prop('hidden', !e.originalEvent.getModifierState('CapsLock'));
+        }
+    }).on('blur', function () { $('#rr_caps').prop('hidden', true); });
+
+    $('#login-form').on('submit', function () {
+        if ($('#remember').is(':checked') && $username.val()) { store.set(KEY_USER, $username.val()); } else { store.del(KEY_USER); }
+        $(this).find('.rr-auth__submit').prop('disabled', true).attr('aria-busy', 'true');
+    });
+});
+</script>
 @endsection

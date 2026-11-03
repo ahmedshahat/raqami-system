@@ -9,6 +9,7 @@ use App\System;
 use App\Transaction;
 use App\User;
 use Composer\Semver\Comparator;
+use Illuminate\Support\Facades\Schema;
 use Module;
 
 class ModuleUtil extends Util
@@ -23,7 +24,7 @@ class ModuleUtil extends Util
     {
         $is_available = Module::has($module_name);
 
-        if ($is_available) {
+        if ($is_available && $this->systemTableExists()) {
             //Check if installed by checking the system table {module_name}_version
             $module_version = System::getProperty(strtolower($module_name).'_version');
             if (empty($module_version)) {
@@ -55,6 +56,13 @@ class ModuleUtil extends Util
      */
     public function getModuleData($function_name, $arguments = null, $get_data_from_modules = [])
     {
+        // During a fresh installation the application boots before migrations
+        // have created the system table. Treat modules as not installed until
+        // that table exists instead of preventing the installer from running.
+        if (! $this->systemTableExists()) {
+            return [];
+        }
+
         $modules = Module::toCollection()->toArray();
 
         // Batch-load all module versions in a single query instead of querying individually
@@ -112,6 +120,18 @@ class ModuleUtil extends Util
     }
 
     /**
+     * Check whether module installation metadata can be queried safely.
+     */
+    protected function systemTableExists(): bool
+    {
+        try {
+            return Schema::hasTable('system');
+        } catch (\Throwable $exception) {
+            return false;
+        }
+    }
+
+    /**
      * Checks if a module is defined
      *
      * @param  string  $module_name
@@ -163,7 +183,9 @@ class ModuleUtil extends Util
     public function hasThePermissionInSubscription($business_id, $permission, $callback_function = null)
     {
         if ($this->isSuperadminInstalled()) {
-            if (auth()->user()->can('superadmin')) {
+            // API login is checked before an authenticated request guard exists.
+            // In that case, continue with the business subscription check below.
+            if (auth()->check() && auth()->user()->can('superadmin')) {
                 return true;
             }
 

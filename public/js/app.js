@@ -2872,6 +2872,8 @@ function submitContactForm(form) {
                     contact_table.ajax.reload();
                 }
 
+                window.dispatchEvent(new CustomEvent('contactAdded', {detail: result.data}));
+
                 var lead_view = urlSearchParam('lead_view');
                 if (lead_view == 'kanban') {
                     initializeLeadKanbanBoard();

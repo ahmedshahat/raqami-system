@@ -261,8 +261,15 @@ class SellPosController extends Controller
         //Added check because $users is of no use if enable_contact_assign if false
         $users = config('constants.enable_contact_assign') ? User::forDropdown($business_id, false, false, false, true) : [];
 
-        return view('sale_pos.create')
+        // شاشة الكاشير الجديدة (رقمي)؛ الموديولات اللي ليها sub_type (زي الصيانة) لسه على الشاشة القديمة
+        $view = empty($sub_type) ? 'sale_pos.create_v2' : 'sale_pos.create';
+
+        $suspended_count = $this->suspendedSalesCount($business_id);
+
+        return view($view)
             ->with(compact(
+                'register_details',
+                'suspended_count',
                 'edit_discount',
                 'edit_price',
                 'business_locations',
@@ -306,7 +313,15 @@ class SellPosController extends Controller
         $business_id = request()->session()->get('user.business_id');
         $business_details = $this->businessUtil->getDetails($business_id);
         $pos_settings = empty($business_details->pos_settings) ? $this->businessUtil->defaultPosSettings() : json_decode($business_details->pos_settings, true);
-        return view('sale_pos.display', compact('pos_settings'));
+        $carousel_images = collect(range(1, 10))
+            ->map(fn ($i) => $pos_settings['carousel_image_'.$i] ?? null)
+            ->filter()
+            ->map(fn ($image) => url('uploads/carousel_images/'.$image))
+            ->values();
+        $logo = ! empty($business_details->logo) ? asset('uploads/business_logos/'.$business_details->logo) : null;
+        $business_name = $business_details->name;
+
+        return view('sale_pos.display', compact('pos_settings', 'carousel_images', 'logo', 'business_name'));
     }
 
     /**
@@ -613,9 +628,9 @@ class SellPosController extends Controller
 
                 
 
-                DB::commit();
-
                 SellCreatedOrModified::dispatch($transaction);
+
+                DB::commit();
 
                 if ($request->input('is_save_and_print') == 1) {
                     $url = $this->transactionUtil->getInvoiceUrl($transaction->id, $business_id);
@@ -653,6 +668,16 @@ class SellPosController extends Controller
                 }
 
                 $output = ['success' => 1, 'msg' => $msg, 'receipt' => $receipt];
+
+                // شاشة الكاشير الجديدة: بيانات نافذة "تم البيع" (رقم الفاتورة، رابطها للواتساب، موبايل العميل)
+                if (!$is_direct_sale && $input['status'] == 'final' && $transaction->is_suspend != 1) {
+                    $output['sale'] = [
+                        'invoice_no' => $transaction->invoice_no,
+                        'customer' => $transaction->contact->name ?? '',
+                        'mobile' => $transaction->contact->mobile ?? '',
+                        'invoice_url' => $this->transactionUtil->getInvoiceUrl($transaction->id, $business_id),
+                    ];
+                }
 
                 if (!empty($whatsapp_link)) {
                     $output['whatsapp_link'] = $whatsapp_link;
@@ -810,6 +835,27 @@ class SellPosController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
+    /**
+     * عدد الفواتير المعلّقة (بيظهر على زرار "المعلّقة" في شاشة الكاشير الجديدة):
+     * الفروع المسموحة لليوزر، وفواتيره هو بس لو مش بيشوف كل المبيعات
+     */
+    private function suspendedSalesCount($business_id)
+    {
+        $suspended_query = Transaction::where('business_id', $business_id)
+            ->where('type', 'sell')
+            ->where('is_suspend', 1)
+            ->whereNull('sub_type');
+        $permitted_locations = auth()->user()->permitted_locations();
+        if ($permitted_locations != 'all') {
+            $suspended_query->whereIn('location_id', $permitted_locations);
+        }
+        if (!auth()->user()->can('sell.view') && !auth()->user()->can('direct_sell.view')) {
+            $suspended_query->where('created_by', auth()->user()->id);
+        }
+
+        return $suspended_query->count();
+    }
+
     public function edit($id)
     {
         $business_id = request()->session()->get('user.business_id');
@@ -823,6 +869,16 @@ class SellPosController extends Controller
 
         if (!$this->moduleUtil->isSubscribed($business_id)) {
             return $this->moduleUtil->expiredResponse();
+        }
+
+        $protected_transaction = Transaction::where('business_id', $business_id)
+            ->where('type', 'sell')
+            ->findOrFail($id);
+        if ($protected_transaction->source === 'construction_certificate' && ! request()->routeIs('edit-pos-payment')) {
+            return redirect()->action([SellController::class, 'index'])->with('status', [
+                'success' => 0,
+                'msg' => __('construction::lang.construction_invoice_locked'),
+            ]);
         }
 
         //Check if the transaction can be edited or not.
@@ -1060,9 +1116,6 @@ class SellPosController extends Controller
         if (auth()->user()->can('customer.create')) {
             $types['customer'] = __('report.customer');
         }
-        if (auth()->user()->can('supplier.create') && auth()->user()->can('customer.create')) {
-            $types['both'] = __('lang_v1.both_supplier_customer');
-        }
         $customer_groups = CustomerGroup::forDropdown($business_id);
 
         //Accounts
@@ -1112,8 +1165,14 @@ class SellPosController extends Controller
         $users = config('constants.enable_contact_assign') ? User::forDropdown($business_id, false, false, false, true) : [];
         $only_payment = request()->segment(2) == 'payment';
 
-        return view('sale_pos.edit')
-            ->with(compact('business_details', 'taxes', 'payment_types', 'walk_in_customer',
+        // شاشة الكاشير الجديدة (نفس شاشة الإضافة بوضع التعديل)؛ الموديولات اللي ليها sub_type لسه على الشاشة القديمة
+        $view = empty($sub_type) && empty($transaction->sub_type) ? 'sale_pos.create_v2' : 'sale_pos.edit';
+        $register_details = $this->cashRegisterUtil->getCurrentCashRegister(auth()->user()->id);
+        $suspended_count = $this->suspendedSalesCount($business_id);
+        $default_location = $business_location;
+
+        return view($view)
+            ->with(compact('register_details', 'suspended_count', 'default_location','business_details', 'taxes', 'payment_types', 'walk_in_customer',
                 'sell_details', 'transaction', 'payment_lines', 'location_printer_type', 'shortcuts',
                 'commission_agent', 'categories', 'pos_settings', 'change_return', 'types', 'customer_groups',
                 'brands', 'accounts', 'waiters', 'redeem_details', 'edit_price', 'edit_discount',
@@ -1135,6 +1194,15 @@ class SellPosController extends Controller
         if (!auth()->user()->can('sell.update') && !auth()->user()->can('direct_sell.access') &&
             !auth()->user()->can('so.update') && !auth()->user()->can('edit_pos_payment')) {
             abort(403, 'Unauthorized action.');
+        }
+
+        $business_id = $request->session()->get('user.business_id');
+        $protected_transaction = Transaction::where('business_id', $business_id)->findOrFail($id);
+        if ($protected_transaction->source === 'construction_certificate' && $request->has('products')) {
+            return redirect()->action([SellController::class, 'index'])->with('status', [
+                'success' => 0,
+                'msg' => __('construction::lang.construction_invoice_locked'),
+            ]);
         }
 
         try {
@@ -1493,6 +1561,16 @@ class SellPosController extends Controller
 
                 $output = ['success' => 1, 'msg' => $msg, 'receipt' => $receipt];
 
+                // شاشة الكاشير الجديدة: نافذة "تم البيع" بعد استكمال فاتورة معلّقة أو تعديلها
+                if (!$is_direct_sale && $input['status'] == 'final' && $transaction->is_suspend != 1) {
+                    $output['sale'] = [
+                        'invoice_no' => $transaction->invoice_no,
+                        'customer' => $transaction->contact->name ?? '',
+                        'mobile' => $transaction->contact->mobile ?? '',
+                        'invoice_url' => $this->transactionUtil->getInvoiceUrl($transaction->id, $business_id),
+                    ];
+                }
+
                 if (!empty($whatsapp_link)) {
                     $output['whatsapp_link'] = $whatsapp_link;
                 }
@@ -1595,7 +1673,17 @@ class SellPosController extends Controller
                 //Begin transaction
                 DB::beginTransaction();
 
+                $transaction = Transaction::where('business_id', $business_id)->findOrFail($id);
+                if ($transaction->source === 'construction_certificate') {
+                    DB::rollBack();
+
+                    return [
+                        'success' => false,
+                        'msg' => __('construction::lang.construction_invoice_locked'),
+                    ];
+                }
                 $output = $this->transactionUtil->deleteSale($business_id, $id);
+                SellCreatedOrModified::dispatch($transaction, true);
 
                 DB::commit();
             } catch (\Exception $e) {
@@ -1679,7 +1767,10 @@ class SellPosController extends Controller
             $accounts = Account::forDropdown($business_id, true, false, true);
         }
 
-        return view('sale_pos.partials.payment_row')
+        // شاشة الكاشير الجديدة بتطلب السطر بتصميم رقمي (v2_js بيزوّد v2=1 على الطلب)
+        $view = $request->boolean('v2') ? 'sale_pos.partials.v2_payment_row' : 'sale_pos.partials.payment_row';
+
+        return view($view)
             ->with(compact('payment_types', 'row_index', 'removable', 'payment_line', 'accounts'));
     }
 
@@ -1734,6 +1825,7 @@ class SellPosController extends Controller
             ->groupBy('transactions.id')
             ->select('transactions.*')
             ->with(['contact', 'table'])
+            ->withCount(['sell_lines' => fn ($q) => $q->whereNull('parent_sell_line_id')])
             ->limit($limit)
             ->get();
 
@@ -1881,11 +1973,13 @@ class SellPosController extends Controller
                 'p.name',
                 'p.type',
                 'p.enable_stock',
+                'p.category_id',
                 'p.image as product_image',
                 'variations.id',
                 'variations.name as variation',
                 'VLD.qty_available',
                 'variations.default_sell_price as selling_price',
+                'variations.sell_price_inc_tax',
                 'variations.sub_sku',
                 'u.short_name as unit'
             )

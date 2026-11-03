@@ -17,8 +17,14 @@ class ModuleAssetServiceProvider extends ServiceProvider
     {
         // Share module assets with all views
         View::composer('*', function ($view) {
-            // Skip asset loading for AJAX requests
-            if (request()->ajax()) {
+            // The installer must be able to render before a database connection
+            // or the system table exists. Module versions are database-backed, so
+            // loading them during first-time installation would crash the installer.
+            if (request()->ajax() ||
+                request()->is('install*') ||
+                ! file_exists(base_path('.env'))) {
+                $view->with('moduleAssets', ['js' => [], 'css' => []]);
+
                 return;
             }
             

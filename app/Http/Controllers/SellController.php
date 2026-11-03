@@ -78,9 +78,7 @@ class SellController extends Controller
     {
         $is_admin = $this->businessUtil->is_admin(auth()->user());
 
-        if (! $is_admin && ! auth()->user()->hasAnyPermission(['sell.view', 'sell.create', 'direct_sell.access', 'direct_sell.view', 'view_own_sell_only', 'view_commission_agent_sell', 'access_shipping', 'access_own_shipping', 'access_commission_agent_shipping', 'so.view_all', 'so.view_own'])) {
-            abort(403, 'Unauthorized action.');
-        }
+        $this->authorizeSellList();
 
         $business_id = request()->session()->get('user.business_id');
         $is_woocommerce = $this->moduleUtil->isModuleInstalled('Woocommerce');
@@ -131,6 +129,14 @@ class SellController extends Controller
                 'rewards_only' => request()->input('rewards_only'),
                 'commission_agent' => request()->input('commission_agent'),
             ];
+            // كل فلاتر الطلب (زي is_direct_sale وlist_for) + بصمة للفواتير، عشان العدد ما يفضلش قديم
+            // بعد إضافة أو حذف أو تعديل فاتورة طول مدة الكاش
+            $cache_key_params['filters'] = request()->except(['draw', 'start', 'length', 'order', 'columns', 'search', '_']);
+            $cache_key_params['stamp'] = Transaction::where('business_id', $business_id)
+                ->where('type', $sale_type)
+                ->selectRaw('COUNT(*) AS c, MAX(id) AS m, MAX(updated_at) AS u')
+                ->first()
+                ->toArray();
             $cache_key = 'sell_list_count_' . md5(json_encode($cache_key_params));
 
             // Get total count using cache (expires in 60 seconds)
@@ -219,6 +225,12 @@ class SellController extends Controller
             $only_shipments = request()->only_shipments == 'true' ? true : false;
 
             $datatable = Datatables::of($sells)
+                ->addColumn('transaction_id', function ($row) {
+                    return $row->id;
+                })
+                ->addColumn('print_url', function ($row) {
+                    return route('sell.printInvoice', [$row->id], false);
+                })
                 ->addColumn(
                     'action',
                     function ($row) use ($only_shipments, $is_admin, $sale_type, $is_zatca) {
@@ -261,7 +273,7 @@ class SellController extends Controller
                         if (auth()->user()->can('sell.view') || auth()->user()->can('direct_sell.view') || auth()->user()->can('view_own_sell_only')) {
                             $html .= '<li><a href="#" data-href="'.action([\App\Http\Controllers\SellController::class, 'show'], [$row->id]).'" class="btn-modal" data-container=".view_modal"><i class="fas fa-eye" aria-hidden="true"></i> '.__('messages.view').'</a></li>';
                         }
-                        if (! $only_shipments) {
+                        if (! $only_shipments && $row->source !== 'construction_certificate') {
                             if ($row->is_direct_sale == 0) {
                                 if (auth()->user()->can('sell.update')) {
                                     $html .= '<li><a target="_blank" href="'.action([\App\Http\Controllers\SellPosController::class, 'edit'], [$row->id]).'"><i class="fas fa-edit"></i> '.__('messages.edit').'</a></li>';
@@ -317,6 +329,7 @@ class SellController extends Controller
                         if ($row->type == 'sell') {
                             if (auth()->user()->can('print_invoice')) {
                                 $html .= '<li><a href="#" class="print-invoice" data-href="'.route('sell.printInvoice', [$row->id]).'"><i class="fas fa-print" aria-hidden="true"></i> '.__('lang_v1.print_invoice').'</a></li>
+                                    <li><a href="#" class="share-invoice-image" data-href="'.route('sell.printInvoice', [$row->id]).'" data-invoice-no="'.e($row->invoice_no).'"><i class="fab fa-whatsapp" aria-hidden="true"></i> مشاركة صورة الفاتورة</a></li>
                                     <li><a href="#" class="print-invoice" data-href="'.route('sell.printInvoice', [$row->id]).'?package_slip=true"><i class="fas fa-file-alt" aria-hidden="true"></i> '.__('lang_v1.packing_slip').'</a></li>';
 
                                 $html .= '<li><a href="#" class="print-invoice" data-href="'.route('sell.printInvoice', [$row->id]).'?delivery_note=true"><i class="fas fa-file-alt" aria-hidden="true"></i> '.__('lang_v1.delivery_note').'</a></li>';
@@ -397,6 +410,43 @@ class SellController extends Controller
                         return (string) view('sell.partials.payment_status', ['payment_status' => $payment_status, 'id' => $row->id]);
                     }
                 )
+                ->editColumn('additional_notes', function ($row) {
+                    if (empty($row->additional_notes)) {
+                        return '';
+                    }
+
+                    $has_woo_note_marker = preg_match(
+                        '/^(?:📝\s*)?(?:توجد ملاحظة|Has a note)\s*:/iu',
+                        trim((string) $row->additional_notes)
+                    );
+
+                    if (! empty($row->woocommerce_order_id) || $has_woo_note_marker) {
+                        return '<span class="label bg-blue no-print"><i class="fas fa-comment-alt"></i> '
+                            .__('woocommerce::lang.sales_table_has_customer_note')
+                            .'</span>';
+                    }
+
+                    return e($row->additional_notes);
+                })
+                ->editColumn('staff_note', function ($row) {
+                    if (empty($row->staff_note)) {
+                        return '';
+                    }
+
+                    $staff_note = trim((string) $row->staff_note);
+                    $is_vodafone_paid_marker = preg_match(
+                        '/(?:مدفوع\s+فودافون\s+كاش|Paid\s+via\s+Vodafone\s+Cash)/iu',
+                        $staff_note
+                    ) || preg_match('/^✅\s*(?:مدفوع|Paid)$/iu', $staff_note);
+
+                    if ($is_vodafone_paid_marker) {
+                        return '<span class="label bg-green no-print"><i class="fas fa-check-circle"></i> '
+                            .__('woocommerce::lang.sales_table_paid_badge')
+                            .'</span>';
+                    }
+
+                    return e($row->staff_note);
+                })
                 ->editColumn(
                     'types_of_service_name',
                     '<span class="service-type-label" data-orig-value="{{$types_of_service_name}}" data-status-name="{{$types_of_service_name}}">{{$types_of_service_name}}</span>'
@@ -519,13 +569,289 @@ class SellController extends Controller
                         }
                     }, ]);
 
-            $rawColumns = ['final_total', 'action', 'total_paid', 'total_remaining', 'payment_status', 'invoice_no', 'discount_amount', 'tax_amount', 'total_before_tax', 'shipping_status', 'types_of_service_name', 'payment_methods', 'return_due', 'conatct_name', 'status', 'zatca_status'];
+            $rawColumns = ['final_total', 'action', 'total_paid', 'total_remaining', 'payment_status', 'invoice_no', 'discount_amount', 'tax_amount', 'total_before_tax', 'shipping_status', 'types_of_service_name', 'payment_methods', 'return_due', 'conatct_name', 'status', 'zatca_status', 'additional_notes', 'staff_note'];
 
-            return $datatable->rawColumns($rawColumns)
-                      ->skipTotalRecords()
-                      ->setFilteredRecords($total_records)
-                      ->make(true);
+            $datatable->rawColumns($rawColumns)->skipTotalRecords();
+
+            // العدد المحفوظ ما بيحسبش البحث، فمع البحث الجدول بيعد النتايج بنفسه
+            if (trim((string) request()->input('search.value')) === '') {
+                $datatable->setFilteredRecords($total_records);
+            }
+
+            return $datatable->make(true);
         }
+
+        // الشاشة الافتراضية هي الجديدة (نظام رقمي)؛ القديمة لليوزر اللي اختار يرجع لها بس
+        $view = auth()->user()->use_classic_sells ? 'sell.index' : 'sell.index_v2';
+
+        return view($view)->with($this->sellListViewData($business_id));
+    }
+
+    /**
+     * Switches the current user between the new create/edit sale screens and the classic ones (for himself only).
+     * Keeps the query string (sale_type, status) so the user lands on the same kind of document,
+     * or goes back to the invoice being edited (edit_id).
+     */
+    public function switchCreate()
+    {
+        $data = request()->validate(['version' => ['required', 'in:new,classic'], 'query' => ['nullable', 'string', 'max:500'], 'edit_id' => ['nullable', 'integer']]);
+
+        $user = auth()->user();
+        $user->use_classic_sell_create = $data['version'] == 'classic';
+        $user->save();
+
+        // من شاشة التعديل: يرجع لنفس الفاتورة
+        if (! empty($data['edit_id'])) {
+            return redirect()->action([self::class, 'edit'], [$data['edit_id']]);
+        }
+
+        parse_str($data['query'] ?? '', $query);
+        $query = array_intersect_key($query, array_flip(['sale_type', 'status']));
+
+        return redirect()->to(action([self::class, 'create']).($query ? '?'.http_build_query($query) : ''));
+    }
+
+    /**
+     * Customer card on the new create/edit invoice screens: phone, balance due, credit limit
+     * (with what is still available, computed like TransactionUtil::isCustomerCreditLimitExeeded)
+     * and the last final invoice. `exclude` skips the invoice being edited.
+     */
+    public function customerSummary($contact_id)
+    {
+        if (! auth()->user()->can('direct_sell.access') && ! auth()->user()->can('direct_sell.update') && ! auth()->user()->can('so.create')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $business_id = request()->session()->get('user.business_id');
+        $contact = Contact::where('business_id', $business_id)->findOrFail($contact_id);
+        $exclude = (int) request()->input('exclude');
+
+        $credit = Transaction::where('business_id', $business_id)->where('contact_id', $contact->id)
+            ->where('type', 'sell')->where('status', 'final')
+            ->when($exclude, fn ($q) => $q->where('id', '!=', $exclude))
+            ->select(
+                DB::raw('SUM(final_total) as total_invoice'),
+                DB::raw('SUM((SELECT SUM(IF(is_return = 1, -1 * amount, amount)) FROM transaction_payments WHERE transaction_payments.transaction_id = transactions.id)) as invoice_paid')
+            )->first();
+        $credit_used = (float) ($credit->total_invoice ?? 0) - (float) ($credit->invoice_paid ?? 0);
+
+        $last = Transaction::where('business_id', $business_id)->where('contact_id', $contact->id)
+            ->where('type', 'sell')->where('status', 'final')
+            ->when($exclude, fn ($q) => $q->where('id', '!=', $exclude))
+            ->latest('transaction_date')->first(['id', 'invoice_no', 'transaction_date', 'final_total']);
+
+        $due = (float) $this->transactionUtil->getContactDue($contact->id, $business_id);
+        $limit = is_null($contact->credit_limit) ? null : (float) $contact->credit_limit;
+
+        return response()->json([
+            'name' => $contact->name,
+            'mobile' => $contact->mobile,
+            'is_default' => (bool) $contact->is_default,
+            'due' => $due,
+            'due_text' => $this->transactionUtil->num_f($due, true),
+            'credit_limit' => $limit,
+            'credit_limit_text' => is_null($limit) ? null : $this->transactionUtil->num_f($limit, true),
+            'credit_available' => is_null($limit) ? null : $limit - $credit_used,
+            'credit_available_text' => is_null($limit) ? null : $this->transactionUtil->num_f($limit - $credit_used, true),
+            'last_invoice' => $last ? [
+                'invoice_no' => $last->invoice_no,
+                'date' => $this->transactionUtil->format_date($last->transaction_date),
+                'total_text' => $this->transactionUtil->num_f($last->final_total, true),
+            ] : null,
+            'url' => auth()->user()->can('customer.view') || auth()->user()->can('customer.view_own') ? action([\App\Http\Controllers\ContactController::class, 'show'], [$contact->id]) : null,
+        ]);
+    }
+
+    /**
+     * Switches the current user between the new sells list and the classic one (for himself only).
+     */
+    public function switchList()
+    {
+        $data = request()->validate(['version' => ['required', 'in:new,classic']]);
+
+        $user = auth()->user();
+        $user->use_classic_sells = $data['version'] == 'classic';
+        $user->save();
+
+        return redirect()->action([self::class, 'index']);
+    }
+
+    /**
+     * The redesigned sells list (/sells/v2). Rows still come from the /sells AJAX endpoint,
+     * and the KPI strip from listSummary().
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function indexV2()
+    {
+        $this->authorizeSellList();
+
+        $business_id = request()->session()->get('user.business_id');
+
+        return view('sell.index_v2')->with($this->sellListViewData($business_id));
+    }
+
+    /**
+     * KPI totals and per payment-status counts for the whole filtered period on /sells/v2.
+     * Takes the same filter params as the /sells AJAX list. The payment status tab is ignored,
+     * so the KPIs and the tab counts stay the same while switching tabs.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function listSummary()
+    {
+        $this->authorizeSellList();
+
+        $business_id = request()->session()->get('user.business_id');
+        request()->merge(['payment_status' => null]);
+
+        $ids = $this->sellListIdsQuery($business_id);
+
+        $paid = 'COALESCE((SELECT SUM(IF(tp.is_return = 1, -1 * tp.amount, tp.amount)) FROM transaction_payments AS tp WHERE tp.transaction_id = t.id), 0)';
+        $overdue = "t.payment_status IN ('due', 'partial') AND t.pay_term_number IS NOT NULL AND t.pay_term_type IS NOT NULL
+            AND IF(t.pay_term_type = 'days', DATE_ADD(t.transaction_date, INTERVAL t.pay_term_number DAY), DATE_ADD(t.transaction_date, INTERVAL t.pay_term_number MONTH)) < CURDATE()";
+
+        $totals = DB::table('transactions AS t')
+            ->whereIn('t.id', (clone $ids)->select('transactions.id'))
+            ->selectRaw("COUNT(*) AS invoices,
+                COALESCE(SUM(t.final_total), 0) AS total,
+                COALESCE(SUM({$paid}), 0) AS paid,
+                COALESCE(SUM(GREATEST(t.final_total - {$paid}, 0)), 0) AS due,
+                COALESCE(SUM(t.payment_status = 'paid'), 0) AS count_paid,
+                COALESCE(SUM(t.payment_status = 'partial'), 0) AS count_partial,
+                COALESCE(SUM(t.payment_status = 'due'), 0) AS count_due,
+                COALESCE(SUM({$overdue}), 0) AS count_overdue")
+            ->first();
+
+        $returns = DB::table('transactions AS sr')
+            ->where('sr.business_id', $business_id)
+            ->where('sr.type', 'sell_return')
+            ->whereIn('sr.return_parent_id', (clone $ids)->select('transactions.id'))
+            ->sum('sr.final_total');
+
+        $invoices = (int) $totals->invoices;
+
+        return response()->json([
+            'total' => (float) $totals->total,
+            'paid' => (float) $totals->paid,
+            'due' => (float) $totals->due,
+            'returns' => (float) $returns,
+            'invoices' => $invoices,
+            'average' => $invoices > 0 ? (float) $totals->total / $invoices : 0,
+            'counts' => [
+                'all' => $invoices,
+                'paid' => (int) $totals->count_paid,
+                'partial' => (int) $totals->count_partial,
+                'due' => (int) $totals->count_due,
+                'overdue' => (int) $totals->count_overdue,
+            ],
+        ]);
+    }
+
+    /**
+     * Excel/CSV export of the whole filtered period on /sells/v2 (not just the visible page).
+     * Takes the list filter params, the payment status tab and the search box; ids[] limits it to selected invoices.
+     */
+    public function exportList()
+    {
+        $this->authorizeSellList();
+
+        $business_id = request()->session()->get('user.business_id');
+        $ids = $this->sellListIdsQuery($business_id);
+
+        $selected = array_values(array_filter(array_map('intval', (array) request()->input('ids', []))));
+        if (! empty($selected)) {
+            $ids->whereIn('transactions.id', $selected);
+        }
+
+        $paid = 'COALESCE((SELECT SUM(IF(tp.is_return = 1, -1 * tp.amount, tp.amount)) FROM transaction_payments AS tp WHERE tp.transaction_id = t.id), 0)';
+
+        $rows = DB::table('transactions AS t')
+            ->whereIn('t.id', (clone $ids)->select('transactions.id'))
+            ->leftJoin('contacts AS c', 'c.id', '=', 't.contact_id')
+            ->join('business_locations AS bl', 'bl.id', '=', 't.location_id')
+            ->leftJoin('users AS u', 'u.id', '=', 't.created_by')
+            ->select(
+                't.id', 't.invoice_no', 't.transaction_date', 't.final_total', 't.payment_status',
+                't.pay_term_number', 't.pay_term_type', 't.additional_notes',
+                'c.name AS customer', 'c.supplier_business_name', 'c.mobile', 'bl.name AS location',
+                DB::raw("{$paid} AS paid"),
+                DB::raw("(SELECT GROUP_CONCAT(DISTINCT tp.method) FROM transaction_payments AS tp WHERE tp.transaction_id = t.id AND tp.is_return = 0) AS methods"),
+                DB::raw("(SELECT COALESCE(SUM(sr.final_total), 0) FROM transactions AS sr WHERE sr.return_parent_id = t.id AND sr.type = 'sell_return') AS returns"),
+                DB::raw("TRIM(CONCAT(COALESCE(u.surname, ''), ' ', COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS added_by")
+            )
+            ->orderBy('t.transaction_date', 'desc')
+            ->orderBy('t.id', 'desc')
+            ->get();
+
+        $export = new \App\Exports\SalesListExport($rows, [
+            'business' => request()->session()->get('business.name'),
+            'start' => request()->input('start_date'),
+            'end' => request()->input('end_date'),
+            'note' => mb_substr(trim((string) request()->input('note')), 0, 500),
+            'selected' => ! empty($selected),
+            'user' => trim(auth()->user()->first_name.' '.auth()->user()->last_name),
+            'methods' => $this->transactionUtil->payment_types(null, true, $business_id),
+            'precision' => (int) request()->session()->get('business.currency_precision', 2),
+        ]);
+
+        // طباعة كل الفترة: صفحة مستقلة جاهزة للطباعة (A4 بالعرض) بنفس بيانات Excel
+        if (request()->input('format') === 'print') {
+            return view('sell.print_list', [
+                'export' => $export,
+                'records' => $export->records(),
+                'business_name' => request()->session()->get('business.name'),
+                'note' => mb_substr(trim((string) request()->input('note')), 0, 500),
+                'precision' => (int) request()->session()->get('business.currency_precision', 2),
+            ]);
+        }
+
+        $format = request()->input('format') === 'csv' ? 'csv' : 'xlsx';
+        $name = 'sales_'.(request()->input('start_date') ?: 'all').'_'.(request()->input('end_date') ?: now()->format('Y-m-d')).'.'.$format;
+
+        return $format === 'csv' ? $export->csvResponse($name) : $export->xlsxResponse($name);
+    }
+
+    /**
+     * Ids of the sells matching the list filters and the /sells/v2 search box (invoice, customer, phone).
+     */
+    private function sellListIdsQuery($business_id)
+    {
+        $ids = $this->transactionUtil->getListSells($business_id, 'sell', true);
+        $this->applySellListFilters($ids, $business_id, 'sell', true);
+
+        $keyword = trim((string) request()->input('search'));
+        if ($keyword !== '') {
+            $ids->where(function ($q) use ($keyword) {
+                $q->where('transactions.invoice_no', 'like', "%{$keyword}%")
+                    ->orWhere('contacts.name', 'like', "%{$keyword}%")
+                    ->orWhere('contacts.supplier_business_name', 'like', "%{$keyword}%")
+                    ->orWhere('contacts.mobile', 'like', "%{$keyword}%");
+            });
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Same access rule as the sells list.
+     */
+    private function authorizeSellList()
+    {
+        if (! $this->businessUtil->is_admin(auth()->user()) && ! auth()->user()->hasAnyPermission(['sell.view', 'sell.create', 'direct_sell.access', 'direct_sell.view', 'view_own_sell_only', 'view_commission_agent_sell', 'access_shipping', 'access_own_shipping', 'access_commission_agent_shipping', 'so.view_all', 'so.view_own'])) {
+            abort(403, 'Unauthorized action.');
+        }
+    }
+
+    /**
+     * Dropdowns and settings shared by the old and the new sells list views.
+     */
+    private function sellListViewData($business_id)
+    {
+        $is_woocommerce = $this->moduleUtil->isModuleInstalled('Woocommerce');
+        $is_tables_enabled = $this->transactionUtil->isModuleEnabled('tables');
+        $is_service_staff_enabled = $this->transactionUtil->isModuleEnabled('service_staff');
+        $is_types_service_enabled = $this->moduleUtil->isModuleEnabled('types_of_service');
 
         $business_locations = BusinessLocation::forDropdown($business_id, false);
         $customers = Contact::customersDropdown($business_id, false);
@@ -552,10 +878,11 @@ class SellController extends Controller
         }
 
         $payment_types = $this->transactionUtil->payment_types(null, true, $business_id);
+        $common_settings = session()->get('business.common_settings', []);
+        $invoice_whatsapp_number = $common_settings['invoice_whatsapp_number'] ?? '';
 
 
-        return view('sell.index')
-        ->with(compact('business_locations', 'customers', 'is_woocommerce', 'sales_representative', 'is_cmsn_agent_enabled', 'commission_agents', 'service_staffs', 'is_tables_enabled', 'is_service_staff_enabled', 'is_types_service_enabled', 'shipping_statuses', 'sources', 'payment_types'));
+        return compact('business_locations', 'customers', 'is_woocommerce', 'sales_representative', 'is_cmsn_agent_enabled', 'commission_agents', 'service_staffs', 'is_tables_enabled', 'is_service_staff_enabled', 'is_types_service_enabled', 'shipping_statuses', 'sources', 'payment_types', 'invoice_whatsapp_number');
     }
 
     /**
@@ -616,9 +943,6 @@ class SellController extends Controller
         if (auth()->user()->can('customer.create')) {
             $types['customer'] = __('report.customer');
         }
-        if (auth()->user()->can('supplier.create') && auth()->user()->can('customer.create')) {
-            $types['both'] = __('lang_v1.both_supplier_customer');
-        }
         $customer_groups = CustomerGroup::forDropdown($business_id);
 
         $payment_line = $this->dummyPaymentLine;
@@ -678,7 +1002,10 @@ class SellController extends Controller
 
         $change_return = $this->dummyPaymentLine;
 
-        return view('sell.create')
+        // شاشة الإنشاء الافتراضية هي الجديدة (نظام رقمي)؛ القديمة لليوزر اللي اختار يرجع لها بس
+        $create_view = auth()->user()->use_classic_sell_create ? 'sell.create' : 'sell.create_v2';
+
+        return view($create_view)
             ->with(compact(
                 'business_details',
                 'taxes',
@@ -794,8 +1121,16 @@ class SellController extends Controller
         $status_color_in_activity = Transaction::sales_order_statuses();
         $sales_orders = $sell->salesOrders();
 
-        return view('sale_pos.show')
-            ->with(compact(
+        $constructionCertificate = null;
+        if ($sell->source === 'construction_certificate' && \Illuminate\Support\Facades\Schema::hasTable('construction_customer_certificates')) {
+            $constructionCertificate = \Modules\Construction\Entities\ConstructionCustomerCertificate::query()
+                ->where('business_id', $business_id)
+                ->where('invoice_transaction_id', $sell->id)
+                ->with(['project', 'contract', 'measurement'])
+                ->first();
+        }
+
+        $viewData = compact(
                 'taxes',
                 'sell',
                 'payment_types',
@@ -808,8 +1143,28 @@ class SellController extends Controller
                 'statuses',
                 'status_color_in_activity',
                 'sales_orders',
-                'line_taxes'
-            ));
+                'line_taxes',
+                'constructionCertificate'
+            );
+
+        if ($constructionCertificate && request()->boolean('construction')) {
+            return view('construction::certificates.invoice', $viewData + [
+                'project' => $constructionCertificate->project,
+                'certificate' => $constructionCertificate,
+            ]);
+        }
+
+        // نافذة الفاتورة بتصميم رقمي، بتتفتح من شاشة المبيعات الجديدة (/sells/v2) بس لحد ما تتعمم
+        if (request()->boolean('v2')) {
+            $viewData['total_returns'] = Transaction::where('business_id', $business_id)
+                ->where('type', 'sell_return')
+                ->where('return_parent_id', $sell->id)
+                ->sum('final_total');
+
+            return view('sale_pos.show_v2')->with($viewData);
+        }
+
+        return view('sale_pos.show')->with($viewData);
     }
 
     /**
@@ -822,6 +1177,15 @@ class SellController extends Controller
     {
         if (! auth()->user()->can('direct_sell.update') && ! auth()->user()->can('so.update')) {
             abort(403, 'Unauthorized action.');
+        }
+
+        $business_id = request()->session()->get('user.business_id');
+        $protected_transaction = Transaction::where('business_id', $business_id)->findOrFail($id);
+        if ($protected_transaction->source === 'construction_certificate') {
+            return redirect()->action([self::class, 'index'])->with('status', [
+                'success' => 0,
+                'msg' => __('construction::lang.construction_invoice_locked'),
+            ]);
         }
 
         //Check if the transaction can be edited or not.
@@ -837,8 +1201,6 @@ class SellController extends Controller
             return back()->with('status', ['success' => 0,
                 'msg' => __('lang_v1.return_exist')]);
         }
-
-        $business_id = request()->session()->get('user.business_id');
 
         $moduleUtil = new ModuleUtil();
 
@@ -931,6 +1293,7 @@ class SellController extends Controller
                             'units.id as unit_id',
                             'transaction_sell_lines.sub_unit_id',
                             'transaction_sell_lines.so_line_id',
+                            'variations.default_purchase_price',
                             DB::raw('vld.qty_available + transaction_sell_lines.quantity AS qty_available')
                         )
                         ->get();
@@ -1040,9 +1403,6 @@ class SellController extends Controller
         if (auth()->user()->can('customer.create')) {
             $types['customer'] = __('report.customer');
         }
-        if (auth()->user()->can('supplier.create') && auth()->user()->can('customer.create')) {
-            $types['both'] = __('lang_v1.both_supplier_customer');
-        }
         $customer_groups = CustomerGroup::forDropdown($business_id);
 
         $transaction->transaction_date = $this->transactionUtil->format_date($transaction->transaction_date, true);
@@ -1131,7 +1491,9 @@ class SellController extends Controller
         //Added check because $users is of no use if enable_contact_assign if false
         $users = config('constants.enable_contact_assign') ? User::forDropdown($business_id, false, false, false, true) : [];
 
-        return view('sell.edit')
+        $edit_view = auth()->user()->use_classic_sell_create ? 'sell.edit' : 'sell.edit_v2';
+
+        return view($edit_view)
             ->with(compact('business_details', 'taxes', 'sell_details', 'transaction', 'commission_agent', 'types', 'customer_groups', 'pos_settings', 'waiters', 'invoice_schemes', 'default_invoice_schemes', 'redeem_details', 'edit_discount', 'edit_price', 'shipping_statuses', 'warranties', 'statuses', 'sales_orders', 'payment_types', 'accounts', 'payment_lines', 'change_return', 'is_order_request_enabled', 'customer_due', 'users'));
     }
 
@@ -1713,7 +2075,10 @@ class SellController extends Controller
         }
 
         // Explicit payment status filter
-        if (! empty(request()->input('payment_status')) && request()->input('payment_status') != 'overdue') {
+        if (request()->input('payment_status') == 'unpaid') {
+            // Not fully paid (due + partial), used by the outstanding KPI on /sells/v2
+            $query->whereIn('transactions.payment_status', ['due', 'partial']);
+        } elseif (! empty(request()->input('payment_status')) && request()->input('payment_status') != 'overdue') {
             $query->where('transactions.payment_status', request()->input('payment_status'));
         } elseif (request()->input('payment_status') == 'overdue') {
             $query->whereIn('transactions.payment_status', ['due', 'partial'])

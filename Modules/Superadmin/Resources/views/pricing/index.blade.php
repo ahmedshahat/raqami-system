@@ -1,65 +1,84 @@
-@extends('layouts.auth')
+@extends('layouts.guest_rr')
 @section('title', __('superadmin::lang.pricing'))
+@section('with_scripts', true)
 
 @section('content')
-    <div class="">
-        @include('superadmin::layouts.partials.currency')
-        <div class="">
-            <div class="tw-mt-20">
-                <div class="tw-flex tw-flex-col tw-items-center">
-                    <div
-                        class="lg:tw-w-16 md:tw-h-16 tw-w-12 tw-h-12 tw-flex tw-items-center tw-justify-center tw-mx-auto tw-overflow-hidden tw-bg-white tw-rounded-full tw-p-0.5 tw-mb-4">
-                        <img src="{{ asset('img/logo-small.png') }}" alt="lock" class="tw-rounded-full tw-object-fill" />
-                    </div>
+    @include('superadmin::layouts.partials.currency')
+    @php
+        $currency = \App\System::getCurrency();
+        $currency_label = $currency && \Lang::has('guest.currency_' . $currency->code)
+            ? __('guest.currency_' . $currency->code)
+            : ($currency->symbol ?? $currency->code ?? '');
+        // المدة ظاهرة في مفتاح ربع سنوي/سنوي، فبنشيلها من اسم الباقة لو مكتوبة جواه بين قوسين
+        $package_name = function ($name) {
+            return trim(preg_replace('/\s*\(\s*(ربع\s*سنو[يى]|سنو[يى]|شهر[يى]|quarterly|yearly|annual|monthly)\s*\)\s*/iu', ' ', $name));
+        };
+        $visible_packages = $packages->filter(function ($package) {
+            return is_null($package->businesses);
+        });
+    @endphp
 
-                    <div class="tw-flex tw-flex-col tw-gap-2 tw-text-center">
-                        <h2 class="tw-font-bold tw-text-3xl tw-text-white">@lang('superadmin::lang.pricing')</h2>
-                        <h3 class="tw-text-sm tw-font-medium tw-text-white">
-                            Choose your prefered {{ config('app.name', 'ultimatePOS') }} pricing plan
-                        </h3>
-                    </div>
+    <div class="rr-landing__wrap rr-pricing">
+        <header class="rr-pricing__intro">
+            <h1 class="rr-landing__title">@lang('guest.pricing_title')</h1>
+            <p class="rr-landing__lead">@lang('guest.pricing_lead')</p>
 
-                    <!-- Montly/annual-->
-                    <div class="tw-flex tw-gap-2 mt-5 md:tw-mt-5">
-                        <span class="tw-text-white">Montly</span>
-
-                        <input type="checkbox" class="tw-dw-toggle tw-dw-toggle-secondary duration_check"
-                            style="margin: 0px" />
-
-                        <span class="tw-flex tw-flex-col tw-text-white"> Annual </span>
-                    </div>
-                </div>
-
-                {{-- <div class="box-body tw-mt-6"> --}}
-                    <div class="tw-flex tw-flex-col md:tw-flex-row tw-gap-5 md:tw-gap-0 tw-mt-5 md:tw-mt-7 tw-mb-10">
-                        @include('superadmin::subscription.partials.packages', [
-                            'action_type' => 'register',
-                        ])
-                    </div>
-                {{-- </div> --}}
+            <div class="rr-segmented" role="group" aria-label="@lang('guest.pricing_duration')" id="rr_pricing_duration">
+                <button type="button" class="rr-segmented__item" data-duration="months" aria-pressed="true">@lang('guest.pricing_quarterly')</button>
+                <button type="button" class="rr-segmented__item" data-duration="years" aria-pressed="false">@lang('guest.pricing_yearly')</button>
             </div>
-        </div>
+            <span class="rr-badge rr-badge--success" id="rr_pricing_saving">@lang('guest.pricing_saving')</span>
+        </header>
+
+        @foreach ($visible_packages->where('price', 0) as $package)
+            @include('superadmin::pricing.partials.trial_strip')
+        @endforeach
+
+        <section class="rr-pricing__grid">
+            @php($pricing_index = 0)
+            @foreach ($visible_packages->where('price', '!=', 0) as $package)
+                @php($pricing_index++)
+                @include('superadmin::pricing.partials.package_card', ['card_index' => $pricing_index])
+            @endforeach
+        </section>
+
+        <section class="rr-landing__features rr-pricing__assurances">
+            @foreach ([['shield', 'no_card'], ['users', 'support'], ['calendar', 'trial'], ['gift', 'updates']] as [$icon, $key])
+                <div class="rr-pricing__assurance">
+                    <span class="rr-landing__feature-icon">@include('partials.rr.icon', ['name' => $icon, 'size' => 20])</span>
+                    <span><strong>@lang('guest.assurance_' . $key)</strong><small>@lang('guest.assurance_' . $key . '_desc')</small></span>
+                </div>
+            @endforeach
+        </section>
+
+        <p class="rr-pricing__note">@include('partials.rr.icon', ['name' => 'info', 'size' => 16]) @lang('guest.pricing_tax_note')</p>
     </div>
 @stop
 
 @section('javascript')
-    <script type="text/javascript">
-        $(document).ready(function() {
-            $('.change_lang').click(function() {
-                window.location = "{{ route('pricing') }}?lang=" + $(this).attr('value');
+    <script>
+        $(function() {
+            var $packages = $('.rr-package');
+            var hasMonths = $packages.filter('.months').length > 0;
+            var hasYears = $packages.filter('.years').length > 0;
+
+            function showDuration(duration) {
+                $('#rr_pricing_duration .rr-segmented__item').each(function() {
+                    $(this).attr('aria-pressed', $(this).data('duration') === duration ? 'true' : 'false');
+                });
+                $packages.filter('.months, .years').prop('hidden', true);
+                $packages.filter('.' + duration).prop('hidden', false);
+            }
+
+            $('#rr_pricing_duration').on('click', '.rr-segmented__item', function() {
+                showDuration($(this).data('duration'));
             });
 
-            $('.duration_check').click(function() {
-                if ($(this).is(':checked')) {
-                    $('.months').fadeOut();
-                    $('.years').fadeIn();
-                } else {
-                    $('.months').fadeIn();
-                    $('.years').fadeOut();
-                }
-            });
-
-            $('.years').fadeOut();
-        })
+            if (hasMonths && hasYears) {
+                showDuration('months');
+            } else {
+                $('#rr_pricing_duration, #rr_pricing_saving').prop('hidden', true);
+            }
+        });
     </script>
 @endsection

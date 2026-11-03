@@ -15,6 +15,7 @@ use App\Http\Controllers\CombinedPurchaseReturnController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerGroupController;
 use App\Http\Controllers\DashboardConfiguratorController;
+use App\Http\Controllers\DashboardV2Controller;
 use App\Http\Controllers\DiscountController;
 use App\Http\Controllers\DocumentAndNoteController;
 use App\Http\Controllers\ExpenseCategoryController;
@@ -111,7 +112,14 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
 
     Route::get('/sign-in-as-user/{id}', [ManageUserController::class, 'signInAsUser'])->name('sign-in-as-user');
 
+    // HomeController@index بيعرض الرئيسية الجديدة (HomeDashboardController)، إلا لليوزر اللي اختار الواجهة القديمة
     Route::get('/home', [HomeController::class, 'index'])->name('home');
+    Route::get('/home/v2', [\App\Http\Controllers\HomeDashboardController::class, 'index'])->name('home.v2');
+    Route::post('/home/switch', [\App\Http\Controllers\HomeDashboardController::class, 'switchHome'])->name('home.switch');
+    Route::post('/home/v2/layout', [\App\Http\Controllers\HomeDashboardController::class, 'saveLayout'])->name('home.v2.layout');
+    Route::post('/user/theme-mode', [\App\Http\Controllers\UserThemeController::class, 'update'])->name('user.theme-mode');
+    Route::get('/dashboard-v2', [DashboardV2Controller::class, 'index'])->name('dashboard.v2');
+    Route::get('/dashboard-v2/summary', [DashboardV2Controller::class, 'summary'])->name('dashboard.v2.summary');
     Route::get('/home/get-totals', [HomeController::class, 'getTotals']);
     Route::get('/home/product-stock-alert', [HomeController::class, 'getProductStockAlert']);
     Route::get('/home/purchase-payment-dues', [HomeController::class, 'getPurchasePaymentDues']);
@@ -152,6 +160,8 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::post('/contacts/check-tax-number', [ContactController::class, 'checkTaxNumber']);
 
     Route::get('/contacts/customers', [ContactController::class, 'getCustomers']);
+    Route::get('/contacts/list-summary', [ContactController::class, 'listSummary'])->name('contacts.list_summary');
+    Route::get('/contacts/list-export', [ContactController::class, 'exportList'])->name('contacts.list_export');
     Route::resource('contacts', ContactController::class);
 
     Route::get('taxonomies-ajax-index-page', [TaxonomyController::class, 'getTaxonomyIndexPage']);
@@ -210,6 +220,7 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('/purchases/get_suppliers', [PurchaseController::class, 'getSuppliers']);
     Route::post('/purchases/get_purchase_entry_row', [PurchaseController::class, 'getPurchaseEntryRow']);
     Route::post('/purchases/check_ref_number', [PurchaseController::class, 'checkRefNumber']);
+    Route::get('/purchases/export', [PurchaseController::class, 'exportList'])->name('purchases.export');
     Route::resource('purchases', PurchaseController::class)->except(['show']);
 
     Route::get('/toggle-subscription/{id}', [SellPosController::class, 'toggleRecurringInvoices']);
@@ -221,6 +232,12 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('/sells/convert-to-proforma/{id}', [SellPosController::class, 'convertToProforma']);
     Route::get('/sells/quotations', [SellController::class, 'getQuotations']);
     Route::get('/sells/draft-dt', [SellController::class, 'getDraftDatables']);
+    Route::get('/sells/v2', [SellController::class, 'indexV2'])->name('sells.v2');
+    Route::get('/sells/v2/summary', [SellController::class, 'listSummary'])->name('sells.v2.summary');
+    Route::get('/sells/v2/export', [SellController::class, 'exportList'])->name('sells.v2.export');
+    Route::post('/sells/switch', [SellController::class, 'switchList'])->name('sells.switch');
+    Route::post('/sells/create/switch', [SellController::class, 'switchCreate'])->name('sells.create.switch');
+    Route::get('/sells/customer-summary/{contact_id}', [SellController::class, 'customerSummary'])->name('sells.customer_summary');
     Route::resource('sells', SellController::class)->except(['show']);
 
     Route::get('/import-sales', [ImportSalesController::class, 'index']);
@@ -335,6 +352,12 @@ Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 
     Route::get('/payments/add_payment/{transaction_id}', [TransactionPaymentController::class, 'addPayment']);
     Route::get('/payments/pay-contact-due/{contact_id}', [TransactionPaymentController::class, 'getPayContactDue']);
     Route::post('/payments/pay-contact-due', [TransactionPaymentController::class, 'postPayContactDue']);
+
+    Route::get('/cheques', [\App\Http\Controllers\ChequeController::class, 'index']);
+    Route::get('/cheques/print/{type}', [\App\Http\Controllers\ChequeController::class, 'printReport'])->where('type', 'receivable|payable|cash_flow');
+    Route::get('/cheques/data/{type}',[\App\Http\Controllers\ChequeController::class, 'data'])->where('type', 'receivable|payable');
+    Route::get('/cheques/{id}/{action}', [\App\Http\Controllers\ChequeController::class, 'actionForm'])->where(['id' => '[0-9]+', 'action' => 'collect|bounce|cancel']);
+    Route::post('/cheques/{id}/{action}', [\App\Http\Controllers\ChequeController::class, 'performAction'])->where(['id' => '[0-9]+', 'action' => 'collect|bounce|cancel']);
     Route::resource('payments', TransactionPaymentController::class);
 
     //Printers...

@@ -1,0 +1,16 @@
+{
+    "name": "Construction",
+    "alias": "construction",
+    "description": "Construction contracting management for Raqmy ERP",
+    "keywords": [
+        "construction",
+        "contracting",
+        "boq",
+        "progress certificates"
+    ],
+    "priority": 0,
+    "providers": [
+        "Modules\\Construction\\Providers\\ConstructionServiceProvider"
+    ],
+    "files": []
+}

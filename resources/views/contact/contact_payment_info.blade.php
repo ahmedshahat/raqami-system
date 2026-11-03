@@ -49,3 +49,25 @@
     <span class="display_currency" data-currency_symbol="true">
     {{ $contact->balance }}</span>
 </p>
+@php
+    $contact_pending_cheques = \App\Cheque::where('business_id', $contact->business_id)
+        ->where('contact_id', $contact->id)
+        ->where('status', \App\Cheque::STATUS_PENDING)
+        ->selectRaw('type, SUM(amount) as total, MIN(due_date) as next_due')
+        ->groupBy('type')
+        ->get()
+        ->keyBy('type');
+@endphp
+@foreach(['receivable' => ['customer', 'both', 'total_invoice', 'invoice_received'], 'payable' => ['supplier', 'both', 'total_purchase', 'purchase_paid']] as $cheque_type => $cfg)
+    @if(in_array($contact->type, [$cfg[0], $cfg[1]]) && !empty($contact_pending_cheques[$cheque_type]))
+        <strong>@lang('cheque.pending_cheques_on_contact') ({{ __('cheque.' . $cheque_type . '_short') }})</strong>
+        <p class="text-muted">
+            <span class="display_currency" data-currency_symbol="true">{{ $contact_pending_cheques[$cheque_type]->total }}</span>
+            <br><small>@lang('cheque.next_due'): {{ @format_date($contact_pending_cheques[$cheque_type]->next_due) }}</small>
+        </p>
+        <strong>@lang('cheque.uncovered_due')</strong>
+        <p class="text-muted">
+            <span class="display_currency" data-currency_symbol="true">{{ $contact->{$cfg[2]} - $contact->{$cfg[3]} - $contact_pending_cheques[$cheque_type]->total }}</span>
+        </p>
+    @endif
+@endforeach

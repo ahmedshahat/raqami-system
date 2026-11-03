@@ -91,8 +91,289 @@ class ContactController extends Controller
             $customer_groups = CustomerGroup::forDropdown($business_id);
         }
 
-        return view('contact.index')
+        // الشاشة الجديدة (نظام رقمي) هي الافتراضية، والقديمة متاحة بالرابط ?classic=1
+        $view = request()->has('classic') ? 'contact.index' : 'contact.index_v2';
+
+        return view($view)
             ->with(compact('type', 'reward_enabled', 'customer_groups', 'users'));
+    }
+
+    /**
+     * KPI totals and tab counts for the whole filtered list on the new contacts screen.
+     * Takes the same filter params as the AJAX list, plus `search`. The tab flags are left out by the screen,
+     * so the KPIs and the tab counts stay the same while switching tabs.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function listSummary()
+    {
+        $type = $this->contactListType();
+        $business_id = request()->session()->get('user.business_id');
+
+        $amounts = $this->contactListAmounts($type);
+
+        $totals = DB::query()
+            ->fromSub($this->contactListQuery($business_id, $type), 'c')
+            ->selectRaw("COUNT(*) AS contacts,
+                COALESCE(SUM(c.contact_status = 'active'), 0) AS active,
+                COALESCE(SUM(GREATEST({$amounts['due']}, 0)), 0) AS due,
+                COALESCE(SUM(GREATEST({$amounts['return_due']}, 0)), 0) AS return_due,
+                COALESCE(SUM(c.balance), 0) AS advance,
+                COALESCE(SUM(GREATEST({$amounts['opening_left']}, 0)), 0) AS opening_left,
+                COALESCE(SUM(({$amounts['due']}) > 0), 0) AS count_due,
+                COALESCE(SUM(c.balance > 0), 0) AS count_advance,
+                COALESCE(SUM({$amounts['returns']} > 0), 0) AS count_returns,
+                COALESCE(SUM(c.opening_balance > 0), 0) AS count_opening")
+            ->first();
+
+        return response()->json([
+            'contacts' => (int) $totals->contacts,
+            'active' => (int) $totals->active,
+            'due' => (float) $totals->due,
+            'return_due' => (float) $totals->return_due,
+            'advance' => (float) $totals->advance,
+            'opening_left' => (float) $totals->opening_left,
+            'counts' => [
+                'all' => (int) $totals->contacts,
+                'due' => (int) $totals->count_due,
+                'advance' => (int) $totals->count_advance,
+                'returns' => (int) $totals->count_returns,
+                'opening' => (int) $totals->count_opening,
+            ],
+        ]);
+    }
+
+    /**
+     * Print or Excel report of the whole filtered list on the new contacts screen (not just the visible page).
+     */
+    public function exportList()
+    {
+        $type = $this->contactListType();
+
+        if (! auth()->user()->can('view_export_buttons')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $business_id = request()->session()->get('user.business_id');
+        $note = mb_substr(trim((string) request()->input('note')), 0, 500);
+
+        $export = new \App\Exports\ContactsListExport(
+            $this->contactListQuery($business_id, $type)->orderBy('contacts.name')->get(),
+            [
+                'type' => $type,
+                'business' => request()->session()->get('business.name'),
+                'note' => $note,
+                'user' => trim(auth()->user()->first_name.' '.auth()->user()->last_name),
+                'precision' => (int) request()->session()->get('business.currency_precision', 2),
+                'logo' => request()->session()->get('business.logo'),
+                'symbol' => request()->session()->get('currency.symbol'),
+            ]
+        );
+
+        $only_due = request()->input('scope') === 'due';
+        $options = \App\Exports\ContactsListExport::reportColumnOptions($type);
+        $selected = request()->has('cols')
+            ? explode(',', (string) request()->input('cols'))
+            : array_keys(array_filter($options, fn ($option) => $option[1]));
+        $records = $export->reportRecords($only_due);
+        $columns = array_intersect_key($options, array_flip($selected));
+
+        if (request()->input('format') === 'report_xlsx') {
+            return $export->xlsxResponse(
+                $type.($only_due ? '_dues_report_' : '_report_').now()->format('Y-m-d').'.xlsx',
+                $export->reportSpreadsheet($records, $columns, $only_due)
+            );
+        }
+
+        return view('contact.print_list', [
+            'type' => $type,
+            'only_due' => $only_due,
+            'records' => $records,
+            'columns' => $columns,
+            'business_name' => request()->session()->get('business.name'),
+            'business_logo' => request()->session()->get('business.logo'),
+            'note' => $note,
+            'precision' => (int) request()->session()->get('business.currency_precision', 2),
+        ]);
+    }
+
+    /**
+     * The list type from the request, with the same access rule as the AJAX list.
+     */
+    private function contactListType()
+    {
+        $type = request()->input('type');
+
+        if (! in_array($type, ['supplier', 'customer'])) {
+            abort(404);
+        }
+
+        if (! auth()->user()->can($type.'.view') && ! auth()->user()->can($type.'.view_own')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        return $type;
+    }
+
+    /**
+     * Contacts matching the list filters and the search box of the new screen.
+     */
+    private function contactListQuery($business_id, $type)
+    {
+        $query = $this->contactUtil->getContactQuery($business_id, $type);
+
+        if ($type == 'supplier') {
+            $this->applySupplierListFilters($query);
+        } else {
+            $this->applyCustomerListFilters($query);
+        }
+
+        $keyword = trim((string) request()->input('search'));
+        if ($keyword !== '') {
+            $columns = ['contact_id', 'name', 'supplier_business_name', 'mobile', 'email', 'tax_number', 'address_line_1', 'address_line_2', 'city', 'state', 'country', 'zip_code'];
+            foreach (range(1, 10) as $number) {
+                $columns[] = 'custom_field'.$number;
+            }
+            $query->where(function ($q) use ($columns, $keyword) {
+                foreach ($columns as $column) {
+                    $q->orWhere('contacts.'.$column, 'like', "%{$keyword}%");
+                }
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * SQL over the grouped list row (alias c), the same formulas as the `due` and `return_due` columns.
+     */
+    private function contactListAmounts($type)
+    {
+        $opening = 'COALESCE(c.opening_balance, 0) - COALESCE(c.opening_balance_paid, 0)';
+
+        if ($type == 'supplier') {
+            // A contact of type "both" has one opening balance, counted with the customers
+            $opening = "IF(c.type = 'both', 0, {$opening})";
+
+            return [
+                'due' => "COALESCE(c.total_purchase, 0) - COALESCE(c.purchase_paid, 0) - COALESCE(c.total_ledger_discount, 0) - COALESCE(c.total_purchase_return, 0) + COALESCE(c.purchase_return_paid, 0) + ({$opening})",
+                'opening_left' => $opening,
+                'return_due' => 'COALESCE(c.total_purchase_return, 0) - COALESCE(c.purchase_return_paid, 0)',
+                'returns' => 'c.total_purchase_return',
+            ];
+        }
+
+        return [
+            'due' => "COALESCE(c.total_invoice, 0) - COALESCE(c.invoice_received, 0) - COALESCE(c.total_ledger_discount, 0) - COALESCE(c.total_sell_return, 0) + COALESCE(c.sell_return_paid, 0) + ({$opening})",
+            'opening_left' => $opening,
+            'return_due' => 'COALESCE(c.total_sell_return, 0) - COALESCE(c.sell_return_paid, 0)',
+            'returns' => 'c.total_sell_return',
+        ];
+    }
+
+    /**
+     * Filters of the supplier list, shared by the AJAX list, the summary and the export.
+     */
+    private function applySupplierListFilters($query)
+    {
+        if (request()->has('has_purchase_due')) {
+			$query->havingRaw('(IFNULL(total_purchase, 0) - IFNULL(purchase_paid, 0) - IFNULL(total_ledger_discount, 0) - IFNULL(total_purchase_return, 0) + IFNULL(purchase_return_paid, 0) + IF(contacts.type = \'both\', 0, IFNULL(opening_balance, 0) - IFNULL(opening_balance_paid, 0))) > 0');
+		}
+
+        if (request()->has('has_purchase_return')) {
+            $query->havingRaw('total_purchase_return > 0');
+        }
+
+        if (request()->has('has_advance_balance')) {
+            $query->where('balance', '>', 0);
+        }
+
+        if (request()->has('has_opening_balance')) {
+            $query->havingRaw('opening_balance > 0');
+        }
+
+        if (! empty(request()->input('contact_status'))) {
+            $query->where('contacts.contact_status', request()->input('contact_status'));
+        }
+
+        if (! empty(request()->input('assigned_to'))) {
+            $query->join('user_contact_access AS uc', 'contacts.id', 'uc.contact_id')
+                ->where('uc.user_id', request()->input('assigned_to'));
+        }
+    }
+
+    /**
+     * Filters of the customer list, shared by the AJAX list, the summary and the export.
+     */
+    private function applyCustomerListFilters($query)
+    {
+        $is_admin = $this->contactUtil->is_admin(auth()->user());
+
+        if (request()->has('has_sell_due')) {
+            $query->havingRaw('(COALESCE(total_invoice, 0) - COALESCE(invoice_received, 0) - COALESCE(total_ledger_discount, 0) - COALESCE(total_sell_return, 0) + COALESCE(sell_return_paid, 0) + COALESCE(opening_balance, 0) - COALESCE(opening_balance_paid, 0)) > 0');
+        }
+
+        if (request()->has('has_sell_return')) {
+            $query->havingRaw('total_sell_return > 0');
+        }
+
+        if (request()->has('has_advance_balance')) {
+            $query->where('balance', '>', 0);
+        }
+
+        if (request()->has('has_opening_balance')) {
+            $query->havingRaw('opening_balance > 0');
+        }
+
+        if (! empty(request()->input('assigned_to'))) {
+            $query->join('user_contact_access AS uc', 'contacts.id', 'uc.contact_id')
+                ->where('uc.user_id', request()->input('assigned_to'));
+        }
+
+        $has_no_sell_from = request()->input('has_no_sell_from', null);
+
+        if (
+            (! $is_admin && auth()->user()->can('customer_with_no_sell_one_month')) ||
+            ($has_no_sell_from == 'one_month' && (auth()->user()->can('customer_with_no_sell_one_month') || auth()->user()->can('customer_irrespective_of_sell')))
+            ) {
+            $from_transaction_date = \Carbon::now()->subDays(30)->format('Y-m-d');
+            $query->havingRaw("max_transaction_date < '{$from_transaction_date}'")
+                     ->orHavingRaw('transaction_date IS NULL');
+        }
+
+        if (
+            (! $is_admin && auth()->user()->can('customer_with_no_sell_three_month')) ||
+            ($has_no_sell_from == 'three_months' && (auth()->user()->can('customer_with_no_sell_three_month') || auth()->user()->can('customer_irrespective_of_sell')))
+        ) {
+            $from_transaction_date = \Carbon::now()->subMonths(3)->format('Y-m-d');
+            $query->havingRaw("max_transaction_date < '{$from_transaction_date}'")
+                     ->orHavingRaw('transaction_date IS NULL');
+        }
+
+        if (
+            (! $is_admin && auth()->user()->can('customer_with_no_sell_six_month')) ||
+            ($has_no_sell_from == 'six_months' && (auth()->user()->can('customer_with_no_sell_six_month') || auth()->user()->can('customer_irrespective_of_sell')))
+        ) {
+            $from_transaction_date = \Carbon::now()->subMonths(6)->format('Y-m-d');
+            $query->havingRaw("max_transaction_date < '{$from_transaction_date}'")
+                     ->orHavingRaw('transaction_date IS NULL');
+        }
+
+        if ((! $is_admin && auth()->user()->can('customer_with_no_sell_one_year')) ||
+            ($has_no_sell_from == 'one_year' && (auth()->user()->can('customer_with_no_sell_one_year') || auth()->user()->can('customer_irrespective_of_sell')))
+        ) {
+            $from_transaction_date = \Carbon::now()->subYear()->format('Y-m-d');
+            $query->havingRaw("max_transaction_date < '{$from_transaction_date}'")
+                     ->orHavingRaw('transaction_date IS NULL');
+        }
+
+        if (! empty(request()->input('customer_group_id'))) {
+            $query->where('contacts.customer_group_id', request()->input('customer_group_id'));
+        }
+
+        if (! empty(request()->input('contact_status'))) {
+            $query->where('contacts.contact_status', request()->input('contact_status'));
+        }
     }
 
     /**
@@ -110,37 +391,17 @@ class ContactController extends Controller
 
         $contact = $this->contactUtil->getContactQuery($business_id, 'supplier');
 
-        if (request()->has('has_purchase_due')) {
-			$contact->havingRaw('(IFNULL(total_purchase, 0) - IFNULL(purchase_paid, 0) - IFNULL(total_ledger_discount, 0)) > 0');
-		}
-
-        if (request()->has('has_purchase_return')) {
-            $contact->havingRaw('total_purchase_return > 0');
-        }
-
-        if (request()->has('has_advance_balance')) {
-            $contact->where('balance', '>', 0);
-        }
-
-        if (request()->has('has_opening_balance')) {
-            $contact->havingRaw('opening_balance > 0');
-        }
-
-        if (! empty(request()->input('contact_status'))) {
-            $contact->where('contacts.contact_status', request()->input('contact_status'));
-        }
-
-        if (! empty(request()->input('assigned_to'))) {
-            $contact->join('user_contact_access AS uc', 'contacts.id', 'uc.contact_id')
-                ->where('uc.user_id', request()->input('assigned_to'));
-        }
+        $this->applySupplierListFilters($contact);
 
         return Datatables::of($contact)
             ->addColumn('address', '{{implode(", ", array_filter([$address_line_1, $address_line_2, $city, $state, $country, $zip_code]))}}')
-            ->addColumn(
-                'due',
-                '<span class="contact_due" data-orig-value="{{$total_purchase - $purchase_paid - $total_ledger_discount}}" data-highlight=false>@format_currency($total_purchase - $purchase_paid - $total_ledger_discount)</span>'
-            )
+            ->addColumn('due', function ($row) {
+                // Net of purchase returns and includes what is left of the opening balance, like the ledger. Type "both" counts the opening with the customers.
+                $opening = $row->type == 'both' ? 0 : $row->opening_balance - $row->opening_balance_paid;
+                $due = $row->total_purchase - $row->purchase_paid - $row->total_ledger_discount - $row->total_purchase_return + $row->purchase_return_paid + $opening;
+
+                return '<span class="contact_due" data-orig-value="'.$due.'" data-highlight=false>'.$this->transactionUtil->num_f($due, true).'</span>';
+            })
             ->addColumn(
                 'return_due',
                 '<span class="return_due" data-orig-value="{{$total_purchase_return - $purchase_return_paid}}" data-highlight=false>@format_currency($total_purchase_return - $purchase_return_paid)'
@@ -157,7 +418,7 @@ class ContactController extends Controller
                     </button>
                     <ul class="dropdown-menu dropdown-menu-left" role="menu">';
 
-                    $html .= '<li><a href="'.action([\App\Http\Controllers\TransactionPaymentController::class, 'getPayContactDue'], [$row->id]).'?type=purchase" class="pay_purchase_due"><i class="fas fa-money-bill-alt" aria-hidden="true"></i>'.__('lang_v1.pay').'</a></li>';
+                    $html .= '<li><a href="'.action([\App\Http\Controllers\TransactionPaymentController::class, 'getPayContactDue'], [$row->id]).'?type=purchase" class="pay_purchase_due"><i class="fas fa-money-bill-alt" aria-hidden="true"></i>'.__('contact_list.pay').'</a></li>';
 
                     $return_due = $row->total_purchase_return - $row->purchase_return_paid;
                     if ($return_due > 0) {
@@ -256,6 +517,7 @@ class ContactController extends Controller
                 }
             })
             ->editColumn('created_at', '{{@format_date($created_at)}}')
+            ->orderColumn('due', "SUM(CASE WHEN t.type = 'purchase' THEN t.final_total - COALESCE((SELECT SUM(amount) FROM transaction_payments WHERE transaction_payments.transaction_id = t.id), 0) WHEN t.type = 'purchase_return' THEN COALESCE((SELECT SUM(amount) FROM transaction_payments WHERE transaction_payments.transaction_id = t.id), 0) - t.final_total WHEN t.type = 'opening_balance' AND contacts.type != 'both' THEN t.final_total - COALESCE((SELECT SUM(IF(is_return = 1, -1 * amount, amount)) FROM transaction_payments WHERE transaction_payments.transaction_id = t.id), 0) WHEN t.type = 'ledger_discount' THEN -t.final_total ELSE 0 END) $1")
             ->removeColumn('opening_balance_paid')
             ->removeColumn('type')
             ->removeColumn('id')
@@ -291,83 +553,19 @@ class ContactController extends Controller
 
         $business_id = request()->session()->get('user.business_id');
 
-        $is_admin = $this->contactUtil->is_admin(auth()->user());
-
         $query = $this->contactUtil->getContactQuery($business_id, 'customer');
 
-        if (request()->has('has_sell_due')) {
-            $query->havingRaw('(COALESCE(total_invoice, 0) - COALESCE(invoice_received, 0) - COALESCE(total_ledger_discount, 0) - COALESCE(total_sell_return, 0) + COALESCE(sell_return_paid, 0)) > 0');
-        }
-
-        if (request()->has('has_sell_return')) {
-            $query->havingRaw('total_sell_return > 0');
-        }
-
-        if (request()->has('has_advance_balance')) {
-            $query->where('balance', '>', 0);
-        }
-
-        if (request()->has('has_opening_balance')) {
-            $query->havingRaw('opening_balance > 0');
-        }
-
-        if (! empty(request()->input('assigned_to'))) {
-            $query->join('user_contact_access AS uc', 'contacts.id', 'uc.contact_id')
-                ->where('uc.user_id', request()->input('assigned_to'));
-        }
-
-        $has_no_sell_from = request()->input('has_no_sell_from', null);
-
-        if (
-            (! $is_admin && auth()->user()->can('customer_with_no_sell_one_month')) ||
-            ($has_no_sell_from == 'one_month' && (auth()->user()->can('customer_with_no_sell_one_month') || auth()->user()->can('customer_irrespective_of_sell')))
-            ) {
-            $from_transaction_date = \Carbon::now()->subDays(30)->format('Y-m-d');
-            $query->havingRaw("max_transaction_date < '{$from_transaction_date}'")
-                     ->orHavingRaw('transaction_date IS NULL');
-        }
-
-        if (
-            (! $is_admin && auth()->user()->can('customer_with_no_sell_three_month')) ||
-            ($has_no_sell_from == 'three_months' && (auth()->user()->can('customer_with_no_sell_three_month') || auth()->user()->can('customer_irrespective_of_sell')))
-        ) {
-            $from_transaction_date = \Carbon::now()->subMonths(3)->format('Y-m-d');
-            $query->havingRaw("max_transaction_date < '{$from_transaction_date}'")
-                     ->orHavingRaw('transaction_date IS NULL');
-        }
-
-        if (
-            (! $is_admin && auth()->user()->can('customer_with_no_sell_six_month')) ||
-            ($has_no_sell_from == 'six_months' && (auth()->user()->can('customer_with_no_sell_six_month') || auth()->user()->can('customer_irrespective_of_sell')))
-        ) {
-            $from_transaction_date = \Carbon::now()->subMonths(6)->format('Y-m-d');
-            $query->havingRaw("max_transaction_date < '{$from_transaction_date}'")
-                     ->orHavingRaw('transaction_date IS NULL');
-        }
-
-        if ((! $is_admin && auth()->user()->can('customer_with_no_sell_one_year')) ||
-            ($has_no_sell_from == 'one_year' && (auth()->user()->can('customer_with_no_sell_one_year') || auth()->user()->can('customer_irrespective_of_sell')))
-        ) {
-            $from_transaction_date = \Carbon::now()->subYear()->format('Y-m-d');
-            $query->havingRaw("max_transaction_date < '{$from_transaction_date}'")
-                     ->orHavingRaw('transaction_date IS NULL');
-        }
-
-        if (! empty(request()->input('customer_group_id'))) {
-            $query->where('contacts.customer_group_id', request()->input('customer_group_id'));
-        }
-
-        if (! empty(request()->input('contact_status'))) {
-            $query->where('contacts.contact_status', request()->input('contact_status'));
-        }
+        $this->applyCustomerListFilters($query);
 
         $contacts = Datatables::of($query)
             ->addColumn('address', '{{implode(", ", array_filter([$address_line_1, $address_line_2, $city, $state, $country, $zip_code]))}}')
         //    + $sell_return_paid add this in due because after paymnet for sell return not calculated 
-            ->addColumn(
-                'due',
-                '<span class="contact_due" data-orig-value="{{$total_invoice - $invoice_received - $total_ledger_discount - $total_sell_return  + $sell_return_paid}}" data-highlight=true>@format_currency($total_invoice - $invoice_received - $total_ledger_discount -  $total_sell_return + $sell_return_paid)  </span>'
-            )
+            ->addColumn('due', function ($row) {
+                // Includes what is left of the opening balance, like the ledger
+                $due = $row->total_invoice - $row->invoice_received - $row->total_ledger_discount - $row->total_sell_return + $row->sell_return_paid + $row->opening_balance - $row->opening_balance_paid;
+
+                return '<span class="contact_due" data-orig-value="'.$due.'" data-highlight=true>'.$this->transactionUtil->num_f($due, true).'</span>';
+            })
             ->addColumn(
                 'return_due',
                 '<span class="return_due" data-orig-value="{{$total_sell_return - $sell_return_paid}}" data-highlight=false>@format_currency($total_sell_return - $sell_return_paid)</span>'
@@ -384,7 +582,7 @@ class ContactController extends Controller
                     </button>
                     <ul class="dropdown-menu dropdown-menu-left" role="menu">';
 
-                    $html .= '<li><a href="'.action([\App\Http\Controllers\TransactionPaymentController::class, 'getPayContactDue'], [$row->id]).'?type=sell" class="pay_sale_due"><i class="fas fa-money-bill-alt" aria-hidden="true"></i>'.__('lang_v1.pay').'</a></li>';
+                    $html .= '<li><a href="'.action([\App\Http\Controllers\TransactionPaymentController::class, 'getPayContactDue'], [$row->id]).'?type=sell" class="pay_sale_due"><i class="fas fa-money-bill-alt" aria-hidden="true"></i>'.__('contact_list.pay').'</a></li>';
                     $return_due = $row->total_sell_return - $row->sell_return_paid;
                     if ($return_due > 0) {
                         $html .= '<li><a href="'.action([\App\Http\Controllers\TransactionPaymentController::class, 'getPayContactDue'], [$row->id]).'?type=sell_return" class="pay_purchase_due"><i class="fas fa-money-bill-alt" aria-hidden="true"></i>'.__('lang_v1.pay_sell_return_due').'</a></li>';
@@ -498,6 +696,7 @@ class ContactController extends Controller
             })
             ->editColumn('total_rp', '{{$total_rp ?? 0}}')
             ->editColumn('created_at', '{{@format_date($created_at)}}')
+            ->orderColumn('due', "SUM(CASE WHEN t.type = 'sell' AND t.status = 'final' THEN t.final_total - COALESCE((SELECT SUM(IF(is_return = 1, -1 * amount, amount)) FROM transaction_payments WHERE transaction_payments.transaction_id = t.id), 0) WHEN t.type = 'opening_balance' THEN t.final_total - COALESCE((SELECT SUM(IF(is_return = 1, -1 * amount, amount)) FROM transaction_payments WHERE transaction_payments.transaction_id = t.id), 0) WHEN t.type = 'ledger_discount' THEN -t.final_total WHEN t.type = 'sell_return' THEN -(t.final_total - COALESCE((SELECT SUM(amount) FROM transaction_payments WHERE transaction_payments.transaction_id = t.id), 0)) ELSE 0 END) $1")
             ->removeColumn('total_invoice')
             ->removeColumn('opening_balance_paid')
             ->removeColumn('invoice_received')
@@ -554,9 +753,6 @@ class ContactController extends Controller
         if (auth()->user()->can('customer.create') || auth()->user()->can('customer.view_own')) {
             $types['customer'] = __('report.customer');
         }
-        if (auth()->user()->can('supplier.create') && auth()->user()->can('customer.create') || auth()->user()->can('supplier.view_own') || auth()->user()->can('customer.view_own')) {
-            $types['both'] = __('lang_v1.both_supplier_customer');
-        }
 
         $customer_groups = CustomerGroup::forDropdown($business_id);
         $selected_type = request()->type;
@@ -566,7 +762,7 @@ class ContactController extends Controller
         //Added check because $users is of no use if enable_contact_assign if false
         $users = config('constants.enable_contact_assign') ? User::forDropdown($business_id, false, false, false, true) : [];
 
-        return view('contact.create')
+        return view('contact.form_v2')
             ->with(compact('types', 'customer_groups', 'selected_type', 'module_form_parts', 'users'));
     }
 
@@ -590,7 +786,7 @@ class ContactController extends Controller
             }
 
             $input = $request->only(['type', 'supplier_business_name',
-                'prefix', 'first_name', 'middle_name', 'last_name', 'tax_number', 'pay_term_number', 'pay_term_type', 'mobile', 'landline', 'alternate_number', 'city', 'state', 'country', 'address_line_1', 'address_line_2', 'customer_group_id', 'zip_code', 'contact_id', 'custom_field1', 'custom_field2', 'custom_field3', 'custom_field4', 'custom_field5', 'custom_field6', 'custom_field7', 'custom_field8', 'custom_field9', 'custom_field10', 'email', 'shipping_address', 'position', 'dob', 'shipping_custom_field_details', 'assigned_to_users', 'land_mark', 'street_name', 'building_number', 'additional_number']);
+                'prefix', 'first_name', 'middle_name', 'last_name', 'tax_number', 'pay_term_number', 'pay_term_type', 'mobile', 'landline', 'alternate_number', 'city', 'state', 'country', 'address_line_1', 'address_line_2', 'customer_group_id', 'zip_code', 'contact_id', 'custom_field1', 'custom_field2', 'custom_field3', 'custom_field4', 'custom_field5', 'custom_field6', 'custom_field7', 'custom_field8', 'custom_field9', 'custom_field10', 'email', 'shipping_address', 'position', 'dob', 'shipping_custom_field_details', 'assigned_to_users', 'land_mark', 'street_name', 'building_number', 'additional_number', 'bosta_city_id', 'bosta_city_name', 'bosta_district_id', 'bosta_district_name', 'bosta_zone_id']);
 
             $name_array = [];
 
@@ -667,6 +863,10 @@ class ContactController extends Controller
 
         $business_id = request()->session()->get('user.business_id');
         $contact = $this->contactUtil->getContactInfo($business_id, $id);
+        // الاستعلام فيه SUM فبيرجّع صف فاضي لجهة مش موجودة أو تابعة لنشاط تاني
+        if (empty($contact->id)) {
+            abort(404);
+        }
 
         $is_selected_contacts = User::isSelectedContacts(auth()->user()->id);
         $user_contacts = [];
@@ -704,8 +904,27 @@ class ContactController extends Controller
            ->latest()
            ->get();
 
-        return view('contact.show')
-             ->with(compact('contact', 'reward_enabled', 'contact_dropdown', 'business_locations', 'view_type', 'contact_view_tabs', 'activities'));
+        if (request()->boolean('classic')) {
+            return view('contact.show')
+                 ->with(compact('contact', 'reward_enabled', 'contact_dropdown', 'business_locations', 'view_type', 'contact_view_tabs', 'activities'));
+        }
+
+        // الأرقام الكلية في getLedgerDetails مش مربوطة بالفترة، فبنطلبها ليوم واحد عشان ما يحسبش كل الحركات
+        $today = \Carbon::now()->format('Y-m-d');
+        $summary = $this->transactionUtil->getLedgerDetails($contact->id, $today, $today);
+
+        $customer_group_name = CustomerGroup::where('business_id', $business_id)->where('id', $contact->customer_group_id)->value('name');
+
+        $pending_cheques = \App\Cheque::where('business_id', $business_id)
+            ->where('contact_id', $contact->id)
+            ->where('status', \App\Cheque::STATUS_PENDING)
+            ->selectRaw('type, SUM(amount) as total, MIN(due_date) as next_due')
+            ->groupBy('type')
+            ->get()
+            ->keyBy('type');
+
+        return view('contact.show_v2')
+             ->with(compact('contact', 'reward_enabled', 'contact_dropdown', 'business_locations', 'view_type', 'contact_view_tabs', 'activities', 'summary', 'customer_group_name', 'pending_cheques'));
     }
 
     /**
@@ -735,7 +954,8 @@ class ContactController extends Controller
             if (auth()->user()->can('customer.create')) {
                 $types['customer'] = __('report.customer');
             }
-            if (auth()->user()->can('supplier.create') && auth()->user()->can('customer.create')) {
+            // نوع "مورد وعميل" اتلغى من الإضافة، وبيفضل ظاهر بس للي متسجل بيه عشان نوعه ما يتغيرش عند الحفظ
+            if ($contact->type == 'both') {
                 $types['both'] = __('lang_v1.both_supplier_customer');
             }
 
@@ -759,7 +979,7 @@ class ContactController extends Controller
             //Added check because $users is of no use if enable_contact_assign if false
             $users = config('constants.enable_contact_assign') ? User::forDropdown($business_id, false, false, false, true) : [];
 
-            return view('contact.edit')
+            return view('contact.form_v2')
                 ->with(compact('contact', 'types', 'customer_groups', 'opening_balance', 'users'));
         }
     }
@@ -780,7 +1000,7 @@ class ContactController extends Controller
         if (request()->ajax()) {
             try {
                 $input = $request->only(['type', 'supplier_business_name', 'prefix', 'first_name', 'middle_name', 'last_name', 'tax_number', 'pay_term_number', 'pay_term_type', 'mobile', 'address_line_1', 'address_line_2', 'zip_code', 'dob', 'alternate_number', 'city', 'state', 'country', 'landline', 'customer_group_id', 'contact_id', 'custom_field1', 'custom_field2', 'custom_field3', 'custom_field4', 'custom_field5', 'custom_field6', 'custom_field7', 'custom_field8', 'custom_field9', 'custom_field10', 'email', 'shipping_address', 'position', 'shipping_custom_field_details', 'export_custom_field_1', 'export_custom_field_2', 'export_custom_field_3', 'export_custom_field_4', 'export_custom_field_5',
-                    'export_custom_field_6', 'assigned_to_users', 'land_mark', 'street_name', 'building_number', 'additional_number']);
+                    'export_custom_field_6', 'assigned_to_users', 'land_mark', 'street_name', 'building_number', 'additional_number', 'bosta_city_id', 'bosta_city_name', 'bosta_district_id', 'bosta_district_name', 'bosta_zone_id']);
 
                 $name_array = [];
 
@@ -996,10 +1216,9 @@ class ContactController extends Controller
     }
 
     /**
-     * Shows import option for contacts
+     * The import page became a window on the list. Old bookmarks of this link open the list with the window open.
      *
-     * @param  \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function getImportContacts()
     {
@@ -1007,26 +1226,16 @@ class ContactController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
-        $zip_loaded = extension_loaded('zip') ? true : false;
+        $type = auth()->user()->can('customer.view') || auth()->user()->can('customer.view_own') ? 'customer' : 'supplier';
 
-        //Check if zip extension it loaded or not.
-        if ($zip_loaded === false) {
-            $output = ['success' => 0,
-                'msg' => 'Please install/enable PHP Zip archive for import',
-            ];
-
-            return view('contact.import')
-                ->with('notification', $output);
-        } else {
-            return view('contact.import');
-        }
+        return redirect()->action([\App\Http\Controllers\ContactController::class, 'index'], ['type' => $type, 'import' => 1]);
     }
 
     /**
-     * Imports contacts
+     * Imports contacts from the import window on the list. All rows are saved or none.
      *
      * @param  \Illuminate\Http\Request
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\JsonResponse
      */
     public function postImportContacts(Request $request)
     {
@@ -1034,10 +1243,17 @@ class ContactController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
+        $is_valid = true;
+        $output = ['success' => 0, 'msg' => __('contact_list.import_no_file')];
+
         try {
             $notAllowed = $this->commonUtil->notAllowedInDemo();
             if (! empty($notAllowed)) {
                 return $notAllowed;
+            }
+
+            if (! extension_loaded('zip')) {
+                return response()->json(['success' => 0, 'msg' => 'Please install/enable PHP Zip archive for import']);
             }
 
             //Set maximum php execution time
@@ -1054,7 +1270,6 @@ class ContactController extends Controller
 
                 $formated_data = [];
 
-                $is_valid = true;
                 $error_msg = '';
 
                 DB::beginTransaction();
@@ -1062,11 +1277,12 @@ class ContactController extends Controller
                     //Check if 27 no. of columns exists
                     if (count($value) != 27) {
                         $is_valid = false;
-                        $error_msg = 'Number of columns mismatch';
+                        $error_msg = __('contact_list.import_err_columns');
                         break;
                     }
 
-                    $row_no = $key + 1;
+                    // رقم الصف في ملف Excel: الصف الأول رؤوس الأعمدة
+                    $row_no = $key + 2;
                     $contact_array = [];
 
                     //Check contact type
@@ -1083,12 +1299,12 @@ class ContactController extends Controller
                             $contact_type = $contact_types[$contact_type];
                         } else {
                             $is_valid = false;
-                            $error_msg = "Invalid contact type $contact_type in row no. $row_no";
+                            $error_msg = __('contact_list.import_err_type_invalid', ['row' => $row_no, 'value' => $contact_type]);
                             break;
                         }
                     } else {
                         $is_valid = false;
-                        $error_msg = "Contact type is required in row no. $row_no";
+                        $error_msg = __('contact_list.import_err_type_required', ['row' => $row_no]);
                         break;
                     }
 
@@ -1098,7 +1314,7 @@ class ContactController extends Controller
                         $contact_array['first_name'] = $value[2];
                     } else {
                         $is_valid = false;
-                        $error_msg = "First name is required in row no. $row_no";
+                        $error_msg = __('contact_list.import_err_name', ['row' => $row_no]);
                         break;
                     }
                     $contact_array['middle_name'] = $value[3];
@@ -1117,7 +1333,7 @@ class ContactController extends Controller
                             $contact_array['pay_term_number'] = trim($value[9]);
                         } else {
                             $is_valid = false;
-                            $error_msg = "Pay term is required in row no. $row_no";
+                            $error_msg = __('contact_list.import_err_pay_term', ['row' => $row_no]);
                             break;
                         }
 
@@ -1127,7 +1343,7 @@ class ContactController extends Controller
                             $contact_array['pay_term_type'] = $pay_term_type;
                         } else {
                             $is_valid = false;
-                            $error_msg = "Pay term period is required in row no. $row_no";
+                            $error_msg = __('contact_list.import_err_pay_period', ['row' => $row_no]);
                             break;
                         }
                     }
@@ -1142,7 +1358,7 @@ class ContactController extends Controller
                             $contact_array['contact_id'] = $value[6];
                         } else {
                             $is_valid = false;
-                            $error_msg = "Contact ID already exists in row no. $row_no";
+                            $error_msg = __('contact_list.import_err_code', ['row' => $row_no]);
                             break;
                         }
                     }
@@ -1168,7 +1384,7 @@ class ContactController extends Controller
                             $contact_array['email'] = $value[12];
                         } else {
                             $is_valid = false;
-                            $error_msg = "Invalid email id in row no. $row_no";
+                            $error_msg = __('contact_list.import_err_email', ['row' => $row_no]);
                             break;
                         }
                     }
@@ -1178,7 +1394,7 @@ class ContactController extends Controller
                         $contact_array['mobile'] = $value[13];
                     } else {
                         $is_valid = false;
-                        $error_msg = "Mobile number is required in row no. $row_no";
+                        $error_msg = __('contact_list.import_err_mobile', ['row' => $row_no]);
                         break;
                     }
 
@@ -1212,6 +1428,10 @@ class ContactController extends Controller
 
                     $formated_data[] = $contact_array;
                 }
+                if ($is_valid && empty($formated_data)) {
+                    $is_valid = false;
+                    $error_msg = __('contact_list.import_empty');
+                }
                 if (! $is_valid) {
                     throw new \Exception($error_msg);
                 }
@@ -1244,7 +1464,7 @@ class ContactController extends Controller
                 }
 
                 $output = ['success' => 1,
-                    'msg' => __('product.file_imported_successfully'),
+                    'msg' => __('contact_list.import_done', ['count' => count($formated_data)]),
                 ];
 
                 DB::commit();
@@ -1253,15 +1473,13 @@ class ContactController extends Controller
             DB::rollBack();
             \Log::emergency('File:'.$e->getFile().'Line:'.$e->getLine().'Message:'.$e->getMessage());
 
+            // أخطاء الملف بتتعرض زي ما هي. غيرها (ملف بايظ، قاعدة بيانات) في اللوج بس
             $output = ['success' => 0,
-                'msg' => $e->getMessage(),
+                'msg' => $is_valid ? __('contact_list.import_failed') : $e->getMessage(),
             ];
-
-            return redirect()->route('contacts.import')->with('notification', $output);
         }
-        $type = ! empty($contact->type) && $contact->type != 'both' ? $contact->type : 'supplier';
 
-        return redirect()->action([\App\Http\Controllers\ContactController::class, 'index'], ['type' => $type])->with('status', $output);
+        return response()->json($output);
     }
 
     /**
@@ -1279,14 +1497,14 @@ class ContactController extends Controller
         $business_id = request()->session()->get('user.business_id');
         $contact_id = request()->input('contact_id');
 
-        $is_admin = $this->contactUtil->is_admin(auth()->user());
+        $can_manage_discount = auth()->user()->can('contact.ledger_discount');
 
         $start_date = request()->start_date;
         $end_date = request()->end_date;
         $format = request()->format;
         $location_id = request()->location_id;
 
-        $contact = Contact::find($contact_id);
+        $contact = Contact::where('business_id', $business_id)->findOrFail($contact_id);
 
         $is_selected_contacts = User::isSelectedContacts(auth()->user()->id);
         $user_contacts = [];
@@ -1309,33 +1527,35 @@ class ContactController extends Controller
 
         $ledger_details = $this->transactionUtil->getLedgerDetails($contact_id, $start_date, $end_date, $format, $location_id, $line_details);
 
+        //Cheques not collected / cleared yet are not payments; show them so the statement explains the due.
+        $pending_cheques = \App\Cheque::where('business_id', $business_id)
+            ->where('contact_id', $contact_id)
+            ->where('status', \App\Cheque::STATUS_PENDING)
+            ->with('transaction')
+            ->orderBy('due_date')
+            ->get();
+        view()->share('pending_cheques', $pending_cheques);
+
         $location = null;
         if (! empty($location_id)) {
             $location = BusinessLocation::where('business_id', $business_id)->find($location_id);
         }
+        if (request()->input('action') == 'print') {
+            return view('contact.ledger_statement')
+                ->with(compact('ledger_details', 'contact', 'location', 'format'));
+        }
+
         if (request()->input('action') == 'pdf') {
             $output_file_name = 'Ledger-'.str_replace(' ', '-', $contact->name).'-'.$start_date.'-'.$end_date.'.pdf';
-            $for_pdf = true;
-            if ($format == 'format_2') {
-                $html = view('contact.ledger_format_2')
-                        ->with(compact('ledger_details', 'contact', 'for_pdf', 'location'))->render();
-            } elseif ($format == 'format_3') {
-                $html = view('contact.ledger_format_3')
-                    ->with(compact('ledger_details', 'contact', 'location', 'is_admin', 'for_pdf'))->render();
-            } elseif ($format == 'format_4') {
-                $html = view('contact.ledger_format_4')
-                    ->with(compact('ledger_details', 'contact', 'location', 'is_admin', 'for_pdf'))->render();
-            } else {
-                $html = view('contact.ledger')
-                    ->with(compact('ledger_details', 'contact', 'for_pdf', 'location'))->render();
-            }
-
-            // Use landscape orientation only for format_4
-            $orientation = ($format == 'format_4') ? 'L' : 'P';
-            $mpdf = $this->getMpdf($orientation);
-            $mpdf->WriteHTML($html);
+            $mpdf = $this->ledgerStatementPdf($ledger_details, $contact, $location, $format);
             $mpdf->Output($output_file_name, 'I');
             exit;
+        }
+
+        // الصفحة الجديدة: جدول أبسط على الشاشة، والـ PDF والإرسال بيفضلوا على القوالب القديمة
+        if (request()->input('ui') == 'v2' && in_array($format, ['format_1', 'format_3'])) {
+            return view('contact.partials.ledger_screen')
+             ->with(compact('ledger_details', 'contact', 'format', 'can_manage_discount'));
         }
 
         if ($format == 'format_2') {
@@ -1343,14 +1563,61 @@ class ContactController extends Controller
              ->with(compact('ledger_details', 'contact', 'location'));
         } elseif ($format == 'format_3') {
             return view('contact.ledger_format_3')
-             ->with(compact('ledger_details', 'contact', 'location', 'is_admin'));
+             ->with(compact('ledger_details', 'contact', 'location', 'can_manage_discount'));
         } elseif ($format == 'format_4') {
             return view('contact.ledger_format_4')
-             ->with(compact('ledger_details', 'contact', 'location', 'is_admin'));
+             ->with(compact('ledger_details', 'contact', 'location', 'can_manage_discount'));
         } else {
             return view('contact.ledger')
-             ->with(compact('ledger_details', 'contact', 'location', 'is_admin'));
+             ->with(compact('ledger_details', 'contact', 'location', 'can_manage_discount'));
         }
+    }
+
+    /**
+     * The account statement as a PDF, with the app font so Arabic matches the screen.
+     * Same template as the print page (contact.ledger_statement).
+     *
+     * @return \Mpdf\Mpdf
+     */
+    private function ledgerStatementPdf($ledger_details, $contact, $location, $format)
+    {
+        $for_pdf = true;
+        $html = view('contact.ledger_statement')
+            ->with(compact('ledger_details', 'contact', 'location', 'format', 'for_pdf'))->render();
+
+        $default_dirs = (new \Mpdf\Config\ConfigVariables())->getDefaults()['fontDir'];
+        $default_fonts = (new \Mpdf\Config\FontVariables())->getDefaults()['fontdata'];
+
+        $mpdf = new \Mpdf\Mpdf([
+            'tempDir' => public_path('uploads/temp'),
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'orientation' => in_array($format, ['format_3', 'format_4']) ? 'L' : 'P',
+            'margin_left' => 10,
+            'margin_right' => 10,
+            'margin_top' => 10,
+            'margin_bottom' => 14,
+            'fontDir' => array_merge($default_dirs, [public_path('fonts/ibm-plex-sans-arabic')]),
+            'fontdata' => $default_fonts + [
+                'ibmplex' => [
+                    'R' => 'IBMPlexSansArabic-Regular.ttf',
+                    'B' => 'IBMPlexSansArabic-Bold.ttf',
+                    'useOTL' => 0xFF,
+                    'useKashida' => 75,
+                ],
+            ],
+            'default_font' => 'ibmplex',
+        ]);
+
+        $rtl = in_array(app()->getLocale(), ['ar', 'fa', 'ur', 'he']);
+        if ($rtl) {
+            $mpdf->SetDirectionality('rtl');
+        }
+        $mpdf->SetTitle(__('contact_statement.title').' - '.$contact->name);
+        $mpdf->SetHTMLFooter('<table width="100%" style="font-size: 8pt; color: #454E60;"><tr><td>'.e($contact->business->name).'</td><td style="text-align: '.($rtl ? 'left' : 'right').';" dir="ltr">{PAGENO} / {nbpg}</td></tr></table>');
+        $mpdf->WriteHTML($html);
+
+        return $mpdf;
     }
 
     public function postCustomersApi(Request $request)
@@ -1400,6 +1667,8 @@ class ContactController extends Controller
             return $notAllowed;
         }
 
+        $contact = Contact::where('business_id', request()->session()->get('user.business_id'))->findOrFail($request->input('contact_id'));
+
         try {
             $data = $request->only(['to_email', 'subject', 'email_body', 'cc', 'bcc', 'ledger_format']);
             $emails_array = array_map('trim', explode(',', $data['to_email']));
@@ -1410,8 +1679,6 @@ class ContactController extends Controller
             $start_date = request()->input('start_date');
             $end_date = request()->input('end_date');
             $location_id = request()->input('location_id');
-
-            $contact = Contact::find($contact_id);
 
             $ledger_details = $this->transactionUtil->getLedgerDetails($contact_id, $start_date, $end_date, $data['ledger_format'], $location_id);
 
@@ -1429,19 +1696,7 @@ class ContactController extends Controller
 
             $data['email_settings'] = request()->session()->get('business.email_settings');
 
-            $for_pdf = true;
-            if ($data['ledger_format'] == 'format_2') {
-                $html = view('contact.ledger_format_2')
-                        ->with(compact('ledger_details', 'contact', 'for_pdf'))->render();
-            } else {
-                $html = view('contact.ledger')
-                        ->with(compact('ledger_details', 'contact', 'for_pdf'))->render();
-            }
-
-            // Use landscape orientation only for format_4
-            $orientation = ($data['ledger_format'] == 'format_4') ? 'L' : 'P';
-            $mpdf = $this->getMpdf($orientation);
-            $mpdf->WriteHTML($html);
+            $mpdf = $this->ledgerStatementPdf($ledger_details, $contact, null, $data['ledger_format']);
 
             $path = config('constants.mpdf_temp_path');
             if (! file_exists($path)) {

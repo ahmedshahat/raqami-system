@@ -91,6 +91,11 @@ class SuperadminSettingsController extends Controller
             'MY_FATOORAH_API_KEY' => $is_demo ? null : env('MY_FATOORAH_API_KEY'),
             'MY_FATOORAH_COUNTRY_ISO' => $is_demo ? null : env('MY_FATOORAH_COUNTRY_ISO'),
             'MY_FATOORAH_IS_TEST' => $is_demo ? null : (env('MY_FATOORAH_IS_TEST') ? 'true' : 'false'),
+            // Kashier Settings
+            'KASHIER_MERCHANT_ID' => $is_demo ? null : env('KASHIER_MERCHANT_ID'),
+            'KASHIER_API_KEY' => $is_demo ? null : env('KASHIER_API_KEY'),
+            'KASHIER_SECRET_KEY' => $is_demo ? null : env('KASHIER_SECRET_KEY'),
+            'KASHIER_MODE' => $is_demo ? null : env('KASHIER_MODE'),
 
         ];
         $mail_drivers = $this->mailDrivers;
@@ -168,7 +173,8 @@ class SuperadminSettingsController extends Controller
                 'PUSHER_APP_ID', 'PUSHER_APP_KEY', 'PUSHER_APP_SECRET',
                 'PUSHER_APP_CLUSTER', 'GOOGLE_MAP_API_KEY', 'PAYSTACK_SECRET_KEY',
                 'PAYSTACK_PUBLIC_KEY', 'FLUTTERWAVE_PUBLIC_KEY',
-                'FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_ENCRYPTION_KEY', 'MAPBOX_ACCESS_TOKEN', 'MY_FATOORAH_API_KEY', 'MY_FATOORAH_IS_TEST', 'MY_FATOORAH_COUNTRY_ISO'
+                'FLUTTERWAVE_SECRET_KEY', 'FLUTTERWAVE_ENCRYPTION_KEY', 'MAPBOX_ACCESS_TOKEN', 'MY_FATOORAH_API_KEY', 'MY_FATOORAH_IS_TEST', 'MY_FATOORAH_COUNTRY_ISO',
+                'KASHIER_MERCHANT_ID', 'KASHIER_API_KEY', 'KASHIER_SECRET_KEY', 'KASHIER_MODE'
             ]);
 
             $env_settings['ALLOW_REGISTRATION'] = ! empty($request->input('ALLOW_REGISTRATION')) ? 'true' : 'false';

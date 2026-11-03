@@ -269,7 +269,10 @@ class ProductController extends Controller
                     return $product;
                 })
                 ->editColumn('image', function ($row) {
-                    return '<div style="display: flex;"><img src="'.$row->image_url.'" alt="Product image" class="product-thumbnail-small"></div>';
+                    $image_url = e($row->image_url);
+                    $fallback_image = e(asset('/img/default.png'));
+
+                    return '<div style="display: flex;"><img src="'.$image_url.'" alt="Product image" class="product-thumbnail-small" onerror="this.onerror=null;this.src=\''.$fallback_image.'\';"></div>';
                 })
                 ->editColumn('type', '@lang("lang_v1." . $type)')
                 ->addColumn('mass_delete', function ($row) {
@@ -1530,7 +1533,10 @@ class ProductController extends Controller
         $common_settings = session()->get('business.common_settings');
         $warranties = Warranty::forDropdown($business_id);
 
-        return view('product.partials.quick_add_product')
+        // شاشة الكاشير الجديدة ليها نافذة بتصميم رقمي (?v2=1)، والشراء والكاشير القديم على القديمة
+        $view = request()->boolean('v2') ? 'product.partials.quick_add_product_v2' : 'product.partials.quick_add_product';
+
+        return view($view)
                 ->with(compact('categories', 'brands', 'units', 'taxes', 'barcode_types', 'default_profit_percent', 'tax_attributes', 'product_name', 'locations', 'product_for', 'enable_expiry', 'enable_lot', 'module_form_parts', 'business_locations', 'common_settings', 'warranties'));
     }
 

@@ -268,9 +268,6 @@ class PurchaseOrderController extends Controller
         if (auth()->user()->can('customer.create')) {
             $types['customer'] = __('report.customer');
         }
-        if (auth()->user()->can('supplier.create') && auth()->user()->can('customer.create')) {
-            $types['both'] = __('lang_v1.both_supplier_customer');
-        }
         $customer_groups = CustomerGroup::forDropdown($business_id);
 
         $business_details = $this->businessUtil->getDetails($business_id);
@@ -554,9 +551,6 @@ class PurchaseOrderController extends Controller
         }
         if (auth()->user()->can('customer.create')) {
             $types['customer'] = __('report.customer');
-        }
-        if (auth()->user()->can('supplier.create') && auth()->user()->can('customer.create')) {
-            $types['both'] = __('lang_v1.both_supplier_customer');
         }
         $customer_groups = CustomerGroup::forDropdown($business_id);
 

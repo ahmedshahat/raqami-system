@@ -70,6 +70,14 @@
                         {!! Form::select('expense_payment_status', ['paid' => __('lang_v1.paid'), 'due' => __('lang_v1.due'), 'partial' => __('lang_v1.partial')], null, ['class' => 'form-control select2', 'style' => 'width:100%', 'placeholder' => __('lang_v1.all')]); !!}
                     </div>
                 </div>
+                @if($construction_expense_integration_enabled)
+                <div class="col-md-3">
+                    <div class="form-group">
+                        {!! Form::label('construction_project_filter', __('construction::lang.expense_link_project').':') !!}
+                        {!! Form::select('construction_project_filter', $construction_projects, request('construction_project_id'), ['class' => 'form-control select2', 'style' => 'width:100%', 'placeholder' => __('lang_v1.all')]); !!}
+                    </div>
+                </div>
+                @endif
             @endcomponent
         </div>
     </div>
@@ -154,4 +162,22 @@
 @stop
 @section('javascript')
  <script src="{{ asset('js/payment.js?v=' . $asset_v) }}"></script>
+@if($construction_expense_integration_enabled)
+<script>
+    // فلتر مشروع المقاولات: بيضيف المشروع لطلب الجدول من غير ما نعدل app.js
+    $(function() {
+        var $table = $('#expense_table');
+        var $filter = $('select#construction_project_filter');
+        $table.on('preXhr.dt', function(e, settings, data) {
+            data.construction_project_id = $filter.val();
+        });
+        $filter.on('change', function() {
+            $table.DataTable().ajax.reload();
+        });
+        if ($filter.val()) {
+            $table.DataTable().ajax.reload();
+        }
+    });
+</script>
+@endif
 @endsection

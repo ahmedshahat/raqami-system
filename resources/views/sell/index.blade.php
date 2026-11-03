@@ -1,11 +1,41 @@
 @extends('layouts.app')
 @section('title', __('lang_v1.all_sales'))
 
+@section('css')
+    <style>
+        @media print {
+            #bulk_receipt_section,
+            #bulk_receipt_section .bulk-invoice-page,
+            #bulk_receipt_section .bulk-invoice-page * {
+                background-color: #fff !important;
+                color: #000 !important;
+                -webkit-text-fill-color: #000 !important;
+                color-scheme: light !important;
+                opacity: 1 !important;
+            }
+
+            #bulk_receipt_section .bulk-invoice-page-break {
+                break-after: page;
+                page-break-after: always;
+            }
+        }
+    </style>
+@endsection
+
 @section('content')
+    {{-- الشاشة القديمة بتظهر بس لليوزر اللي رجع لها؛ الشريط ده بيرجّعه للجديدة --}}
+    <div class="rr-scope rr-classic-note no-print">
+        <span>@lang('sell_list.classic_note')</span>
+        <form method="POST" action="{{ route('sells.switch') }}" class="rr-inline-form">
+            @csrf
+            <input type="hidden" name="version" value="new">
+            <button type="submit" class="rr-btn rr-btn--primary rr-btn--sm">@lang('sell_list.try_new_screen')</button>
+        </form>
+    </div>
 
     <!-- Content Header (Page header) -->
     <section class="content-header no-print">
-        <h1  class="tw-text-xl md:tw-text-3xl tw-font-bold tw-text-black">@lang('sale.sells') <span id="sell_list_selected_range" class="tw-text-gray-600 tw-font-normal tw-text-base">{{ @format_date(\Carbon\Carbon::now()->subDays(29)) }} ~ {{ @format_date(\Carbon\Carbon::now()) }}</span>
+        <h1  class="tw-text-xl md:tw-text-3xl tw-font-bold tw-text-black">@lang('sale.sells') <span id="sell_list_selected_range" class="tw-text-gray-600 tw-font-normal tw-text-base">{{ @format_date(\Carbon\Carbon::now()->startOfYear()) }} ~ {{ @format_date(\Carbon\Carbon::now()) }}</span>
         </h1>
     </section>
 
@@ -63,9 +93,25 @@
                 @php
                     $custom_labels = json_decode(session('business.custom_labels'), true);
                 @endphp
+                @can('print_invoice')
+                    <div class="clearfix tw-mb-3">
+                        <button type="button" id="print_selected_invoices"
+                            class="tw-dw-btn tw-dw-btn-sm tw-dw-btn-outline tw-dw-btn-primary pull-left"
+                            disabled>
+                            <i class="fas fa-print" aria-hidden="true"></i>
+                            طباعة الفواتير المحددة (<span id="selected_invoices_count">0</span>)
+                        </button>
+                    </div>
+                @endcan
                 <table class="table table-bordered table-striped ajax_view" id="sell_table">
                     <thead>
                         <tr>
+                            @can('print_invoice')
+                                <th class="text-center">
+                                    <input type="checkbox" id="select_all_invoices" title="تحديد فواتير الصفحة الحالية"
+                                        aria-label="تحديد فواتير الصفحة الحالية">
+                                </th>
+                            @endcan
                             <th>@lang('messages.action')</th>
                             <th>@lang('messages.date')</th>
                             <th>@lang('sale.invoice_no')</th>
@@ -98,7 +144,7 @@
                     <tbody></tbody>
                     <tfoot>
                         <tr class="bg-gray font-17 footer-total text-center">
-                            <td colspan="6"><strong>@lang('sale.total'):</strong></td>
+                            <td colspan="{{ auth()->user()->can('print_invoice') ? 7 : 6 }}"><strong>@lang('sale.total'):</strong></td>
                             <td class="footer_payment_status_count"></td>
                             <td class="payment_method_count"></td>
                             <td class="footer_sale_total"></td>
@@ -121,18 +167,56 @@
     <div class="modal fade edit_payment_modal" tabindex="-1" role="dialog" aria-labelledby="gridSystemModalLabel">
     </div>
 
+    <div class="modal fade" id="invoice_image_share_modal" tabindex="-1" role="dialog" aria-labelledby="invoiceImageShareTitle">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title" id="invoiceImageShareTitle">مشاركة صورة الفاتورة</h4>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="invoice_image_preview" alt="صورة الفاتورة" style="max-width: 100%; height: auto; border: 1px solid #ddd;">
+                    <p id="invoice_whatsapp_recipient" style="margin-top: 10px; font-weight: bold;"></p>
+                    <p id="invoice_share_help" class="help-block" style="margin-top: 10px;"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">إغلاق</button>
+                    <button type="button" class="btn btn-info" id="download_invoice_image"><i class="fas fa-download"></i> تنزيل الصورة</button>
+                    <button type="button" class="btn btn-success" id="open_invoice_whatsapp"><i class="fab fa-whatsapp"></i> تنزيل وفتح واتساب</button>
+                    <button type="button" class="btn btn-success" id="share_invoice_image"><i class="fas fa-share-alt"></i> مشاركة</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- This will be printed -->
     <section class="invoice print_section" id="receipt_section">
         </section> 
+    <section class="invoice print_section" id="bulk_receipt_section"></section>
 
 @stop
 
 @section('javascript')
+    @include('sell.partials.invoice_share_print_js')
     <script type="text/javascript">
+        var selectedInvoices = {};
+
+        function updateSelectedInvoicesUi() {
+            var selectedCount = Object.keys(selectedInvoices).length;
+            $('#selected_invoices_count').text(selectedCount);
+            $('#print_selected_invoices').prop('disabled', selectedCount === 0);
+
+            var pageCheckboxes = $('#sell_table tbody .select-invoice');
+            var checkedOnPage = pageCheckboxes.filter(':checked').length;
+            $('#select_all_invoices')
+                .prop('checked', pageCheckboxes.length > 0 && checkedOnPage === pageCheckboxes.length)
+                .prop('indeterminate', checkedOnPage > 0 && checkedOnPage < pageCheckboxes.length);
+        }
+
         $(document).ready(function() {
             //Date range as a button
-            var startLast30 = moment().subtract(29, 'days');
-            var endLast = moment();
+            var currentYearStart = moment().startOf('year');
+            var currentDate = moment();
             
             // Function to update heading with date range
             function updateDateRangeHeading(start, end) {
@@ -141,15 +225,15 @@
                     var formattedEnd = end.format(moment_date_format);
                     $('#sell_list_selected_range').text(formattedStart + ' ~ ' + formattedEnd);
                 } else {
-                    // Reset to default (last 30 days)
-                    var defaultStart = moment().subtract(29, 'days').format(moment_date_format);
+                    // Reset heading to the default current-year period.
+                    var defaultStart = moment().startOf('year').format(moment_date_format);
                     var defaultEnd = moment().format(moment_date_format);
                     $('#sell_list_selected_range').text(defaultStart + ' ~ ' + defaultEnd);
                 }
             }
             
             $('#sell_list_filter_date_range').daterangepicker(
-                $.extend(true, {}, dateRangeSettings, { startDate: startLast30, endDate: endLast }),
+                $.extend(true, {}, dateRangeSettings, { startDate: currentYearStart, endDate: currentDate }),
                 function(start, end) {
                     updateDateRangeHeading(start, end);
                     sell_table.ajax.reload();
@@ -166,7 +250,7 @@
                 serverSide: true,
                 fixedHeader:false,
                 aaSorting: [
-                    [1, 'desc']
+                    [{{ auth()->user()->can('print_invoice') ? 2 : 1 }}, 'desc']
                 ],
                 "ajax": {
                     "url": "/sells",
@@ -210,7 +294,38 @@
                 scrollY: "75vh",
                 scrollX: true,
                 scrollCollapse: true,
-                columns: [{
+                columns: [
+                    @can('print_invoice')
+                    {
+                        data: 'transaction_id',
+                        name: 'transactions.id',
+                        defaultContent: '',
+                        orderable: false,
+                        searchable: false,
+                        className: 'selectable_td text-center',
+                        render: function(data, type, row) {
+                            // Keep the table usable during rolling deployments where
+                            // the updated view may briefly run with an older controller.
+                            if (data === null || data === undefined || data === '') {
+                                return '';
+                            }
+
+                            if (type !== 'display') {
+                                return data;
+                            }
+
+                            var checked = selectedInvoices[data] ? ' checked' : '';
+                            var invoiceNumber = $('<div>').html(row.invoice_no || data).text() || data;
+                            var escapedInvoiceNumber = $('<div>').text(invoiceNumber).html();
+                            var escapedPrintUrl = $('<div>').text(row.print_url || '').html();
+                            return '<input type="checkbox" class="select-invoice" value="' + data +
+                                '" data-invoice-no="' + escapedInvoiceNumber +
+                                '" data-print-url="' + escapedPrintUrl + '"' + checked +
+                                ' aria-label="تحديد الفاتورة ' + escapedInvoiceNumber + '">';
+                        }
+                    },
+                    @endcan
+                    {
                         data: 'action',
                         name: 'action',
                         orderable: false,
@@ -347,6 +462,7 @@
                 ],
                 "fnDrawCallback": function(oSettings) {
                     __currency_convert_recursively($('#sell_table'));
+                    updateSelectedInvoicesUi();
                 },
                 "footerCallback": function(row, data, start, end, display) {
                     var footer_sale_total = 0;
@@ -376,7 +492,7 @@
                     $('.payment_method_count').html(__count_status(data, 'payment_methods'));
                 },
                 createdRow: function(row, data, dataIndex) {
-                    $(row).find('td:eq(6)').attr('class', 'clickable_td');
+                    $(row).find('td:eq({{ auth()->user()->can('print_invoice') ? 7 : 6 }})').attr('class', 'clickable_td');
                 }
             });
 
@@ -389,7 +505,56 @@
             $('#only_subscriptions').on('ifChanged', function(event) {
                 sell_table.ajax.reload();
             });
+
+            $('#sell_table').on('click', 'tbody td.selectable_td', function(event) {
+                event.stopPropagation();
+
+                if ($(event.target).is('.select-invoice')) {
+                    return;
+                }
+
+                event.preventDefault();
+                $(this).find('.select-invoice').trigger('click');
+            });
+
+            $(document).on('change', '.select-invoice', function() {
+                var transactionId = String($(this).val());
+
+                if (this.checked) {
+                    selectedInvoices[transactionId] = {
+                        id: transactionId,
+                        number: String($(this).data('invoice-no') || transactionId),
+                        url: String($(this).data('print-url') || '')
+                    };
+                } else {
+                    delete selectedInvoices[transactionId];
+                }
+
+                updateSelectedInvoicesUi();
+            });
+
+            $('#select_all_invoices').on('change', function() {
+                var shouldSelect = this.checked;
+                $('#sell_table tbody .select-invoice').each(function() {
+                    $(this).prop('checked', shouldSelect).trigger('change');
+                });
+            });
+
+            $('#print_selected_invoices').on('click', async function() {
+                var invoices = Object.keys(selectedInvoices).map(function(id) {
+                    return selectedInvoices[id];
+                });
+
+                if (!invoices.length) {
+                    toastr.warning('حدد فاتورة واحدة على الأقل للطباعة.');
+                    return;
+                }
+
+                await printInvoicesBulk(invoices, $(this));
+                updateSelectedInvoicesUi();
+            });
         });
+
     </script>
     <script src="{{ asset('js/payment.js?v=' . $asset_v) }}"></script>
 @endsection

@@ -400,6 +400,12 @@ class SellReturnController extends Controller
                 $output = ['success' => 1,
                     'msg' => __('lang_v1.success'),
                     'receipt' => $receipt,
+                    // نافذة "تم حفظ المرتجع" في شاشة المرتجع الجديدة
+                    'sell_return' => [
+                        'id' => $sell_return->id,
+                        'invoice_no' => $sell_return->invoice_no,
+                        'print_url' => action([\App\Http\Controllers\SellReturnController::class, 'printInvoice'], [$sell_return->id]),
+                    ],
                 ];
             }
         } catch (\Exception $e) {
@@ -674,8 +680,11 @@ class SellReturnController extends Controller
         }
 
         $business_id = request()->session()->get('user.business_id');
+        // فاتورة بيع نهائية بس (المسودة وعرض السعر مالهمش مرتجع)
         $query = Transaction::where('business_id', $business_id)
-            ->where('invoice_no', $invoice_no);
+            ->where('type', 'sell')
+            ->where('status', 'final')
+            ->where('invoice_no', trim($invoice_no));
 
         $permitted_locations = auth()->user()->permitted_locations();
         if ($permitted_locations != 'all') {
@@ -690,12 +699,15 @@ class SellReturnController extends Controller
 
         if (empty($sell)) {
             return ['success' => 0,
-                'msg' => trans('lang_v1.sell_not_found'),
+                'msg' => __('return_screen.not_found', ['number' => $invoice_no]),
             ];
         }
 
+        // من الكاشير؟ شاشة المرتجع ترجّعه للكاشير بعد الحفظ
+        $from_pos = str_contains((string) request()->headers->get('referer'), '/pos/');
+
         return ['success' => 1,
-            'redirect_url' => action([\App\Http\Controllers\SellReturnController::class, 'add'], [$sell->id]),
+            'redirect_url' => action([\App\Http\Controllers\SellReturnController::class, 'add'], [$sell->id]).($from_pos ? '?from=pos' : ''),
         ];
     }
 }

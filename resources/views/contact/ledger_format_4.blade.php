@@ -4,7 +4,7 @@
 @endif
 
 <!-- Header Section -->
-<div class="col-md-12 col-sm-12" style="margin-top: 20px; @if(!empty($for_pdf)) width:100%; @endif">
+<div class="rr-cs__doc-head col-md-12 col-sm-12" style="margin-top: 20px; @if(!empty($for_pdf)) width:100%; @endif">
     <div class="col-md-4 col-sm-4 text-left" style="@if(!empty($for_pdf)) width:33.33%; float:left; @endif">
         <p><strong>{{$contact->business->name}}</strong><br>
             @if(!empty($location))
@@ -83,6 +83,7 @@
     @if(!empty($for_pdf))
     <br>
     @endif
+    @include('contact.partials.ledger_pending_cheques')
     <p class="text-center" style="text-align: center;"><strong>@lang('lang_v1.ledger_table_heading', ['start_date' => $ledger_details['start_date'], 'end_date' => $ledger_details['end_date']])</strong></p>
     <div class="table-responsive">
         <table class="table @if(!empty($for_pdf)) table-pdf td-border @endif" id="ledger_table">
