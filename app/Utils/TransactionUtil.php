@@ -734,6 +734,16 @@ class TransactionUtil extends Util
                 }
                 //Cheques on sells / purchases go to the cheques register, not to payments, until collected.
                 $cheque_type = \App\Cheque::typeForTransaction($transaction->type);
+                //A credit invoice paid by cheque is often saved with amount 0: the cheque then covers what is left on the invoice.
+                if ($payment_amount == 0 && $payment['method'] == 'cheque' && ! empty($cheque_type) && empty($payment['is_return']) && ! empty($payment['cheque_number'])) {
+                    $other_payments = 0;
+                    foreach ($payments as $other) {
+                        if ($other !== $payment && empty($other['is_return']) && empty($other['payment_id']) && ! empty($other['amount'])) {
+                            $other_payments += $uf_data ? $this->num_uf($other['amount']) : $other['amount'];
+                        }
+                    }
+                    $payment_amount = max(0, round($transaction->final_total - $this->getTotalPaid($transaction->id) - $other_payments, 4));
+                }
                 if ($payment_amount > 0 && $payment['method'] == 'cheque' && ! empty($cheque_type) && empty($payment['is_return'])) {
                     if (! empty($payment['paid_on'])) {
                         $cheque_received_on = $uf_data ? $this->uf_date($payment['paid_on'], true) : $payment['paid_on'];

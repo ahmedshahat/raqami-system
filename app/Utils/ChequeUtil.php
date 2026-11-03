@@ -64,11 +64,15 @@ class ChequeUtil extends Util
             DB::raw("SUM(IF(due_date > '$in_30', amount, 0)) as later"),
             DB::raw('SUM(amount) as total'),
             DB::raw("SUM(IF(due_date < '$today', 1, 0)) as overdue_count"),
+            DB::raw("SUM(IF(due_date = '$today', 1, 0)) as today_count"),
+            DB::raw("SUM(IF(due_date > '$today' AND due_date <= '$in_7', 1, 0)) as this_week_count"),
+            DB::raw("SUM(IF(due_date > '$in_7' AND due_date <= '$in_30', 1, 0)) as this_month_count"),
+            DB::raw("SUM(IF(due_date > '$in_30', 1, 0)) as later_count"),
             DB::raw('COUNT(*) as total_count')
         )->first();
 
         $summary = [];
-        foreach (['overdue', 'today', 'this_week', 'this_month', 'later', 'total', 'overdue_count', 'total_count'] as $key) {
+        foreach (['overdue', 'today', 'this_week', 'this_month', 'later', 'total', 'overdue_count', 'today_count', 'this_week_count', 'this_month_count', 'later_count', 'total_count'] as $key) {
             $summary[$key] = (float) ($row->{$key} ?? 0);
         }
 

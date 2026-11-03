@@ -2872,7 +2872,25 @@ $(document).on('change', '.payment_types_dropdown', function(e) {
         }
     }
 
-    //Validate max amount and disable account if advance 
+    //Cheque with no amount: the cheque covers what is left on the invoice
+    if (payment_type == 'cheque' && $('input#final_total_input').length) {
+        var cheque_amount_el = payment_row.find('.payment-amount');
+        if (cheque_amount_el.length && !(__read_number(cheque_amount_el) > 0)) {
+            var other_paid = 0;
+            $('.payment-amount').not(cheque_amount_el).each(function() {
+                if ($(this).closest('.payment_row').find('.payment_types_dropdown').length) {
+                    other_paid += __read_number($(this));
+                }
+            });
+            var cheque_remaining = __read_number($('input#final_total_input')) - other_paid;
+            if (cheque_remaining > 0) {
+                __write_number(cheque_amount_el, cheque_remaining);
+                cheque_amount_el.change();
+            }
+        }
+    }
+
+    //Validate max amount and disable account if advance
     amount_element = payment_row.find('.payment-amount');
     account_dropdown = payment_row.find('.account-dropdown');
     if (payment_type == 'advance') {

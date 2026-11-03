@@ -69,7 +69,7 @@
 		</div>
 	</div>
 	<div class="col-md-12">
-		<p class="help-block"><i class="fa fa-info-circle"></i> {{ $cheque_register_type == 'payable' ? __('cheque.register_hint_payable') : __('cheque.register_hint') }}</p>
+		<p class="help-block"><i class="fa fa-info-circle"></i> {{ $cheque_register_type == 'payable' ? __('cheque.register_hint_payable') : __('cheque.register_hint') }}<br><i class="fa fa-info-circle"></i> {{ __('cheque.amount_hint') }}</p>
 	</div>
 	@endif
 </div>

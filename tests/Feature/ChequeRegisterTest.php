@@ -84,6 +84,31 @@ class ChequeRegisterTest extends TestCase
         $this->assertEquals(1000, $cheque->amount);
     }
 
+    public function test_zero_amount_cheque_on_credit_invoice_takes_the_remaining_due(): void
+    {
+        $sell = $this->makeTransaction('sell', 1000);
+        app(TransactionUtil::class)->createOrUpdatePaymentLines($sell, [
+            ['amount' => 300, 'method' => 'cash', 'paid_on' => now()->toDateTimeString()],
+            ['amount' => 0, 'method' => 'cheque', 'cheque_number' => 'ZERO-1', 'cheque_due_date' => now()->addDays(30)->format('Y-m-d'), 'paid_on' => now()->toDateTimeString()],
+            ['amount' => 0, 'method' => 'cash', 'is_return' => 1],
+        ], $this->business->id, $this->user->id, false);
+
+        $cheque = Cheque::where('transaction_id', $sell->id)->firstOrFail();
+        $this->assertEquals(700, $cheque->amount);
+        $this->assertSame('ZERO-1', $cheque->cheque_number);
+        $this->assertSame(1, TransactionPayment::where('transaction_id', $sell->id)->count());
+    }
+
+    public function test_zero_amount_cheque_without_number_is_ignored(): void
+    {
+        $sell = $this->makeTransaction('sell', 1000);
+        app(TransactionUtil::class)->createOrUpdatePaymentLines($sell, [
+            ['amount' => 0, 'method' => 'cheque', 'paid_on' => now()->toDateTimeString()],
+        ], $this->business->id, $this->user->id, false);
+
+        $this->assertSame(0, Cheque::where('transaction_id', $sell->id)->count());
+    }
+
     public function test_collecting_a_cheque_creates_the_payment_and_marks_invoice_paid(): void
     {
         $sell = $this->makeTransaction('sell', 1000);
@@ -197,10 +222,19 @@ class ChequeRegisterTest extends TestCase
         $this->payWithCheque($sell, 1000, now()->addDays(5)->format('Y-m-d'));
         $cheque = Cheque::where('transaction_id', $sell->id)->firstOrFail();
 
-        $this->get('/cheques')->assertOk()->assertSee(__('cheque.cheques_report'));
+        $page = $this->get('/cheques')->assertOk()->assertSee(__('cheque.cheques_report'));
+        // One menu entry only (under Reports); no extra link under Sales.
+        $this->assertStringNotContainsString('cheques?tab=receivable', $page->getContent());
         $this->getJson('/cheques/data/receivable?draw=1&start=0&length=25', ['X-Requested-With' => 'XMLHttpRequest'])
             ->assertOk()->assertJsonStructure(['data']);
         $this->get('/cheques/'.$cheque->id.'/collect')->assertOk();
+        $this->get('/cheques/print/receivable?status=pending')->assertOk()->assertSee($cheque->cheque_number)->assertSee(__('cheque.sign_accountant'));
+        $this->get('/cheques/print/cash_flow')->assertOk()->assertSee(__('cheque.cash_flow'));
+        $rows = $this->getJson('/cheques/data/receivable?draw=1&start=0&length=25', ['X-Requested-With' => 'XMLHttpRequest'])
+            ->assertOk()->json('data');
+        $row = collect($rows)->firstWhere('id', $cheque->id);
+        $this->assertStringContainsString('rr-menu', $row['action']);
+        $this->assertStringContainsString(__('cheque.view_invoice'), $row['action']);
 
         $this->post('/cheques/'.$cheque->id.'/bounce', ['action_date' => now()->format('Y-m-d')])
             ->assertOk()->assertJson(['success' => true]);
