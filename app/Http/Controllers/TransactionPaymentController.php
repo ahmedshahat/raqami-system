@@ -454,8 +454,12 @@ class TransactionPaymentController extends Controller
         if (request()->ajax()) {
             $business_id = request()->session()->get('user.business_id');
 
+            //The totals below always return a row, so an unknown contact must stop here.
+            Contact::where('business_id', $business_id)->findOrFail($contact_id);
+
             $due_payment_type = request()->input('type');
             $query = Contact::where('contacts.id', $contact_id)
+                            ->where('contacts.business_id', $business_id)
                             ->leftjoin('transactions AS t', 'contacts.id', '=', 't.contact_id');
             if ($due_payment_type == 'purchase') {
                 $query->select(
@@ -516,11 +520,11 @@ class TransactionPaymentController extends Controller
                                     $contact_details->total_return_paid;
             }
 
-            //If opening balance due exists add to payment amount
+            //If opening balance due exists add to payment amount (a return is not settled against it)
             $contact_details->opening_balance = ! empty($contact_details->opening_balance) ? $contact_details->opening_balance : 0;
             $contact_details->opening_balance_paid = ! empty($contact_details->opening_balance_paid) ? $contact_details->opening_balance_paid : 0;
             $ob_due = $contact_details->opening_balance - $contact_details->opening_balance_paid;
-            if ($ob_due > 0) {
+            if ($ob_due > 0 && in_array($due_payment_type, ['purchase', 'sell'])) {
                 $payment_line->amount += $ob_due;
             }
 

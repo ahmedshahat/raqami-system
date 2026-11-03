@@ -125,4 +125,181 @@ class HomeDashboardTest extends TestCase
         $rendered = $util->renderLayout($layout, $available);
         $this->assertSame([['forecast'], ['top_products'], ['payment_methods']], $rendered['cards']);
     }
+
+    private function addOpeningBalance($business, $type, $amount, $paid = 0, $location_id = null)
+    {
+        $contact = \App\Contact::create([
+            'business_id' => $business->id,
+            'type' => $type,
+            'contact_type' => 'individual',
+            'first_name' => 'Opening',
+            'name' => 'Opening',
+            'contact_id' => 'HOB-'.uniqid(),
+            'mobile' => '0500000000',
+            'created_by' => $this->user->id,
+            'contact_status' => 'active',
+        ]);
+        $transaction = \App\Transaction::create([
+            'business_id' => $business->id,
+            'location_id' => $location_id ?: $business->locations()->first()->id,
+            'contact_id' => $contact->id,
+            'type' => 'opening_balance',
+            'status' => 'final',
+            'payment_status' => 'due',
+            'final_total' => $amount,
+            'total_before_tax' => $amount,
+            'transaction_date' => now(),
+            'created_by' => $this->user->id,
+        ]);
+        if ($paid > 0) {
+            \App\TransactionPayment::create([
+                'transaction_id' => $transaction->id,
+                'business_id' => $business->id,
+                'amount' => $paid,
+                'method' => 'cash',
+                'paid_on' => now(),
+                'created_by' => $this->user->id,
+            ]);
+        }
+
+        return $contact;
+    }
+
+    public function test_outstanding_includes_what_is_left_of_the_opening_balances()
+    {
+        $business = Business::whereHas('locations')->firstOrFail();
+        $util = app(HomeDashboardUtil::class);
+        $before = $util->outstanding($business->id, null, 'all');
+
+        $this->addOpeningBalance($business, 'customer', 1000, 300);
+        $this->addOpeningBalance($business, 'both', 200);
+        $this->addOpeningBalance($business, 'supplier', 500);
+        $deleted = $this->addOpeningBalance($business, 'customer', 9000);
+        $deleted->delete();
+
+        $other = Business::where('id', '!=', $business->id)->firstOrFail();
+        $this->addOpeningBalance($other, 'customer', 7000);
+
+        $after = $util->outstanding($business->id, null, 'all');
+        $this->assertEqualsWithDelta(900, $after['receivable'] - $before['receivable'], 0.001);
+        $this->assertEqualsWithDelta(500, $after['payable'] - $before['payable'], 0.001);
+        $this->assertEqualsWithDelta(900, $after['receivable_opening'] - $before['receivable_opening'], 0.001);
+        $this->assertEqualsWithDelta(500, $after['payable_opening'] - $before['payable_opening'], 0.001);
+    }
+
+    public function test_outstanding_opening_balances_follow_the_location_limits()
+    {
+        $business = Business::has('locations', '>=', 2)->firstOrFail();
+        $locations = $business->locations()->pluck('id');
+        $util = app(HomeDashboardUtil::class);
+
+        $inside = $util->outstanding($business->id, $locations[0], 'all')['receivable_opening'];
+        $outside = $util->outstanding($business->id, $locations[1], 'all')['receivable_opening'];
+        $permitted = $util->outstanding($business->id, null, [$locations[1]])['receivable_opening'];
+
+        $this->addOpeningBalance($business, 'customer', 400, 0, $locations[0]);
+
+        $this->assertEqualsWithDelta($inside + 400, $util->outstanding($business->id, $locations[0], 'all')['receivable_opening'], 0.001);
+        $this->assertEqualsWithDelta($outside, $util->outstanding($business->id, $locations[1], 'all')['receivable_opening'], 0.001);
+        $this->assertEqualsWithDelta($permitted, $util->outstanding($business->id, null, [$locations[1]])['receivable_opening'], 0.001);
+    }
+
+    public function test_home_shows_the_opening_part_under_the_total()
+    {
+        $business = Business::whereHas('locations')->firstOrFail();
+        $this->addOpeningBalance($business, 'supplier', 500);
+
+        $this->withSession(['user.business_id' => $business->id])->get('/home/v2')
+            ->assertOk()
+            ->assertSee(__('home_v2.stat_opening_part'));
+    }
+
+    private function addDocument($contact, $type, $amount, $paid = 0, $extra = [])
+    {
+        $transaction = \App\Transaction::create(array_merge([
+            'business_id' => $contact->business_id,
+            'location_id' => Business::find($contact->business_id)->locations()->first()->id,
+            'contact_id' => $contact->id,
+            'type' => $type,
+            'status' => 'final',
+            'payment_status' => 'due',
+            'final_total' => $amount,
+            'total_before_tax' => $amount,
+            'transaction_date' => now(),
+            'created_by' => $this->user->id,
+        ], $extra));
+        if ($paid > 0) {
+            \App\TransactionPayment::create([
+                'transaction_id' => $transaction->id,
+                'business_id' => $contact->business_id,
+                'amount' => $paid,
+                'method' => 'cash',
+                'paid_on' => now(),
+                'created_by' => $this->user->id,
+            ]);
+        }
+
+        return $transaction;
+    }
+
+    public function test_receivable_nets_returns_per_customer_and_keeps_credits_apart()
+    {
+        $business = Business::whereHas('locations')->firstOrFail();
+        $util = app(HomeDashboardUtil::class);
+        $before = $util->outstanding($business->id, null, 'all');
+
+        $owes = $this->addOpeningBalance($business, 'customer', 0);
+        $this->addDocument($owes, 'sell', 1000);
+        $this->addDocument($owes, 'sell_return', 100);
+        $this->addDocument($owes, 'sell', 500, 0, ['status' => 'draft']);
+        $this->addDocument($owes, 'ledger_discount', 50, 0, ['sub_type' => 'sell_discount']);
+        $overpaid = $this->addOpeningBalance($business, 'customer', 0);
+        $this->addDocument($overpaid, 'sell', 100, 300);
+
+        $after = $util->outstanding($business->id, null, 'all');
+        $this->assertEqualsWithDelta(850, $after['receivable'] - $before['receivable'], 0.001);
+        $this->assertEqualsWithDelta(200, $after['receivable_credit'] - $before['receivable_credit'], 0.001);
+    }
+
+    public function test_payable_nets_purchase_returns_per_supplier_and_keeps_credits_apart()
+    {
+        $business = Business::whereHas('locations')->firstOrFail();
+        $util = app(HomeDashboardUtil::class);
+        $before = $util->outstanding($business->id, null, 'all');
+
+        $owed = $this->addOpeningBalance($business, 'supplier', 200);
+        $this->addDocument($owed, 'purchase', 1000, 100);
+        $this->addDocument($owed, 'purchase_return', 300, 50);
+        $this->addDocument($owed, 'ledger_discount', 20, 0, ['sub_type' => 'purchase_discount']);
+        $returned = $this->addOpeningBalance($business, 'supplier', 0);
+        $this->addDocument($returned, 'purchase', 100);
+        $this->addDocument($returned, 'purchase_return', 400);
+
+        $after = $util->outstanding($business->id, null, 'all');
+        $this->assertEqualsWithDelta(830, $after['payable'] - $before['payable'], 0.001);
+        $this->assertEqualsWithDelta(300, $after['payable_credit'] - $before['payable_credit'], 0.001);
+    }
+
+    public function test_home_total_matches_the_contacts_list_kpi()
+    {
+        $business = Business::whereHas('locations')->firstOrFail();
+        $session = ['user.business_id' => $business->id, 'business' => $business->toArray(), 'currency' => ['symbol' => 'SAR', 'thousand_separator' => ',', 'decimal_separator' => '.']];
+        $outstanding = app(HomeDashboardUtil::class)->outstanding($business->id, null, 'all');
+
+        foreach (['customer' => 'receivable', 'supplier' => 'payable'] as $type => $key) {
+            $kpi = $this->withSession($session)->getJson('/contacts/list-summary?type='.$type)->assertOk()->json('due');
+            $this->assertEqualsWithDelta($kpi, $outstanding[$key], 0.01, $type);
+        }
+    }
+
+    public function test_home_shows_the_credit_balance_under_the_total()
+    {
+        $business = Business::whereHas('locations')->firstOrFail();
+        $overpaid = $this->addOpeningBalance($business, 'customer', 0);
+        $this->addDocument($overpaid, 'sell', 100, 300);
+
+        $this->withSession(['user.business_id' => $business->id])->get('/home/v2')
+            ->assertOk()
+            ->assertSee(__('home_v2.stat_credit_receivable'));
+    }
 }

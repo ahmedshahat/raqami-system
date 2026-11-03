@@ -265,19 +265,49 @@ class HomeDashboardUtil
     }
 
     /**
-     * Outstanding customer / supplier balances (all time, not limited to the period).
+     * Outstanding customer / supplier balances (all time, not limited to the period), built from
+     * each contact's own balance with the same formulas as the contacts list. One contact's credit
+     * can't reduce what another owes, so a net credit stays out of the total and is returned apart.
+     * A contact of type "both" has one opening balance, counted with the customers.
      */
     public function outstanding($business_id, $location_id, $permitted_locations)
     {
-        $permitted = $this->permitted($permitted_locations);
-        $sells = $this->transactionUtil->getSellTotals($business_id, null, null, $location_id, null, $permitted);
-        $purchases = $this->transactionUtil->getPurchaseTotals($business_id, null, null, $location_id, null, $permitted);
-        $ledger = $this->transactionUtil->getTotalLedgerDiscount($business_id);
+        $paid = '(SELECT COALESCE(SUM(tp.amount), 0) FROM transaction_payments as tp WHERE tp.transaction_id = t.id)';
+        $paid_net = '(SELECT COALESCE(SUM(IF(tp.is_return = 1, -1 * tp.amount, tp.amount)), 0) FROM transaction_payments as tp WHERE tp.transaction_id = t.id)';
+        $opening = "IF(t.type = 'opening_balance', t.final_total - {$paid_net}, 0)";
 
-        return [
-            'receivable' => (float) $sells['invoice_due'] - (float) $ledger['total_sell_discount'],
-            'payable' => (float) $purchases['purchase_due'] - (float) $ledger['total_purchase_discount'],
-        ];
+        $contacts = DB::table('transactions as t')
+            ->join('contacts as c', 'c.id', '=', 't.contact_id')
+            ->where('t.business_id', $business_id)
+            ->whereNull('c.deleted_at')
+            ->whereIn('t.type', ['sell', 'sell_return', 'purchase', 'purchase_return', 'opening_balance', 'ledger_discount'])
+            ->groupBy('c.id', 'c.type')
+            ->select(
+                'c.type',
+                DB::raw("SUM(CASE
+                    WHEN t.type = 'sell' AND t.status = 'final' THEN t.final_total - {$paid_net}
+                    WHEN t.type = 'sell_return' THEN {$paid} - t.final_total
+                    WHEN t.type = 'ledger_discount' AND t.sub_type = 'sell_discount' THEN -1 * t.final_total
+                    ELSE 0 END) + SUM({$opening}) as receivable"),
+                DB::raw("SUM(CASE
+                    WHEN t.type = 'purchase' THEN t.final_total - {$paid}
+                    WHEN t.type = 'purchase_return' THEN {$paid} - t.final_total
+                    WHEN t.type = 'ledger_discount' AND t.sub_type = 'purchase_discount' THEN -1 * t.final_total
+                    ELSE 0 END) + IF(c.type = 'supplier', SUM({$opening}), 0) as payable"),
+                DB::raw("SUM({$opening}) as opening_left")
+            );
+        $this->filterLocation($contacts, 't.location_id', $location_id, $permitted_locations);
+
+        $row = DB::query()->fromSub($contacts, 'b')
+            ->selectRaw("COALESCE(SUM(IF(b.type = 'supplier', 0, GREATEST(b.receivable, 0))), 0) as receivable,
+                COALESCE(SUM(IF(b.type = 'supplier', 0, GREATEST(-1 * b.receivable, 0))), 0) as receivable_credit,
+                COALESCE(SUM(IF(b.type = 'supplier', 0, GREATEST(b.opening_left, 0))), 0) as receivable_opening,
+                COALESCE(SUM(IF(b.type = 'customer', 0, GREATEST(b.payable, 0))), 0) as payable,
+                COALESCE(SUM(IF(b.type = 'customer', 0, GREATEST(-1 * b.payable, 0))), 0) as payable_credit,
+                COALESCE(SUM(IF(b.type = 'supplier', GREATEST(b.opening_left, 0), 0)), 0) as payable_opening")
+            ->first();
+
+        return array_map('floatval', (array) $row);
     }
 
     /**

@@ -5,6 +5,7 @@
 <svg class="rr-icon{{ $rrIconFlip ? ' rr-icon--flip' : '' }}" width="{{ $rrIconSize }}" height="{{ $rrIconSize }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
 @switch($name)
     @case('calendar')<rect x="4" y="5" width="16" height="15" rx="2"></rect><path d="M4 10h16M8 3v4M16 3v4"></path>@break
+    @case('upload')<path d="M12 16V4M7 9l5-5 5 5M5 20h14"></path>@break
     @case('plus')<path d="M12 5v14M5 12h14"></path>@break
     @case('building')<rect x="5" y="3" width="14" height="18" rx="1"></rect><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"></path>@break
     @case('arrow-forward')<path d="M5 12h14M13 6l6 6-6 6"></path>@break
@@ -50,6 +51,7 @@
     @case('receipt')<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"></path><path d="M9 8h6M9 12h6M9 16h3"></path>@break
     @case('cart')<circle cx="9" cy="20" r="1.3"></circle><circle cx="18" cy="20" r="1.3"></circle><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h9.4a1 1 0 0 0 1-.8L21 8H6.2"></path>@break
     @case('undo')<path d="M9 14L4 9l5-5"></path><path d="M4 9h11a5 5 0 0 1 0 10h-3"></path>@break
+    @case('tag')<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9z"></path><circle cx="7.5" cy="7.5" r="1.3"></circle>@break
     @case('box')<path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"></path><path d="M3 8l9 5 9-5M12 13v8"></path>@break
     @case('truck')<path d="M2 6h11v10H2zM13 10h4l3 3v3h-7"></path><circle cx="6" cy="18" r="2"></circle><circle cx="17" cy="18" r="2"></circle>@break
     @case('cheque')<rect x="2.5" y="6" width="19" height="12" rx="2"></rect><path d="M6 10h6M6 14h4M14.5 14.5c1-.2 1.7-1.8 2.5-1.8s.8 1.6 2 1.3"></path>@break
@@ -60,5 +62,18 @@
     @case('sliders')<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle>@break
     @case('moon')<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path>@break
     @case('sun')<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>@break
+    @case('minus')<path d="M5 12h14"></path>@break
+    @case('pause')<circle cx="12" cy="12" r="9"></circle><path d="M10 9v6M14 9v6"></path>@break
+    @case('cash')<rect x="2.5" y="6" width="19" height="12" rx="2"></rect><circle cx="12" cy="12" r="2.5"></circle><path d="M6 9.5v.01M18 14.5v.01"></path>@break
+    @case('card')<rect x="2.5" y="5" width="19" height="14" rx="2"></rect><path d="M2.5 10h19M6 15h4"></path>@break
+    @case('barcode')<path d="M4 6v12M7 6v12M11 6v12M14 6v12M17 6v12M20 6v12"></path>@break
+    @case('grid')<rect x="4" y="4" width="6.5" height="6.5" rx="1"></rect><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"></rect><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"></rect><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"></rect>@break
+    @case('maximize')<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"></path>@break
+    @case('power')<path d="M12 3v8"></path><path d="M7 6.5a7 7 0 1 0 10 0"></path>@break
+    @case('message')<path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.2A8 8 0 1 1 20 11.5z"></path>@break
+    @case('volume')<path d="M4 9v6h4l5 4V5L8 9H4z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"></path>@break
+    @case('volume-off')<path d="M4 9v6h4l5 4V5L8 9H4z"></path><path d="M17 9.5l5 5M22 9.5l-5 5"></path>@break
+    @case('store')<path d="M3.5 9l1.8-4.5h13.4L20.5 9"></path><path d="M3.5 9h17v1a2.83 2.83 0 0 1-5.67 0 2.83 2.83 0 0 1-5.66 0 2.83 2.83 0 0 1-5.67 0V9z"></path><path d="M5 12.6V20h14v-7.4M10 20v-4.5h4V20"></path>@break
+    @case('keyboard')<rect x="2.5" y="6" width="19" height="12" rx="2"></rect><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"></path>@break
 @endswitch
 </svg>

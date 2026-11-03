@@ -111,12 +111,12 @@ class HomeDashboardController extends Controller
                 $kpis[$key]['url'] = $url;
             }
 
-            $outstanding = $show('secondary') ? $this->dashboardUtil->outstanding($business_id, $location_id, $permitted_locations) : ['receivable' => 0, 'payable' => 0];
+            $outstanding = $show('secondary') ? $this->dashboardUtil->outstanding($business_id, $location_id, $permitted_locations) : ['receivable' => 0, 'payable' => 0, 'receivable_opening' => 0, 'payable_opening' => 0, 'receivable_credit' => 0, 'payable_credit' => 0];
             $secondary = [
                 'purchases' => ['value' => $sum($current, 'purchase'), 'icon' => 'cart', 'tone' => 'neutral'],
                 'sell_returns' => ['value' => $sum($current, 'sell_return'), 'icon' => 'undo', 'tone' => 'danger'],
-                'receivable' => ['value' => $outstanding['receivable'], 'icon' => 'users', 'tone' => 'info'],
-                'payable' => ['value' => $outstanding['payable'], 'icon' => 'building', 'tone' => 'warning'],
+                'receivable' => ['value' => $outstanding['receivable'], 'opening' => $outstanding['receivable_opening'], 'credit' => $outstanding['receivable_credit'], 'icon' => 'users', 'tone' => 'info'],
+                'payable' => ['value' => $outstanding['payable'], 'opening' => $outstanding['payable_opening'], 'credit' => $outstanding['payable_credit'], 'icon' => 'building', 'tone' => 'warning'],
             ];
         }
 

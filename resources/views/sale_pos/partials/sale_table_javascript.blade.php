@@ -24,9 +24,10 @@ sell_table = $('#sell_table').DataTable({
         fixedHeader:false,
         fixedHeader:false,
         aaSorting: [[1, 'desc']],
-        scrollY: "75vh",
-        scrollX:        true,
-        scrollCollapse: true,
+        // في تاب صفحة جهة الاتصال جدول واحد بيتحرك كله، عشان رأس الجدول ما يفصلش عن الصفوف
+        scrollY: $('#sell_table').closest('.rr-cs__dt-tab').length ? '' : "75vh",
+        scrollX: ! $('#sell_table').closest('.rr-cs__dt-tab').length,
+        scrollCollapse: ! $('#sell_table').closest('.rr-cs__dt-tab').length,
         "ajax": {
             "url": "/sells",
             "data": function ( d ) {
@@ -118,7 +119,8 @@ sell_table = $('#sell_table').DataTable({
             $('.payment_method_count').html(__count_status(data, 'payment_methods'));
         },
         createdRow: function( row, data, dataIndex ) {
-            $( row ).find('td:eq(6)').attr('class', 'clickable_td');
+            // cell().node() بدل td:eq عشان الأعمدة المخفية متغيرش مكان خلية الدفع
+            $( this.api().cell(dataIndex, 6).node() ).attr('class', 'clickable_td');
         }
     });
     

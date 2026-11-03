@@ -23,6 +23,19 @@
         </tr>
     </thead>
     <tfoot>
+        @if(! empty($rr_plain_footer))
+            {{-- خلية لكل عمود: الـ colspan بيبوظ الفوتر لما الأعمدة تتخفي --}}
+            <tr class="footer-total">
+                <td><strong>@lang('sale.total')</strong></td>
+                <td></td><td></td><td></td><td></td>
+                <td class="footer_status_count"></td>
+                <td class="footer_payment_status_count"></td>
+                <td class="footer_purchase_total"></td>
+                <td><small>@lang('report.purchase_due') - <span class="footer_total_due"></span><br>
+                @lang('lang_v1.purchase_return') - <span class="footer_total_purchase_return_due"></span></small></td>
+                <td></td><td></td><td></td><td></td><td></td>
+            </tr>
+        @else
         <tr class="bg-gray font-17 text-center footer-total">
             <td colspan="5"><strong>@lang('sale.total'):</strong></td>
             <td class="footer_status_count"></td>
@@ -33,5 +46,6 @@
             </small></td>
             <td></td>
         </tr>
+        @endif
     </tfoot>
 </table>

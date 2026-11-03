@@ -40,8 +40,16 @@ class SalesListExport
 
     private const HEAD_ROW = 8;
 
-    public function __construct(private Collection $rows, private array $meta)
+    public function __construct(protected Collection $rows, protected array $meta)
     {
+    }
+
+    /**
+     * نصوص التقرير. تقرير المشتريات بيبدّل اللي يخصه ويسيب الباقي.
+     */
+    public function phrase(string $key, array $replace = []): string
+    {
+        return __('sell_list.'.$key, $replace);
     }
 
     /**
@@ -51,19 +59,19 @@ class SalesListExport
     {
         return [
             ['key' => 'n', 'label' => '#', 'width' => 6, 'type' => 'int'],
-            ['key' => 'invoice', 'label' => __('sell_list.col_invoice'), 'width' => 16],
-            ['key' => 'date', 'label' => __('sell_list.xl_date'), 'width' => 18, 'type' => 'date'],
-            ['key' => 'customer', 'label' => __('sell_list.col_customer'), 'width' => 28],
-            ['key' => 'mobile', 'label' => __('sell_list.xl_mobile'), 'width' => 16],
-            ['key' => 'location', 'label' => __('sell_list.col_location'), 'width' => 18],
-            ['key' => 'total', 'label' => __('sell_list.col_total'), 'width' => 15, 'type' => 'money', 'sum' => true],
-            ['key' => 'paid', 'label' => __('sell_list.col_paid'), 'width' => 15, 'type' => 'money', 'sum' => true],
-            ['key' => 'due', 'label' => __('sell_list.col_due'), 'width' => 15, 'type' => 'money', 'sum' => true],
-            ['key' => 'returns', 'label' => __('sell_list.kpi_returns'), 'width' => 13, 'type' => 'money', 'sum' => true],
-            ['key' => 'status', 'label' => __('sell_list.col_status'), 'width' => 15],
-            ['key' => 'method', 'label' => __('sell_list.col_method'), 'width' => 18],
-            ['key' => 'added_by', 'label' => __('sell_list.col_added_by'), 'width' => 18],
-            ['key' => 'note', 'label' => __('sell_list.col_sell_note'), 'width' => 30],
+            ['key' => 'invoice', 'label' => $this->phrase('col_invoice'), 'width' => 16],
+            ['key' => 'date', 'label' => $this->phrase('xl_date'), 'width' => 18, 'type' => 'date'],
+            ['key' => 'customer', 'label' => $this->phrase('col_customer'), 'width' => 28],
+            ['key' => 'mobile', 'label' => $this->phrase('xl_mobile'), 'width' => 16],
+            ['key' => 'location', 'label' => $this->phrase('col_location'), 'width' => 18],
+            ['key' => 'total', 'label' => $this->phrase('col_total'), 'width' => 15, 'type' => 'money', 'sum' => true],
+            ['key' => 'paid', 'label' => $this->phrase('col_paid'), 'width' => 15, 'type' => 'money', 'sum' => true],
+            ['key' => 'due', 'label' => $this->phrase('col_due'), 'width' => 15, 'type' => 'money', 'sum' => true],
+            ['key' => 'returns', 'label' => $this->phrase('kpi_returns'), 'width' => 13, 'type' => 'money', 'sum' => true],
+            ['key' => 'status', 'label' => $this->phrase('col_status'), 'width' => 15],
+            ['key' => 'method', 'label' => $this->phrase('col_method'), 'width' => 18],
+            ['key' => 'added_by', 'label' => $this->phrase('col_added_by'), 'width' => 18],
+            ['key' => 'note', 'label' => $this->phrase('col_sell_note'), 'width' => 30],
         ];
     }
 
@@ -130,16 +138,16 @@ class SalesListExport
     public function periodText(): string
     {
         if (! empty($this->meta['selected'])) {
-            return __('sell_list.xl_selected_only');
+            return $this->phrase('xl_selected_only');
         }
         if (empty($this->meta['start']) || empty($this->meta['end'])) {
-            return __('sell_list.xl_all_dates');
+            return $this->phrase('xl_all_dates');
         }
 
         // التواريخ معزولة اتجاهيًا (LRI…PDI) عشان ما تتقلبش جوه جملة عربي
         $iso = fn ($date) => "\u{2066}{$date}\u{2069}";
 
-        return __('sell_list.range', ['start' => $iso($this->meta['start']), 'end' => $iso($this->meta['end'])]);
+        return $this->phrase('range', ['start' => $iso($this->meta['start']), 'end' => $iso($this->meta['end'])]);
     }
 
     public function spreadsheet(): Spreadsheet
@@ -153,11 +161,11 @@ class SalesListExport
         }
 
         $book = new Spreadsheet();
-        $book->getProperties()->setTitle(__('sell_list.xl_title'))->setCreator((string) ($this->meta['business'] ?? ''));
+        $book->getProperties()->setTitle($this->phrase('xl_title'))->setCreator((string) ($this->meta['business'] ?? ''));
         $book->getDefaultStyle()->getFont()->setName('Segoe UI')->setSize(10)->getColor()->setRGB(self::INK);
 
         $sheet = $book->getActiveSheet();
-        $sheet->setTitle(mb_substr(__('sell_list.title'), 0, 31));
+        $sheet->setTitle(mb_substr($this->phrase('title'), 0, 31));
         $sheet->setRightToLeft(app()->getLocale() === 'ar');
         $sheet->setShowGridlines(false);
 
@@ -167,14 +175,14 @@ class SalesListExport
         $sheet->getStyle('A1')->getFont()->setSize(18)->setBold(true)->getColor()->setRGB(self::BRAND);
         $sheet->getRowDimension(1)->setRowHeight(32);
 
-        $this->text($sheet, 'A2', __('sell_list.xl_title').'  ·  '.$this->periodText());
+        $this->text($sheet, 'A2', $this->phrase('xl_title').'  ·  '.$this->periodText());
         $sheet->mergeCells("A2:{$last}2");
         $sheet->getStyle('A2')->getFont()->setSize(12)->setBold(true);
         $sheet->getRowDimension(2)->setRowHeight(22);
 
         $note = trim((string) ($this->meta['note'] ?? ''));
-        $this->text($sheet, 'A3', ($note !== '' ? __('sell_list.active_filters').': '.$note.'  ·  ' : '').
-            __('sell_list.xl_generated', ['date' => now()->format('Y-m-d H:i'), 'user' => (string) ($this->meta['user'] ?? '')]));
+        $this->text($sheet, 'A3', ($note !== '' ? $this->phrase('active_filters').': '.$note.'  ·  ' : '').
+            $this->phrase('xl_generated', ['date' => now()->format('Y-m-d H:i'), 'user' => (string) ($this->meta['user'] ?? '')]));
         $sheet->mergeCells("A3:{$last}3");
         $sheet->getStyle('A3')->getFont()->setSize(9)->getColor()->setRGB(self::MUTED);
         $sheet->getStyle("A1:{$last}3")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
@@ -224,7 +232,7 @@ class SalesListExport
             $r++;
         }
         if (empty($records)) {
-            $this->text($sheet, "A{$first}", __('sell_list.empty'));
+            $this->text($sheet, "A{$first}", $this->phrase('empty'));
             $sheet->mergeCells("A{$first}:{$last}{$first}");
             $sheet->getStyle("A{$first}")->getFont()->getColor()->setRGB(self::MUTED);
         }
@@ -262,7 +270,7 @@ class SalesListExport
         }
 
         // ─── صف الإجمالي: SUBTOTAL بيحسب الصفوف الظاهرة بس بعد فلتر Excel ───
-        $this->text($sheet, "A{$totalRow}", __('sell_list.xl_total_row'));
+        $this->text($sheet, "A{$totalRow}", $this->phrase('xl_total_row'));
         $sheet->mergeCells("A{$totalRow}:".$col['location'].$totalRow);
         foreach ($columns as $column) {
             if (! empty($column['sum'])) {
@@ -283,12 +291,12 @@ class SalesListExport
         };
         $count = 'SUBTOTAL(103,'.$col['invoice'].$first.':'.$col['invoice'].$end.')';
         $kpis = [
-            [__('sell_list.kpi_total'), '=SUBTOTAL(109,'.$ref('total').')', self::BRAND, self::BRAND_TINT, $moneyFormat],
-            [__('sell_list.kpi_paid'), '=SUBTOTAL(109,'.$ref('paid').')', self::TONES['paid'][0], self::TONES['paid'][1], $moneyFormat],
-            [__('sell_list.kpi_due'), '=SUBTOTAL(109,'.$ref('due').')', self::TONES['due'][0], self::TONES['due'][1], $moneyFormat],
-            [__('sell_list.kpi_returns'), '=SUBTOTAL(109,'.$ref('returns').')', self::TONES['overdue'][0], self::TONES['overdue'][1], $moneyFormat],
-            [__('sell_list.kpi_invoices'), empty($records) ? 0 : '='.$count, self::TONES['partial'][0], self::TONES['partial'][1], '#,##0'],
-            [__('sell_list.kpi_average'), empty($records) ? 0 : '=IFERROR(SUBTOTAL(109,'.$ref('total').')/'.$count.',0)', self::MUTED, 'EEF0F4', $moneyFormat],
+            [$this->phrase('kpi_total'), '=SUBTOTAL(109,'.$ref('total').')', self::BRAND, self::BRAND_TINT, $moneyFormat],
+            [$this->phrase('kpi_paid'), '=SUBTOTAL(109,'.$ref('paid').')', self::TONES['paid'][0], self::TONES['paid'][1], $moneyFormat],
+            [$this->phrase('kpi_due'), '=SUBTOTAL(109,'.$ref('due').')', self::TONES['due'][0], self::TONES['due'][1], $moneyFormat],
+            [$this->phrase('kpi_returns'), '=SUBTOTAL(109,'.$ref('returns').')', self::TONES['overdue'][0], self::TONES['overdue'][1], $moneyFormat],
+            [$this->phrase('kpi_invoices'), empty($records) ? 0 : '='.$count, self::TONES['partial'][0], self::TONES['partial'][1], '#,##0'],
+            [$this->phrase('kpi_average'), empty($records) ? 0 : '=IFERROR(SUBTOTAL(109,'.$ref('total').')/'.$count.',0)', self::MUTED, 'EEF0F4', $moneyFormat],
         ];
         $c = 1;
         foreach ($kpis as $kpi) {

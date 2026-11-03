@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Contact;
 use App\CustomerGroup;
 use App\SellingPriceGroup;
 use App\Utils\Util;
 use Illuminate\Http\Request;
-use Yajra\DataTables\Facades\DataTables;
 
 class CustomerGroupController extends Controller
 {
@@ -32,34 +32,22 @@ class CustomerGroupController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
-        if (request()->ajax()) {
-            $business_id = request()->session()->get('user.business_id');
+        $business_id = request()->session()->get('user.business_id');
 
-            $customer_group = CustomerGroup::where('customer_groups.business_id', $business_id)
-                                    ->leftjoin('selling_price_groups as spg', 'spg.id', '=', 'customer_groups.selling_price_group_id')
-                                ->select(['customer_groups.name', 'customer_groups.amount', 'spg.name as selling_price_group', 'customer_groups.id', 'price_calculation_type']);
+        $customer_groups = CustomerGroup::where('customer_groups.business_id', $business_id)
+                                ->leftjoin('selling_price_groups as spg', 'spg.id', '=', 'customer_groups.selling_price_group_id')
+                                ->select(['customer_groups.*', 'spg.name as selling_price_group'])
+                                ->orderBy('customer_groups.name')
+                                ->get();
 
-            return Datatables::of($customer_group)
-                    ->addColumn(
-                        'action',
-                        '@can("customer.update")
-                            <button data-href="{{action(\'App\Http\Controllers\CustomerGroupController@edit\', [$id])}}" class="tw-dw-btn tw-dw-btn-xs tw-dw-btn-outline tw-dw-btn-primary tw-m-0.5 edit_customer_group_button"><i class="glyphicon glyphicon-edit"></i> @lang("messages.edit")</button>
-                        &nbsp;
-                        @endcan
+        $customer_counts = Contact::where('business_id', $business_id)
+                                ->whereIn('customer_group_id', $customer_groups->pluck('id'))
+                                ->selectRaw('customer_group_id, COUNT(*) as total')
+                                ->groupBy('customer_group_id')
+                                ->pluck('total', 'customer_group_id');
 
-                        @can("customer.delete")
-                            <button data-href="{{action(\'App\Http\Controllers\CustomerGroupController@destroy\', [$id])}}" class="tw-dw-btn tw-dw-btn-outline tw-dw-btn-xs tw-dw-btn-error tw-m-0.5 delete_customer_group_button"><i class="glyphicon glyphicon-trash"></i> @lang("messages.delete")</button>
-                        @endcan'
-                    )
-                    ->editColumn('selling_price_group', '@if($price_calculation_type=="selling_price_group") {{$selling_price_group}} @else -- @endif ')
-                    ->editColumn('amount', '@if($price_calculation_type=="percentage") {{$amount}} @else -- @endif ')
-                    ->removeColumn('id')
-                    ->removeColumn('price_calculation_type')
-                    ->rawColumns([3])
-                    ->make(false);
-        }
-
-        return view('customer_group.index');
+        return view(request()->ajax() ? 'customer_group.partials.list' : 'customer_group.index')
+                ->with(compact('customer_groups', 'customer_counts'));
     }
 
     /**
@@ -76,7 +64,7 @@ class CustomerGroupController extends Controller
         $business_id = request()->session()->get('user.business_id');
         $price_groups = SellingPriceGroup::forDropdown($business_id, false);
 
-        return view('customer_group.create')->with(compact('price_groups'));
+        return view('customer_group.form')->with(compact('price_groups'));
     }
 
     /**
@@ -127,12 +115,11 @@ class CustomerGroupController extends Controller
 
         if (request()->ajax()) {
             $business_id = request()->session()->get('user.business_id');
-            $customer_group = CustomerGroup::where('business_id', $business_id)->find($id);
+            $customer_group = CustomerGroup::where('business_id', $business_id)->findOrFail($id);
 
-            $business_id = request()->session()->get('user.business_id');
             $price_groups = SellingPriceGroup::forDropdown($business_id, false);
 
-            return view('customer_group.edit')
+            return view('customer_group.form')
                 ->with(compact('customer_group', 'price_groups'));
         }
     }

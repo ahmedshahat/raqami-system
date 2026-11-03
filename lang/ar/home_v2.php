@@ -46,6 +46,9 @@ return [
     'stat_sell_returns' => 'مرتجعات المبيعات',
     'stat_receivable' => 'إجمالي المستحق على العملاء',
     'stat_payable' => 'إجمالي المستحق للموردين',
+    'stat_opening_part' => 'منه رصيد افتتاحي',
+    'stat_credit_receivable' => 'أرصدة دائنة لعملاء',
+    'stat_credit_payable' => 'أرصدة مدينة على موردين',
 
     'chart_title' => 'المبيعات والمشتريات والمصروفات',
     'chart_desc_hour' => 'حسب الساعة، مع مجمل الربح لكل ساعة',

@@ -4,7 +4,7 @@
 @endif
 
 <!-- Header Section -->
-<div class="col-md-12 col-sm-12" style="margin-top: 20px; @if(!empty($for_pdf)) width:100%; @endif">
+<div class="rr-cs__doc-head col-md-12 col-sm-12" style="margin-top: 20px; @if(!empty($for_pdf)) width:100%; @endif">
     <div class="col-md-4 col-sm-4 text-left" style="@if(!empty($for_pdf)) width:33.33%; float:left; @endif">
         <p><strong>{{$contact->business->name}}</strong><br>
             @if(!empty($location))

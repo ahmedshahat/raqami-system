@@ -596,3 +596,5 @@
   
   </div><!-- /.modal-content -->
 </div><!-- /.modal-dialog -->
+
+@include('contact.partials.zatca_address_rule')

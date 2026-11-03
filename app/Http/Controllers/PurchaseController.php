@@ -66,40 +66,7 @@ class PurchaseController extends Controller
         if (request()->ajax()) {
             $purchases = $this->transactionUtil->getListPurchases($business_id);
 
-            $permitted_locations = auth()->user()->permitted_locations();
-            if ($permitted_locations != 'all') {
-                $purchases->whereIn('transactions.location_id', $permitted_locations);
-            }
-
-            if (! empty(request()->supplier_id)) {
-                $purchases->where('contacts.id', request()->supplier_id);
-            }
-            if (! empty(request()->location_id)) {
-                $purchases->where('transactions.location_id', request()->location_id);
-            }
-            if (! empty(request()->input('payment_status')) && request()->input('payment_status') != 'overdue') {
-                $purchases->where('transactions.payment_status', request()->input('payment_status'));
-            } elseif (request()->input('payment_status') == 'overdue') {
-                $purchases->whereIn('transactions.payment_status', ['due', 'partial'])
-                    ->whereNotNull('transactions.pay_term_number')
-                    ->whereNotNull('transactions.pay_term_type')
-                    ->whereRaw("IF(transactions.pay_term_type='days', DATE_ADD(transactions.transaction_date, INTERVAL transactions.pay_term_number DAY) < CURDATE(), DATE_ADD(transactions.transaction_date, INTERVAL transactions.pay_term_number MONTH) < CURDATE())");
-            }
-
-            if (! empty(request()->status)) {
-                $purchases->where('transactions.status', request()->status);
-            }
-
-            if (! empty(request()->start_date) && ! empty(request()->end_date)) {
-                $start = request()->start_date;
-                $end = request()->end_date;
-                $purchases->whereDate('transactions.transaction_date', '>=', $start)
-                            ->whereDate('transactions.transaction_date', '<=', $end);
-            }
-
-            if (! auth()->user()->can('purchase.view') && auth()->user()->can('view_own_purchase')) {
-                $purchases->where('transactions.created_by', request()->session()->get('user.id'));
-            }
+            $this->applyPurchaseListFilters($purchases);
 
             return Datatables::of($purchases)
                 ->addColumn('action', function ($row) {
@@ -223,6 +190,116 @@ class PurchaseController extends Controller
     }
 
     /**
+     * The print and Excel report of the purchases list, for the whole period and filters.
+     */
+    public function exportList()
+    {
+        if (! auth()->user()->can('purchase.view') && ! auth()->user()->can('purchase.create') && ! auth()->user()->can('view_own_purchase')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $business_id = request()->session()->get('user.business_id');
+
+        $ids = $this->transactionUtil->getListPurchases($business_id);
+        $this->applyPurchaseListFilters($ids);
+
+        $keyword = trim((string) request()->input('search'));
+        if ($keyword !== '') {
+            $ids->where(function ($q) use ($keyword) {
+                $q->where('transactions.ref_no', 'like', "%{$keyword}%")
+                    ->orWhere('contacts.name', 'like', "%{$keyword}%")
+                    ->orWhere('contacts.supplier_business_name', 'like', "%{$keyword}%")
+                    ->orWhere('BS.name', 'like', "%{$keyword}%");
+            });
+        }
+
+        $paid = 'COALESCE((SELECT SUM(IF(tp.is_return = 1, -1 * tp.amount, tp.amount)) FROM transaction_payments AS tp WHERE tp.transaction_id = t.id), 0)';
+
+        $rows = \DB::table('transactions AS t')
+            ->whereIn('t.id', (clone $ids)->select('transactions.id'))
+            ->leftJoin('contacts AS c', 'c.id', '=', 't.contact_id')
+            ->join('business_locations AS bl', 'bl.id', '=', 't.location_id')
+            ->leftJoin('users AS u', 'u.id', '=', 't.created_by')
+            ->select(
+                't.id', 't.ref_no AS invoice_no', 't.status AS receive_status', 't.transaction_date', 't.final_total', 't.payment_status',
+                't.pay_term_number', 't.pay_term_type', 't.additional_notes',
+                'c.name AS customer', 'c.supplier_business_name', 'c.mobile', 'bl.name AS location',
+                \DB::raw("{$paid} AS paid"),
+                \DB::raw('(SELECT GROUP_CONCAT(DISTINCT tp.method) FROM transaction_payments AS tp WHERE tp.transaction_id = t.id AND tp.is_return = 0) AS methods'),
+                \DB::raw("(SELECT COALESCE(SUM(pr.final_total), 0) FROM transactions AS pr WHERE pr.return_parent_id = t.id AND pr.type = 'purchase_return') AS returns"),
+                \DB::raw("TRIM(CONCAT(COALESCE(u.surname, ''), ' ', COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS added_by")
+            )
+            ->orderBy('t.transaction_date', 'desc')
+            ->orderBy('t.id', 'desc')
+            ->get();
+
+        $note = mb_substr(trim((string) request()->input('note')), 0, 500);
+        $precision = (int) request()->session()->get('business.currency_precision', 2);
+        $export = new \App\Exports\PurchasesListExport($rows, [
+            'business' => request()->session()->get('business.name'),
+            'start' => request()->input('start_date'),
+            'end' => request()->input('end_date'),
+            'note' => $note,
+            'user' => trim(auth()->user()->first_name.' '.auth()->user()->last_name),
+            'methods' => $this->transactionUtil->payment_types(null, true, $business_id),
+            'precision' => $precision,
+        ]);
+
+        if (request()->input('format') === 'print') {
+            return view('sell.print_list', [
+                'export' => $export,
+                'records' => $export->records(),
+                'business_name' => request()->session()->get('business.name'),
+                'note' => $note,
+                'precision' => $precision,
+            ]);
+        }
+
+        return $export->xlsxResponse('purchases_'.(request()->input('start_date') ?: 'all').'_'.(request()->input('end_date') ?: now()->format('Y-m-d')).'.xlsx');
+    }
+
+    /**
+     * The filters of the purchases list, shared by the table and its report.
+     */
+    private function applyPurchaseListFilters($purchases)
+    {
+        $permitted_locations = auth()->user()->permitted_locations();
+        if ($permitted_locations != 'all') {
+            $purchases->whereIn('transactions.location_id', $permitted_locations);
+        }
+
+        if (! empty(request()->supplier_id)) {
+            $purchases->where('contacts.id', request()->supplier_id);
+        }
+        if (! empty(request()->location_id)) {
+            $purchases->where('transactions.location_id', request()->location_id);
+        }
+        if (! empty(request()->input('payment_status')) && request()->input('payment_status') != 'overdue') {
+            $purchases->where('transactions.payment_status', request()->input('payment_status'));
+        } elseif (request()->input('payment_status') == 'overdue') {
+            $purchases->whereIn('transactions.payment_status', ['due', 'partial'])
+                ->whereNotNull('transactions.pay_term_number')
+                ->whereNotNull('transactions.pay_term_type')
+                ->whereRaw("IF(transactions.pay_term_type='days', DATE_ADD(transactions.transaction_date, INTERVAL transactions.pay_term_number DAY) < CURDATE(), DATE_ADD(transactions.transaction_date, INTERVAL transactions.pay_term_number MONTH) < CURDATE())");
+        }
+
+        if (! empty(request()->status)) {
+            $purchases->where('transactions.status', request()->status);
+        }
+
+        if (! empty(request()->start_date) && ! empty(request()->end_date)) {
+            $start = request()->start_date;
+            $end = request()->end_date;
+            $purchases->whereDate('transactions.transaction_date', '>=', $start)
+                        ->whereDate('transactions.transaction_date', '<=', $end);
+        }
+
+        if (! auth()->user()->can('purchase.view') && auth()->user()->can('view_own_purchase')) {
+            $purchases->where('transactions.created_by', request()->session()->get('user.id'));
+        }
+    }
+
+    /**
      * Show the form for creating a new resource.
      *
      * @return \Illuminate\Http\Response
@@ -261,9 +338,6 @@ class PurchaseController extends Controller
         }
         if (auth()->user()->can('customer.create')) {
             $types['customer'] = __('report.customer');
-        }
-        if (auth()->user()->can('supplier.create') && auth()->user()->can('customer.create')) {
-            $types['both'] = __('lang_v1.both_supplier_customer');
         }
         $customer_groups = CustomerGroup::forDropdown($business_id);
 
@@ -591,9 +665,6 @@ class PurchaseController extends Controller
         }
         if (auth()->user()->can('customer.create')) {
             $types['customer'] = __('report.customer');
-        }
-        if (auth()->user()->can('supplier.create') && auth()->user()->can('customer.create')) {
-            $types['both'] = __('lang_v1.both_supplier_customer');
         }
         $customer_groups = CustomerGroup::forDropdown($business_id);
 

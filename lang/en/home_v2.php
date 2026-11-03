@@ -45,6 +45,9 @@ return [
     'stat_sell_returns' => 'Sales returns',
     'stat_receivable' => 'Total due from customers',
     'stat_payable' => 'Total due to suppliers',
+    'stat_opening_part' => 'Includes opening balance',
+    'stat_credit_receivable' => 'Customer credit balances',
+    'stat_credit_payable' => 'Supplier debit balances',
 
     'chart_title' => 'Sales, purchases and expenses',
     'chart_desc_hour' => 'By hour, with gross profit for each hour',

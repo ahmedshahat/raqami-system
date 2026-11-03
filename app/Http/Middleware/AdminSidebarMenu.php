@@ -105,27 +105,20 @@ class AdminSidebarMenu
                         if (auth()->user()->can('supplier.view') || auth()->user()->can('supplier.view_own')) {
                             $sub->url(
                                 action([\App\Http\Controllers\ContactController::class, 'index'], ['type' => 'supplier']),
-                                __('report.supplier'),
+                                __('contact_list.menu_suppliers'),
                                 ['icon' => '', 'active' => request()->input('type') == 'supplier']
                             );
                         }
                         if (auth()->user()->can('customer.view') || auth()->user()->can('customer.view_own')) {
                             $sub->url(
                                 action([\App\Http\Controllers\ContactController::class, 'index'], ['type' => 'customer']),
-                                __('report.customer'),
+                                __('contact_list.menu_customers'),
                                 ['icon' => '', 'active' => request()->input('type') == 'customer']
                             );
                             $sub->url(
                                 action([\App\Http\Controllers\CustomerGroupController::class, 'index']),
-                                __('lang_v1.customer_groups'),
+                                __('contact_list.menu_customer_groups'),
                                 ['icon' => '', 'active' => request()->segment(1) == 'customer-group']
-                            );
-                        }
-                        if (auth()->user()->can('supplier.create') || auth()->user()->can('customer.create')) {
-                            $sub->url(
-                                action([\App\Http\Controllers\ContactController::class, 'getImportContacts']),
-                                __('lang_v1.import_contacts'),
-                                ['icon' => '', 'active' => request()->segment(1) == 'contacts' && request()->segment(2) == 'import']
                             );
                         }
 

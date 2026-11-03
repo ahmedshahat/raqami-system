@@ -1,6 +1,6 @@
 {{--
-    طباعة قائمة المبيعات لكل الفترة والفلاتر (/sells/v2/export?format=print).
-    صفحة مستقلة من غير layout التطبيق، بتفتح في تاب جديد وبتطبع نفسها. البيانات نفسها اللي في Excel (SalesListExport).
+    طباعة قائمة المبيعات أو المشتريات لكل الفترة والفلاتر (/sells/v2/export و/purchases/export بـ format=print).
+    صفحة مستقلة من غير layout التطبيق، بتفتح في تاب جديد وبتطبع نفسها. البيانات نفسها اللي في Excel (SalesListExport وPurchasesListExport).
 --}}
 @php
     $rtl = in_array(app()->getLocale(), ['ar', 'fa', 'ur', 'he']);
@@ -15,7 +15,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ __('sell_list.xl_title') }} · {{ $export->periodText() }}</title>
+<title>{{ $export->phrase('xl_title') }} · {{ $export->periodText() }}</title>
 <style>
     @font-face { font-family: 'IBM Plex Sans Arabic'; font-weight: 400; src: url('{{ asset('fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Regular.woff2') }}') format('woff2'); }
     @font-face { font-family: 'IBM Plex Sans Arabic'; font-weight: 600; src: url('{{ asset('fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-SemiBold.woff2') }}') format('woff2'); }
@@ -66,44 +66,44 @@
 </head>
 <body>
 <div class="toolbar">
-    <button type="button" onclick="window.print()">@lang('sell_list.print')</button>
-    <button type="button" onclick="window.close()">@lang('sell_list.close')</button>
+    <button type="button" onclick="window.print()">{{ $export->phrase('print') }}</button>
+    <button type="button" onclick="window.close()">{{ $export->phrase('close') }}</button>
 </div>
 <main class="page">
     <div class="bar"></div>
     <header class="head">
         <div>
             <h1>{{ $business_name }}</h1>
-            <h2>{{ __('sell_list.xl_title') }} · {{ $export->periodText() }}</h2>
-            @if($note !== '')<p>@lang('sell_list.active_filters'): {{ $note }}</p>@endif
+            <h2>{{ $export->phrase('xl_title') }} · {{ $export->periodText() }}</h2>
+            @if($note !== '')<p>{{ $export->phrase('active_filters') }}: {{ $note }}</p>@endif
         </div>
         <div class="meta">
-            <p>{{ __('sell_list.xl_generated', ['date' => now()->format('Y-m-d H:i'), 'user' => trim(auth()->user()->first_name.' '.auth()->user()->last_name)]) }}</p>
+            <p>{{ $export->phrase('xl_generated', ['date' => now()->format('Y-m-d H:i'), 'user' => trim(auth()->user()->first_name.' '.auth()->user()->last_name)]) }}</p>
         </div>
     </header>
 
     <section class="kpis">
-        <div class="kpi"><span>@lang('sell_list.kpi_total')</span><strong class="num">{{ $fmt($total) }}</strong></div>
-        <div class="kpi" style="--c: #0A6252"><span>@lang('sell_list.kpi_paid')</span><strong class="num">{{ $fmt($sum('paid')) }}</strong></div>
-        <div class="kpi" style="--c: #7C4A00"><span>@lang('sell_list.kpi_due')</span><strong class="num">{{ $fmt($sum('due')) }}</strong></div>
-        <div class="kpi" style="--c: #AE231B"><span>@lang('sell_list.kpi_returns')</span><strong class="num">{{ $fmt($sum('returns')) }}</strong></div>
-        <div class="kpi" style="--c: #0A5A82"><span>@lang('sell_list.kpi_invoices')</span><strong class="num">{{ number_format($count) }}</strong></div>
-        <div class="kpi" style="--c: #5B6475"><span>@lang('sell_list.kpi_average')</span><strong class="num">{{ $fmt($count ? $total / $count : 0) }}</strong></div>
+        <div class="kpi"><span>{{ $export->phrase('kpi_total') }}</span><strong class="num">{{ $fmt($total) }}</strong></div>
+        <div class="kpi" style="--c: #0A6252"><span>{{ $export->phrase('kpi_paid') }}</span><strong class="num">{{ $fmt($sum('paid')) }}</strong></div>
+        <div class="kpi" style="--c: #7C4A00"><span>{{ $export->phrase('kpi_due') }}</span><strong class="num">{{ $fmt($sum('due')) }}</strong></div>
+        <div class="kpi" style="--c: #AE231B"><span>{{ $export->phrase('kpi_returns') }}</span><strong class="num">{{ $fmt($sum('returns')) }}</strong></div>
+        <div class="kpi" style="--c: #0A5A82"><span>{{ $export->phrase('kpi_invoices') }}</span><strong class="num">{{ number_format($count) }}</strong></div>
+        <div class="kpi" style="--c: #5B6475"><span>{{ $export->phrase('kpi_average') }}</span><strong class="num">{{ $fmt($count ? $total / $count : 0) }}</strong></div>
     </section>
 
     <table>
         <thead>
             <tr>
                 <th class="c">#</th>
-                <th>@lang('sell_list.col_invoice')</th>
-                <th>@lang('sell_list.col_customer')</th>
-                <th>@lang('sell_list.col_location')</th>
-                <th class="n">@lang('sell_list.col_total')</th>
-                <th class="n">@lang('sell_list.col_paid')</th>
-                <th class="n">@lang('sell_list.col_due')</th>
-                <th class="n">@lang('sell_list.kpi_returns')</th>
-                <th>@lang('sell_list.col_status')</th>
-                <th>@lang('sell_list.col_method')</th>
+                <th>{{ $export->phrase('col_invoice') }}</th>
+                <th>{{ $export->phrase('col_customer') }}</th>
+                <th>{{ $export->phrase('col_location') }}</th>
+                <th class="n">{{ $export->phrase('col_total') }}</th>
+                <th class="n">{{ $export->phrase('col_paid') }}</th>
+                <th class="n">{{ $export->phrase('col_due') }}</th>
+                <th class="n">{{ $export->phrase('kpi_returns') }}</th>
+                <th>{{ $export->phrase('col_status') }}</th>
+                <th>{{ $export->phrase('col_method') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -118,17 +118,17 @@
                     <td class="n num">{{ $fmt($v['paid']) }}</td>
                     <td class="n num">{{ $fmt($v['due']) }}</td>
                     <td class="n num">{{ $v['returns'] ? $fmt($v['returns']) : '' }}</td>
-                    <td>@if($v['status'] !== '')<span class="badge badge--{{ $tones[$record['tone']] ?? 'due' }}">{{ $v['status'] }}</span>@endif</td>
+                    <td>@if($v['status'] !== '')<span class="badge badge--{{ $tones[$record['tone']] ?? 'due' }}">{{ $v['status'] }}</span>@endif @if(! empty($v['receive']))<span class="sub">{{ $v['receive'] }}</span>@endif</td>
                     <td>{{ $v['method'] }}</td>
                 </tr>
             @empty
-                <tr><td colspan="10" class="empty">@lang('sell_list.empty')</td></tr>
+                <tr><td colspan="10" class="empty">{{ $export->phrase('empty') }}</td></tr>
             @endforelse
         </tbody>
         @if($count)
             <tfoot>
                 <tr>
-                    <td colspan="4">@lang('sell_list.xl_total_row') <span class="num">({{ number_format($count) }})</span></td>
+                    <td colspan="4">{{ $export->phrase('xl_total_row') }} <span class="num">({{ number_format($count) }})</span></td>
                     <td class="n num">{{ $fmt($total) }}</td>
                     <td class="n num">{{ $fmt($sum('paid')) }}</td>
                     <td class="n num">{{ $fmt($sum('due')) }}</td>

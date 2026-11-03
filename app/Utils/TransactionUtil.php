@@ -3212,7 +3212,7 @@ class TransactionUtil extends Util
         //Get all unpaid transaction for the contact
         $types = ['opening_balance', $type];
 
-        if ($type == 'purchase_return') {
+        if (in_array($type, ['purchase_return', 'sell_return'])) {
             $types = [$type];
         }
 
