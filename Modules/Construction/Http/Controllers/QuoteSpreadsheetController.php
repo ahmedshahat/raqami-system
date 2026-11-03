@@ -41,12 +41,14 @@ class QuoteSpreadsheetController extends BaseController
         if ($sheet->getHighestDataRow() > 2001) {
             throw ValidationException::withMessages(['quote_file' => __('construction::lang.quote_import_row_limit')]);
         }
-        $rawRows = $sheet->rangeToArray('A2:G'.$sheet->getHighestDataRow(), null, true, false, false);
-        $existingCodes = $quote->items()->pluck('code')->map(fn ($code) => mb_strtolower(trim($code)))->flip();
+        $lastColumn = $sheet->getHighestDataColumn();
+        $header = $sheet->rangeToArray('A1:'.$lastColumn.'1', null, true, false, false)[0] ?? [];
+        $rawRows = $sheet->getHighestDataRow() >= 2
+            ? $sheet->rangeToArray('A2:'.$lastColumn.$sheet->getHighestDataRow(), null, true, false, false)
+            : [];
         $rows = $this->normalizeRows(
             $rawRows,
-            $existingCodes,
-            $quote->items()->count() + 1,
+            $this->columnMap($header),
             ((int) $quote->items()->max('sort_order')) + 10
         );
         if ($rows->isEmpty()) {
@@ -95,22 +97,25 @@ class QuoteSpreadsheetController extends BaseController
                 ->firstOrFail();
             $this->ensureEditable($lockedQuote);
 
-            $existingCodes = $lockedQuote->items()->pluck('code')->map(fn ($code) => mb_strtolower(trim($code)))->all();
+            // الكود بيتولد هنا (مش في المعاينة) بترتيب صفوف الملف، بعد أكبر كود مستخدم في العرض
+            $existingCodes = $lockedQuote->items()->pluck('code')->map(fn ($code) => mb_strtolower(trim($code)))->flip();
+            $next = $lockedQuote->nextItemCodeNumber();
             foreach ($batch->rows_json as $row) {
-                abort_if(in_array(mb_strtolower($row['code']), $existingCodes, true), 422, __('construction::lang.quote_duplicate_code'));
+                do {
+                    $code = ConstructionQuote::formatItemCode($next++);
+                } while ($existingCodes->has(mb_strtolower($code)));
                 $lockedQuote->items()->create([
                     'business_id' => $this->businessId(),
-                    'code' => $row['code'],
+                    'code' => $code,
                     'description' => $row['description'],
                     'unit_id' => $row['unit_id'],
                     'unit' => $row['unit'],
                     'quantity' => $row['quantity'],
                     'unit_price' => $row['unit_price'],
-                    'total' => $row['total'],
+                    'total' => round((float) $row['quantity'] * (float) $row['unit_price'], 4),
                     'sort_order' => $row['sort_order'],
                     'notes' => $row['notes'] ?: null,
                 ]);
-                $existingCodes[] = mb_strtolower($row['code']);
             }
             $lockedQuote->refreshTotal();
             $batch->update(['status' => 'imported', 'imported_at' => now()]);
@@ -120,7 +125,38 @@ class QuoteSpreadsheetController extends BaseController
             ->with('status', ['success' => 1, 'msg' => __('construction::lang.quote_import_completed', ['count' => $batch->row_count])]);
     }
 
-    private function normalizeRows(array $rawRows, $existingCodes, int $nextCodeNumber = 1, int $firstSortOrder = 10)
+    /**
+     * أعمدة الملف بتتعرف من عناوين الصف الأول، فالنموذج الجديد (من غير كود وإجمالي) والقديم الاتنين شغالين.
+     * عمودا "كود البند" و"الإجمالي" بيتجاهلوا: الكود بيتولد عند الحفظ والإجمالي = الكمية × السعر.
+     * لو العناوين مش متعرفة، الترتيب الافتراضي هو النموذج الجديد.
+     */
+    private function columnMap(array $header): array
+    {
+        $aliases = [
+            'description' => ['بيان الأعمال', 'البيان', 'الوصف', 'description'],
+            'unit' => ['الوحدة', 'unit'],
+            'quantity' => ['الكمية', 'quantity', 'qty'],
+            'unit_price' => ['سعر الوحدة', 'unit price', 'price'],
+            'notes' => ['ملاحظات', 'notes'],
+        ];
+        $map = [];
+        foreach ($header as $index => $title) {
+            $title = mb_strtolower(trim((string) $title));
+            foreach ($aliases as $field => $names) {
+                if (! isset($map[$field]) && in_array($title, $names, true)) {
+                    $map[$field] = $index;
+                }
+            }
+        }
+
+        if (! isset($map['description'], $map['unit'], $map['quantity'], $map['unit_price'])) {
+            return ['description' => 0, 'unit' => 1, 'quantity' => 2, 'unit_price' => 3, 'notes' => 4];
+        }
+
+        return $map + ['notes' => null];
+    }
+
+    private function normalizeRows(array $rawRows, array $columns, int $firstSortOrder = 10)
     {
         $unitLookup = [];
         foreach (Unit::where('business_id', $this->businessId())->whereNull('deleted_at')->get(['id', 'short_name', 'actual_name']) as $systemUnit) {
@@ -128,44 +164,35 @@ class QuoteSpreadsheetController extends BaseController
                 $unitLookup[mb_strtolower(trim($label))] ??= $systemUnit;
             }
         }
+        $cell = fn (array $raw, string $field) => $columns[$field] === null ? null : ($raw[$columns[$field]] ?? null);
 
-        $seen = [];
         $rows = collect();
         foreach ($rawRows as $offset => $raw) {
-            if (collect($raw)->filter(fn ($value) => $value !== null && trim((string) $value) !== '')->isEmpty()) {
+            $hasValue = collect(array_keys($columns))
+                ->contains(fn ($field) => trim((string) $cell($raw, $field)) !== '');
+            if (! $hasValue) {
                 continue;
             }
 
             $rowNumber = $offset + 2;
-            $code = trim((string) ($raw[0] ?? ''));
-            if ($code === '') {
-                do {
-                    $code = 'ITM-'.str_pad((string) $nextCodeNumber++, 3, '0', STR_PAD_LEFT);
-                    $normalizedCode = mb_strtolower($code);
-                } while (isset($seen[$normalizedCode]) || $existingCodes->has($normalizedCode));
-            }
-            $description = trim((string) ($raw[1] ?? ''));
-            $unitLabel = trim((string) ($raw[2] ?? ''));
+            $description = trim((string) $cell($raw, 'description'));
+            $unitLabel = trim((string) $cell($raw, 'unit'));
             $systemUnit = $unitLookup[mb_strtolower($unitLabel)] ?? null;
-            $quantity = $this->number($raw[3] ?? null, false);
-            $unitPrice = $this->number($raw[4] ?? null, true);
-            $notes = trim((string) ($raw[5] ?? ''));
+            $quantity = $this->number($cell($raw, 'quantity'), false);
+            $unitPrice = $this->number($cell($raw, 'unit_price'), true);
+            $notes = trim((string) $cell($raw, 'notes'));
             $errors = [];
-            $normalizedCode = mb_strtolower($code);
 
-            if (mb_strlen($code) > 60) $errors[] = __('construction::lang.quote_import_code_too_long');
             if ($description === '') $errors[] = __('construction::lang.import_description_required');
             elseif (mb_strlen($description) > 500) $errors[] = __('construction::lang.quote_import_description_too_long');
-            if (isset($seen[$normalizedCode]) || $existingCodes->has($normalizedCode)) $errors[] = __('construction::lang.quote_import_duplicate_code');
             if ($unitLabel === '') $errors[] = __('construction::lang.import_unit_required');
-            elseif (! $systemUnit) $errors[] = __('construction::lang.import_unit_not_found');
+            elseif (! $systemUnit) $errors[] = __('construction::lang.import_unit_not_found_named', ['unit' => $unitLabel]);
             if ($quantity === null) $errors[] = __('construction::lang.quote_import_invalid_quantity');
             if ($unitPrice === null) $errors[] = __('construction::lang.import_invalid_price');
             if (mb_strlen($notes) > 2000) $errors[] = __('construction::lang.quote_import_notes_too_long');
 
-            $row = [
+            $rows->push([
                 'row_number' => $rowNumber,
-                'code' => $code,
                 'description' => $description,
                 'unit' => $systemUnit?->short_name ?: $unitLabel,
                 'unit_id' => $systemUnit?->id,
@@ -175,9 +202,7 @@ class QuoteSpreadsheetController extends BaseController
                 'total' => $quantity !== null && $unitPrice !== null ? round($quantity * $unitPrice, 4) : 0,
                 'sort_order' => $firstSortOrder + ($rows->count() * 10),
                 'errors' => $errors,
-            ];
-            $rows->push($row);
-            if (! isset($seen[$normalizedCode])) $seen[$normalizedCode] = true;
+            ]);
         }
 
         return $rows;
@@ -216,6 +241,6 @@ class QuoteSpreadsheetController extends BaseController
 
     private function ensureEditable(ConstructionQuote $quote): void
     {
-        abort_unless(in_array($quote->status, ['draft', 'sent'], true) && ! $quote->project_id, 422, __('construction::lang.quote_locked'));
+        abort_unless($quote->isEditable(), 422, __('construction::lang.quote_locked'));
     }
 }

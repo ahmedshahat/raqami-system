@@ -9,6 +9,9 @@
     $importTotal = $rows->sum('total');
     $currencyParts = \Modules\Construction\Support\CurrencyFormatter::parts(0);
     $quantityPrecision = (int) session('business.quantity_precision', 2);
+    // وحدات مكتوبة في الملف ومش موجودة في النظام: نعرض زرار إضافتها بدل ما المستخدم يدور عليها
+    $missingUnits = $rows->filter(fn ($row) => empty($row['unit_id']) && trim((string) ($row['unit'] ?? '')) !== '')->pluck('unit')->unique()->values();
+    $canCreateUnits = auth()->user()->can('unit.create') || (new \App\Utils\Util())->is_admin(auth()->user(), (int) session('user.business_id'));
 @endphp
 
 @section('module_content')
@@ -72,9 +75,15 @@
         <div class="rr-callout__copy">
             <strong id="rr-import-state-title">{{ $hasErrors ? __('construction::lang.quote_import_needs_fix') : __('construction::lang.import_ready') }}</strong>
             <p>{{ $hasErrors ? __('construction::lang.import_fix_errors') : __('construction::lang.quote_import_confirm_hint') }}</p>
+            @if($missingUnits->isNotEmpty())
+                <p>@lang('construction::lang.import_missing_units', ['units' => $missingUnits->implode('، ')])</p>
+            @endif
         </div>
         <div class="rr-callout__actions">
             @if($hasErrors)
+                @if($missingUnits->isNotEmpty() && $canCreateUnits)
+                    <button type="button" class="rr-btn rr-btn--secondary rr-btn--sm" data-rr-unit-add>@include('construction::partials.rr_icon', ['name' => 'plus'])@lang('construction::lang.add_unit')</button>
+                @endif
                 <a class="rr-btn rr-btn--secondary rr-btn--sm" href="{{ route('construction.quotes.import-template') }}">@include('construction::partials.rr_icon', ['name' => 'download'])@lang('construction::lang.download_import_template')</a>
                 <a class="rr-btn rr-btn--primary rr-btn--sm" href="{{ route('construction.quotes.show', ['quote' => $quote->id, 'import' => 1]) }}">@include('construction::partials.rr_icon', ['name' => 'plus'])@lang('construction::lang.import_upload_again')</a>
             @endif
@@ -98,7 +107,6 @@
                 <thead>
                     <tr>
                         <th class="rr-th rr-th--num rr-col--index" scope="col">#</th>
-                        <th class="rr-th" scope="col">@lang('construction::lang.boq_code')</th>
                         <th class="rr-th" scope="col">@lang('construction::lang.boq_description')</th>
                         <th class="rr-th" scope="col">@lang('construction::lang.unit')</th>
                         <th class="rr-th rr-th--num" scope="col">@lang('construction::lang.quantity')</th>
@@ -112,7 +120,6 @@
                         @php $rowHasErrors = count($row['errors']) > 0; @endphp
                         <tr class="rr-tr {{ $rowHasErrors ? 'rr-tr--danger' : '' }}" @unless($rowHasErrors) data-rr-valid-row @endunless>
                             <td class="rr-td rr-td--num rr-td--muted"><span class="rr-num">{{ $row['row_number'] }}</span></td>
-                            <td class="rr-td"><span class="rr-code">{{ $row['code'] ?: '—' }}</span></td>
                             <td class="rr-td rr-td--wrap rr-col--text">{{ $row['description'] ?: '—' }}</td>
                             <td class="rr-td rr-td--muted">{{ $row['unit'] ?: '—' }}</td>
                             <td class="rr-td rr-td--num"><span class="rr-num">{{ number_format((float) $row['quantity'], $quantityPrecision) }}</span></td>
@@ -132,7 +139,7 @@
                 </tbody>
                 <tfoot class="rr-tfoot">
                     <tr>
-                        <td class="rr-td" colspan="6">@lang('construction::lang.import_total')</td>
+                        <td class="rr-td" colspan="5">@lang('construction::lang.import_total')</td>
                         <td class="rr-td rr-td--num"><span class="rr-money rr-money--sm">@include('construction::partials.money', ['value' => $importTotal])</span></td>
                         <td class="rr-td"></td>
                     </tr>
@@ -152,6 +159,7 @@
         </div>
     </section>
 </main>
+@include('construction::partials.unit_quick_create')
 @endsection
 
 @section('module_javascript')

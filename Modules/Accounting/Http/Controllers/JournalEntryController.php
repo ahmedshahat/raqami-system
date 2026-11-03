@@ -44,7 +44,8 @@ class JournalEntryController extends Controller
         $business_id = request()->session()->get('user.business_id');
 
         if (! (auth()->user()->can('superadmin') ||
-            $this->moduleUtil->hasThePermissionInSubscription($business_id, 'accounting_module'))) {
+            $this->moduleUtil->hasThePermissionInSubscription($business_id, 'accounting_module')) ||
+            ! (auth()->user()->can('accounting.view_journal'))) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -242,11 +243,11 @@ class JournalEntryController extends Controller
         $business_id = request()->session()->get('user.business_id');
 
         if (! (auth()->user()->can('superadmin') ||
-            $this->moduleUtil->hasThePermissionInSubscription($business_id, 'accounting_module')) ||
-            ! (auth()->user()->can('accounting.view_journal'))) {
+            $this->moduleUtil->hasThePermissionInSubscription($business_id, 'accounting_module'))) {
             abort(403, 'Unauthorized action.');
         }
 
+        // صلاحية view_journal بتعرض أي قيد؛ صلاحية محاسبة المقاولات بتعرض قيود المشاريع بس (الزرار ده جوه شاشات المقاولات)
         $journal = AccountingAccTransMapping::where('business_id', $business_id)
             ->where('type', 'journal_entry')
             ->findOrFail($id);

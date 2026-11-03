@@ -638,13 +638,13 @@ class ExpenseController extends Controller
                         return;
                     }
                     if (! $projectId) {
-                        $fail(__('expense.construction_item_requires_project'));
+                        $fail(__('construction::lang.expense_link_item_requires_project'));
                         return;
                     }
                     $valid = DB::table('construction_boq_items')->where('business_id', $businessId)
                         ->where('project_id', $projectId)->where('row_type', 'item')->where('id', $value)->exists();
                     if (! $valid) {
-                        $fail(__('expense.construction_item_project_mismatch'));
+                        $fail(__('construction::lang.expense_link_item_project_mismatch'));
                     }
                 },
             ],

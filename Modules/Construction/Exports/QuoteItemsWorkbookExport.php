@@ -14,6 +14,10 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
+/**
+ * نموذج استيراد بنود عرض السعر. مفيهوش كود ولا إجمالي: الكود بيتولد عند الحفظ والإجمالي = الكمية × السعر.
+ * الاستيراد بيتعرف على الأعمدة من عناوينها، فالملفات القديمة اللي فيها العمودين دول بتشتغل برضه.
+ */
 class QuoteItemsWorkbookExport extends BindsTextSafely implements FromArray, WithCustomValueBinder, WithColumnWidths, WithStyles, WithColumnFormatting, WithTitle
 {
     public function __construct(private readonly Collection $items, private readonly string $sheetTitle = 'بنود عرض السعر')
@@ -24,13 +28,11 @@ class QuoteItemsWorkbookExport extends BindsTextSafely implements FromArray, Wit
     {
         return new self(collect([
             (object) [
-                'code' => 'ITM-001',
                 'description' => 'خرسانة مسلحة للأساسات',
                 'unit' => 'م3',
                 'quantity' => 100,
                 'unit_price' => 2500,
                 'notes' => 'احذف بيانات المثال أو عدّلها',
-                'total' => 250000,
             ],
         ]), 'نموذج استيراد عرض السعر');
     }
@@ -38,18 +40,16 @@ class QuoteItemsWorkbookExport extends BindsTextSafely implements FromArray, Wit
     public function array(): array
     {
         $rows = [[
-            'كود البند', 'بيان الأعمال', 'الوحدة', 'الكمية', 'سعر الوحدة', 'ملاحظات', 'إجمالي البند',
+            'بيان الأعمال', 'الوحدة', 'الكمية', 'سعر الوحدة', 'ملاحظات',
         ]];
 
         foreach ($this->items as $item) {
             $rows[] = [
-                $item->code,
                 $item->description,
                 $item->unit,
                 (float) $item->quantity,
                 (float) $item->unit_price,
                 $item->notes,
-                (float) $item->total,
             ];
         }
 
@@ -60,15 +60,15 @@ class QuoteItemsWorkbookExport extends BindsTextSafely implements FromArray, Wit
     {
         $sheet->setRightToLeft(true);
         $sheet->freezePane('A2');
-        $sheet->getStyle('A1:G1')->applyFromArray([
+        $sheet->getStyle('A1:E1')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '2D237F']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
-        $sheet->getStyle('A:G')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
-        $sheet->getStyle('B:B')->getAlignment()->setWrapText(true);
-        $sheet->getStyle('F:F')->getAlignment()->setWrapText(true);
-        $sheet->setAutoFilter('A1:G'.max(2, $sheet->getHighestRow()));
+        $sheet->getStyle('A:E')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A:A')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('E:E')->getAlignment()->setWrapText(true);
+        $sheet->setAutoFilter('A1:E'.max(2, $sheet->getHighestRow()));
         $sheet->getRowDimension(1)->setRowHeight(28);
 
         return [];
@@ -79,12 +79,12 @@ class QuoteItemsWorkbookExport extends BindsTextSafely implements FromArray, Wit
         $quantityFormat = $this->excelNumberFormat((int) session('business.quantity_precision', 2));
         $currencyFormat = $this->excelNumberFormat((int) session('business.currency_precision', 2));
 
-        return ['D' => $quantityFormat, 'E' => $currencyFormat, 'G' => $currencyFormat];
+        return ['C' => $quantityFormat, 'D' => $currencyFormat];
     }
 
     public function columnWidths(): array
     {
-        return ['A' => 17, 'B' => 48, 'C' => 14, 'D' => 16, 'E' => 17, 'F' => 34, 'G' => 18];
+        return ['A' => 48, 'B' => 14, 'C' => 16, 'D' => 17, 'E' => 34];
     }
 
     public function title(): string

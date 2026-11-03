@@ -4,7 +4,7 @@
 @php
     $quoteTones = ['draft' => 'neutral', 'sent' => 'brand', 'accepted' => 'success', 'rejected' => 'danger', 'expired' => 'warning', 'converted' => 'info'];
     $quoteState = $quote->project_id ? 'converted' : $quote->status;
-    $isEditable = in_array($quote->status, ['draft', 'sent'], true) && ! $quote->project_id;
+    $isEditable = $quote->isEditable();
     $customerName = $quote->customer?->supplier_business_name ?: $quote->customer?->name;
     $expiryDate = $quote->quote_date->copy()->addDays((int) $quote->validity_days);
     $currencyParts = \Modules\Construction\Support\CurrencyFormatter::parts(0);
@@ -236,8 +236,8 @@
                                 <div class="rr-control rr-control--sm"><input id="rr-entry-__INDEX__-desc" class="rr-control__input" name="items[__INDEX__][description]" maxlength="500" required></div>
                             </div>
                             <div class="rr-entry-field rr-entry-field--unit">
-                                <label class="rr-entry-field__label" for="rr-entry-__INDEX__-unit">@lang('construction::lang.unit')<span class="rr-field__req" aria-hidden="true">*</span></label>
-                                <div class="rr-control rr-control--sm"><select id="rr-entry-__INDEX__-unit" class="rr-control__input rr-control__select" name="items[__INDEX__][unit_id]" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select><span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span></div>
+                                <div class="rr-field__head"><label class="rr-entry-field__label" for="rr-entry-__INDEX__-unit">@lang('construction::lang.unit')<span class="rr-field__req" aria-hidden="true">*</span></label>@include('construction::partials.unit_add_button')</div>
+                                <div class="rr-control rr-control--sm"><select id="rr-entry-__INDEX__-unit" data-rr-unit-select class="rr-control__input rr-control__select" name="items[__INDEX__][unit_id]" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select><span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span></div>
                             </div>
                             <span class="rr-entry-row__break" aria-hidden="true"></span>
                             <div class="rr-entry-field rr-entry-field--num">
@@ -364,9 +364,9 @@
                                         <div class="rr-control"><input id="rr-item-{{ $item->id }}-code" class="rr-control__input" name="code" value="{{ $item->code }}" required></div>
                                     </div>
                                     <div class="rr-field">
-                                        <label class="rr-field__label" for="rr-item-{{ $item->id }}-unit">@lang('construction::lang.unit')<span class="rr-field__req" aria-hidden="true">*</span></label>
+                                        <div class="rr-field__head"><label class="rr-field__label" for="rr-item-{{ $item->id }}-unit">@lang('construction::lang.unit')<span class="rr-field__req" aria-hidden="true">*</span></label>@include('construction::partials.unit_add_button')</div>
                                         <div class="rr-control">
-                                            <select id="rr-item-{{ $item->id }}-unit" class="rr-control__input rr-control__select" name="unit_id" required>
+                                            <select id="rr-item-{{ $item->id }}-unit" data-rr-unit-select class="rr-control__input rr-control__select" name="unit_id" required>
                                                 @foreach($units as $unit)<option value="{{ $unit->id }}" @selected($unit->id === $item->unit_id)>{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach
                                             </select>
                                             <span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span>
@@ -405,7 +405,8 @@
 @if(! $quote->project_id)
     @can('construction.boq.approve')
         {{-- تغيير الحالة --}}
-        <div class="modal fade rr-scope" id="ct-quote-status" tabindex="-1" role="dialog" aria-labelledby="rr-quote-status-title">
+        @php $statusErrors = collect(['status', 'reason'])->map(fn ($field) => $errors->first($field))->filter()->values(); @endphp
+        <div class="modal fade rr-scope" id="ct-quote-status" tabindex="-1" role="dialog" aria-labelledby="rr-quote-status-title" @if($statusErrors->isNotEmpty()) data-rr-status-open-on-load @endif>
             <div class="modal-dialog rr-modal-dialog rr-modal-dialog--compact rr-modal-dialog--sm" role="document">
                 <div class="modal-content rr-modal">
                     <form method="POST" action="{{ route('construction.quotes.status', $quote->id) }}">
@@ -418,15 +419,36 @@
                             <button type="button" class="rr-btn rr-btn--ghost rr-btn--sm rr-btn--icon" data-dismiss="modal" aria-label="@lang('construction::lang.close_dialog')">@include('construction::partials.rr_icon', ['name' => 'close', 'size' => 18])</button>
                         </header>
                         <div class="rr-modal__body">
-                            <div class="rr-field">
-                                <label class="rr-field__label" for="rr-quote-status-select">@lang('construction::lang.quote_status')</label>
-                                <div class="rr-control">
-                                    <select id="rr-quote-status-select" class="rr-control__input rr-control__select" name="status">
-                                        @foreach(\Modules\Construction\Entities\ConstructionQuote::STATUSES as $state)
-                                            <option value="{{ $state }}" @selected($state === $quote->status)>@lang('construction::lang.quote_status_' . $state)</option>
-                                        @endforeach
-                                    </select>
-                                    <span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span>
+                            @if($statusErrors->isNotEmpty())
+                                <div class="rr-alert rr-alert--danger" role="alert">{{ $statusErrors->implode(' ') }}</div>
+                            @endif
+                            <div class="rr-form-wrap">
+                                <div class="rr-form-grid">
+                                    <div class="rr-field rr-field--full">
+                                        <span class="rr-field__label">@lang('construction::lang.quote_current_status')</span>
+                                        <div><span class="rr-badge rr-badge--{{ $quoteTones[$quote->status] ?? 'neutral' }}"><span class="rr-badge__dot" aria-hidden="true"></span>@lang('construction::lang.quote_status_' . $quote->status)</span></div>
+                                    </div>
+                                    <div class="rr-field rr-field--full">
+                                        <label class="rr-field__label" for="rr-quote-status-select">@lang('construction::lang.quote_new_status')<span class="rr-field__req" aria-hidden="true">*</span></label>
+                                        <div class="rr-control">
+                                            {{-- الانتقالات المسموحة بس، من ConstructionQuote::TRANSITIONS --}}
+                                            <select id="rr-quote-status-select" class="rr-control__input rr-control__select" name="status" required>
+                                                @foreach($quote->allowedTransitions() as $state)
+                                                    <option value="{{ $state }}" @selected(old('status') === $state)>@lang('construction::lang.quote_status_' . $state)</option>
+                                                @endforeach
+                                            </select>
+                                            <span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span>
+                                        </div>
+                                        @if(in_array($quote->status, ['accepted', 'rejected', 'expired'], true) && $quote->isPastValidity())
+                                            <div class="rr-field__hint">@lang('construction::lang.quote_reopen_validity_hint', ['date' => $expiryDate->format('Y-m-d')])</div>
+                                        @endif
+                                    </div>
+                                    <div class="rr-field rr-field--full">
+                                        <label class="rr-field__label" for="rr-quote-status-reason">@lang('construction::lang.quote_status_reason') <span class="rr-field__opt">(@lang('construction::lang.optional'))</span></label>
+                                        <div class="rr-control rr-control--area">
+                                            <textarea id="rr-quote-status-reason" class="rr-control__input rr-control__input--short" name="reason" rows="2" maxlength="500">{{ old('reason') }}</textarea>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -446,11 +468,13 @@
         @include('construction::quotes.partials.convert_modal', ['quote' => $quote])
     @endcan
 @endif
+@include('construction::partials.unit_quick_create')
 @endsection
 
 @section('module_javascript')
 <script>
 $(function () {
+    $('#ct-quote-status[data-rr-status-open-on-load]').modal('show');
     var body = document.getElementById('ct-quote-entry-rows'), template = document.getElementById('ct-quote-row-template'), add = document.getElementById('ct-quote-add-row'), next = 0;
     if (body && template && add) {
         function update() {

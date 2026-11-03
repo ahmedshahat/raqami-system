@@ -11,8 +11,10 @@ use App\Utils\Util;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Modules\Construction\Entities\ConstructionProject;
 use Modules\Construction\Entities\ConstructionQuote;
+use Modules\Construction\Support\AuditTrail;
 use Modules\Construction\Support\PrintPdfFactory;
 
 class QuoteController extends BaseController
@@ -90,7 +92,7 @@ class QuoteController extends BaseController
         DB::transaction(function () use ($quote, $validated) {
             $quote = ConstructionQuote::where('business_id', $this->businessId())
                 ->whereKey($quote)->lockForUpdate()->firstOrFail();
-            abort_unless(in_array($quote->status, ['draft', 'sent'], true) && ! $quote->project_id,
+            abort_unless($quote->isEditable(),
                 422, __('construction::lang.quote_header_locked'));
             $quote->update($validated);
         });
@@ -129,7 +131,7 @@ class QuoteController extends BaseController
     {
         $this->authorizePermission('construction.boq.manage');
         $quote = $this->findQuote($quote);
-        abort_unless(in_array($quote->status, ['draft', 'sent'], true) && ! $quote->project_id, 422, __('construction::lang.quote_locked'));
+        abort_unless($quote->isEditable(), 422, __('construction::lang.quote_locked'));
         $rows = $request->input('items');
         $util = new Util();
         if (is_array($rows)) {
@@ -155,13 +157,13 @@ class QuoteController extends BaseController
 
         DB::transaction(function () use ($quote, $validated, $units) {
             $lockedQuote = ConstructionQuote::whereKey($quote->id)->lockForUpdate()->firstOrFail();
-            abort_unless(in_array($lockedQuote->status, ['draft', 'sent'], true) && ! $lockedQuote->project_id, 422, __('construction::lang.quote_locked'));
-            $next = $lockedQuote->items()->count() + 1;
+            abort_unless($lockedQuote->isEditable(), 422, __('construction::lang.quote_locked'));
+            $next = $lockedQuote->nextItemCodeNumber();
             foreach ($validated['items'] as $row) {
                 $code = trim((string) ($row['code'] ?? ''));
                 if ($code === '') {
                     do {
-                        $code = 'ITM-'.str_pad((string) $next++, 3, '0', STR_PAD_LEFT);
+                        $code = ConstructionQuote::formatItemCode($next++);
                     } while ($lockedQuote->items()->where('code', $code)->exists());
                 }
                 abort_if($lockedQuote->items()->where('code', $code)->exists(), 422, __('construction::lang.quote_duplicate_code'));
@@ -188,7 +190,7 @@ class QuoteController extends BaseController
     {
         $this->authorizePermission('construction.boq.manage');
         $quote = $this->findQuote($quote);
-        abort_unless(in_array($quote->status, ['draft', 'sent'], true) && ! $quote->project_id, 422, __('construction::lang.quote_locked'));
+        abort_unless($quote->isEditable(), 422, __('construction::lang.quote_locked'));
         $util = new Util();
         $request->merge([
             'quantity' => $util->num_uf($request->input('quantity', 0)),
@@ -220,7 +222,7 @@ class QuoteController extends BaseController
     {
         $this->authorizePermission('construction.boq.manage');
         $quote = $this->findQuote($quote);
-        abort_unless(in_array($quote->status, ['draft', 'sent'], true) && ! $quote->project_id, 422, __('construction::lang.quote_locked'));
+        abort_unless($quote->isEditable(), 422, __('construction::lang.quote_locked'));
         DB::transaction(function () use ($quote, $item) {
             $quote->items()->findOrFail($item)->delete();
             $quote->refreshTotal();
@@ -232,16 +234,45 @@ class QuoteController extends BaseController
     public function status(Request $request, int $quote)
     {
         $this->authorizePermission('construction.boq.approve');
-        $validated = $request->validate(['status' => ['required', Rule::in(ConstructionQuote::STATUSES)]]);
-        DB::transaction(function () use ($quote, $validated) {
+        $validated = $request->validate([
+            'status' => ['required', Rule::in(ConstructionQuote::STATUSES)],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ], [], ['reason' => __('construction::lang.quote_status_reason')]);
+
+        // الرفض بيرجع كخطأ تحقق يظهر جوه نافذة تغيير الحالة، والحالة مش بتتغير
+        $quote = DB::transaction(function () use ($quote, $validated) {
             $quote = ConstructionQuote::where('business_id', $this->businessId())->whereKey($quote)->lockForUpdate()->firstOrFail();
-            abort_if($quote->project_id, 422, __('construction::lang.quote_already_converted'));
-            abort_if($quote->status === 'accepted' && $validated['status'] !== 'accepted', 422, __('construction::lang.quote_locked'));
-            abort_if($validated['status'] !== 'draft' && ! $quote->items()->exists(), 422, __('construction::lang.quote_requires_items'));
-            $quote->update(['status' => $validated['status']]);
+            $from = $quote->status;
+            $to = $validated['status'];
+            if ($quote->project_id) {
+                throw ValidationException::withMessages(['status' => __('construction::lang.quote_status_converted_locked')]);
+            }
+            if (! $quote->canTransitionTo($to)) {
+                throw ValidationException::withMessages(['status' => __('construction::lang.quote_status_transition_not_allowed', [
+                    'from' => __('construction::lang.quote_status_'.$from),
+                    'to' => __('construction::lang.quote_status_'.$to),
+                ])]);
+            }
+            if ($to !== 'draft' && ! $quote->items()->exists()) {
+                throw ValidationException::withMessages(['status' => __('construction::lang.quote_requires_items')]);
+            }
+
+            $quote->update(['status' => $to]);
+            $reason = trim((string) ($validated['reason'] ?? ''));
+            AuditTrail::record('quote_status_changed', $quote, null, ['status' => $from], array_filter([
+                'status' => $to,
+                'reason' => $reason,
+            ], fn ($value) => $value !== ''));
+
+            return $quote->setAttribute('previous_status', $from);
         });
 
-        return back()->with('status', ['success' => 1, 'msg' => __('construction::lang.quote_status_saved')]);
+        $message = __('construction::lang.quote_status_saved');
+        if ($quote->status === 'sent' && in_array($quote->previous_status, ['accepted', 'rejected', 'expired'], true) && $quote->isPastValidity()) {
+            $message .= ' '.__('construction::lang.quote_reopened_past_validity', ['date' => $quote->validUntil()->format('Y-m-d')]);
+        }
+
+        return back()->with('status', ['success' => 1, 'msg' => $message]);
     }
 
     public function convert(Request $request, int $quote)

@@ -187,8 +187,8 @@
                                             <div class="rr-control rr-control--sm"><input id="boq-row-{{ $rowIndex }}-desc" name="items[{{ $rowIndex }}][description]" class="rr-control__input" maxlength="500" value="{{ $row['description'] ?? '' }}" placeholder="@lang('construction::lang.item_name_example')" required></div>
                                         </div>
                                         <div class="rr-entry-field rr-entry-field--unit">
-                                            <label class="rr-entry-field__label" for="boq-row-{{ $rowIndex }}-unit">@lang('construction::lang.unit'){!! $req !!}</label>
-                                            <div class="rr-control rr-control--sm"><select id="boq-row-{{ $rowIndex }}-unit" name="items[{{ $rowIndex }}][unit_id]" class="rr-control__input rr-control__select" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected((string) ($row['unit_id'] ?? '') === (string) $unit->id)>{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select><span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span></div>
+                                            <div class="rr-field__head"><label class="rr-entry-field__label" for="boq-row-{{ $rowIndex }}-unit">@lang('construction::lang.unit'){!! $req !!}</label>@include('construction::partials.unit_add_button')</div>
+                                            <div class="rr-control rr-control--sm"><select id="boq-row-{{ $rowIndex }}-unit" data-rr-unit-select name="items[{{ $rowIndex }}][unit_id]" class="rr-control__input rr-control__select" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}" @selected((string) ($row['unit_id'] ?? '') === (string) $unit->id)>{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select><span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span></div>
                                         </div>
                                         <span class="rr-entry-row__break" aria-hidden="true"></span>
                                         <div class="rr-entry-field rr-entry-field--num">
@@ -383,9 +383,9 @@
                                         <div class="rr-control"><input id="rr-boq-item-{{ $item->id }}-code" class="rr-control__input" name="code" value="{{ $item->code }}" required></div>
                                     </div>
                                     <div class="rr-field">
-                                        <label class="rr-field__label" for="rr-boq-item-{{ $item->id }}-unit">@lang('construction::lang.unit'){!! $req !!}</label>
+                                        <div class="rr-field__head"><label class="rr-field__label" for="rr-boq-item-{{ $item->id }}-unit">@lang('construction::lang.unit'){!! $req !!}</label>@include('construction::partials.unit_add_button')</div>
                                         <div class="rr-control">
-                                            <select id="rr-boq-item-{{ $item->id }}-unit" class="rr-control__input rr-control__select" name="unit_id" required>
+                                            <select id="rr-boq-item-{{ $item->id }}-unit" data-rr-unit-select class="rr-control__input rr-control__select" name="unit_id" required>
                                                 @foreach($units as $unit)<option value="{{ $unit->id }}" @selected($item->unit_id == $unit->id)>{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach
                                             </select>
                                             <span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span>
@@ -420,6 +420,7 @@
         </div>
     @endforeach
 @endif
+@include('construction::partials.unit_quick_create')
 @endsection
 @include('construction::partials.quick_create')
 
@@ -436,8 +437,8 @@
                 <div class="rr-control rr-control--sm"><input data-name="description" class="rr-control__input" maxlength="500" placeholder="@lang('construction::lang.item_name_example')" required></div>
             </div>
             <div class="rr-entry-field rr-entry-field--unit">
-                <label class="rr-entry-field__label">@lang('construction::lang.unit'){!! $req !!}</label>
-                <div class="rr-control rr-control--sm"><select data-name="unit_id" class="rr-control__input rr-control__select" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select><span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span></div>
+                <div class="rr-field__head"><label class="rr-entry-field__label">@lang('construction::lang.unit'){!! $req !!}</label>@include('construction::partials.unit_add_button')</div>
+                <div class="rr-control rr-control--sm"><select data-name="unit_id" data-rr-unit-select class="rr-control__input rr-control__select" required><option value="">@lang('construction::lang.choose')</option>@foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach</select><span class="rr-control__chev">@include('construction::partials.rr_icon', ['name' => 'chevron-down', 'size' => 16])</span></div>
             </div>
             <span class="rr-entry-row__break" aria-hidden="true"></span>
             <div class="rr-entry-field rr-entry-field--num">

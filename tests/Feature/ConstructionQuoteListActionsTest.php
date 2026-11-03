@@ -56,6 +56,13 @@ class ConstructionQuoteListActionsTest extends TestCase
         $converted->update(['project_id' => $project->id]);
 
         $html = $this->get(route('construction.quotes.index'))->assertOk()->getContent();
+        // نوافذ القائمة بتاخد رابطها من زرار الصف؛ متغير اللوب كان بيربطها بآخر عرض في الصفحة
+        $this->assertSame(1, preg_match('/id="ct-quote-edit".*?<form([^>]*)>/s', $html, $editForm));
+        $this->assertStringContainsString('data-update-url=', $editForm[1]);
+        $this->assertStringNotContainsString('action=', $editForm[1]);
+        $this->assertSame(1, preg_match('/id="ct-quote-convert".*?<form([^>]*)>/s', $html, $convertForm));
+        $this->assertStringContainsString('data-convert-url=', $convertForm[1]);
+        $this->assertStringNotContainsString('action=', $convertForm[1]);
         $row = function (ConstructionQuote $quote) use ($html): string {
             $this->assertSame(1, preg_match('/<tr[^>]*\bdata-quote-id="'.$quote->id.'"[^>]*>(.*?)<\/tr>/s', $html, $matches));
 

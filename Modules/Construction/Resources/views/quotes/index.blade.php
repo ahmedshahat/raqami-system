@@ -195,8 +195,9 @@
     @include('construction::quotes.partials.form_modal', ['mode' => 'create'])
 @endcan
 @can('construction.project.create')
-@include('construction::quotes.partials.form_modal', ['mode' => 'edit'])
-@include('construction::quotes.partials.convert_modal')
+{{-- quote => null صريح: متغير الـ foreach بتاع الجدول بيفضل موجود بعد اللوب، ومن غيره النافذة كانت بتتربط بآخر عرض في الصفحة --}}
+@include('construction::quotes.partials.form_modal', ['mode' => 'edit', 'quote' => null])
+@include('construction::quotes.partials.convert_modal', ['quote' => null])
 @endcan
 @can('construction.project.delete')
 <div class="modal fade rr-scope" id="ct-quote-delete" tabindex="-1" role="dialog" aria-labelledby="rr-quote-delete-title">
@@ -260,7 +261,7 @@ $(function () {
 
     $('#ct-quote-edit').on('show.bs.modal', function (event) {
         var trigger = event.relatedTarget, form = this.querySelector('form');
-        if (!trigger) return;
+        if (!trigger || !form.dataset.updateUrl) return;
         form.action = form.dataset.updateUrl.replace('__QUOTE__', trigger.dataset.quoteId);
         form.elements.quote_date.value = trigger.dataset.quoteDate;
         form.elements.customer_id.value = trigger.dataset.customerId;
@@ -270,7 +271,7 @@ $(function () {
     });
     $('#ct-quote-convert').on('show.bs.modal', function (event) {
         var trigger = event.relatedTarget, form = this.querySelector('form');
-        if (!trigger) return;
+        if (!trigger || !form.dataset.convertUrl) return;
         form.action = form.dataset.convertUrl.replace('__QUOTE__', trigger.dataset.quoteId);
         form.elements.project_name.value = trigger.dataset.quoteTitle;
     });

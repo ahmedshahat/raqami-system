@@ -1506,7 +1506,6 @@ $(document).ready(function() {
                 d.expense_category_id = $('select#expense_category_id').val();
                 d.expense_sub_category_id = $('select#expense_sub_category_id_filter').val();
                 d.payment_status = $('select#expense_payment_status').val();
-                d.construction_project_id = $('select#construction_project_filter').val();
                 d.start_date = $('input#expense_date_range')
                     .data('daterangepicker')
                     .startDate.format('YYYY-MM-DD');
@@ -1552,32 +1551,12 @@ $(document).ready(function() {
 
     $('select#location_id, select#expense_for, select#created_by, select#select#expense_contact_filter, \
         select#expense_category_id, select#expense_payment_status, \
-        select#expense_sub_category_id_filter, select#construction_project_filter').on(
+        select#expense_sub_category_id_filter').on(
         'change',
         function() {
             expense_table.ajax.reload();
         }
     );
-
-    $(document).on('change', 'select.construction-project-select', function() {
-        var $project = $(this);
-        var $form = $project.closest('form');
-        var $group = $form.find('.construction-project-item-group');
-        var $item = $form.find('select.construction-project-item-select');
-        var projectId = $project.val();
-        $item.empty().append(new Option($item.data('placeholder') || '', '', true, true)).trigger('change');
-        if (!projectId) {
-            $group.addClass('hide');
-            return;
-        }
-        $group.removeClass('hide');
-        $item.prop('disabled', true);
-        $.getJSON($project.data('items-url') + '/' + projectId + '/items')
-            .done(function(items) {
-                $.each(items, function(_, item) { $item.append(new Option(item.text, item.id, false, false)); });
-            })
-            .always(function() { $item.prop('disabled', false).trigger('change'); });
-    });
 
     //Date picker
     $('#expense_transaction_date').datetimepicker({

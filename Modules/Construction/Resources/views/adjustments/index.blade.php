@@ -158,9 +158,9 @@
                                 <div class="rr-control"><input name="code" id="ct-adjustment-code" class="rr-control__input rr-control__input--num" maxlength="60"></div>
                             </div>
                             <div class="rr-field">
-                                <label class="rr-field__label" for="ct-adjustment-unit">@lang('construction::lang.unit'){!! $req !!}</label>
+                                <div class="rr-field__head"><label class="rr-field__label" for="ct-adjustment-unit">@lang('construction::lang.unit'){!! $req !!}</label>@include('construction::partials.unit_add_button')</div>
                                 <div class="rr-control">
-                                    <select name="unit_id" id="ct-adjustment-unit" class="rr-control__input rr-control__select" required>
+                                    <select name="unit_id" id="ct-adjustment-unit" data-rr-unit-select class="rr-control__input rr-control__select" required>
                                         <option value="">@lang('construction::lang.choose')</option>
                                         @foreach($units as $unit)<option value="{{ $unit->id }}">{{ $unit->actual_name }} ({{ $unit->short_name }})</option>@endforeach
                                     </select>
@@ -207,6 +207,7 @@
     </div>
 </div>
 @endcan
+@include('construction::partials.unit_quick_create')
 @endsection
 
 @section('module_javascript')

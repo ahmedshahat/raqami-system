@@ -11,6 +11,7 @@ use Modules\Construction\Http\Controllers\BoqSpreadsheetController;
 use Modules\Construction\Http\Controllers\ContractController;
 use Modules\Construction\Http\Controllers\PrintFontController;
 use Modules\Construction\Http\Controllers\QuoteController;
+use Modules\Construction\Http\Controllers\UnitQuickCreateController;
 use Modules\Construction\Http\Controllers\QuoteSpreadsheetController;
 use Modules\Construction\Http\Controllers\ContractAdjustmentController;
 use Modules\Construction\Http\Controllers\MaterialController;
@@ -132,6 +133,7 @@ Route::middleware([
     Route::get('reports/retention-guarantees/print', [RetentionGuaranteesReportController::class, 'print'])->name('reports.retention-guarantees.print');
     Route::get('print-font/{weight}', [PrintFontController::class, 'show'])->name('print-font');
     Route::get('quotes', [QuoteController::class, 'index'])->name('quotes.index');
+    Route::post('units', [UnitQuickCreateController::class, 'store'])->name('units.store');
     Route::post('quotes', [QuoteController::class, 'store'])->name('quotes.store');
     Route::get('quotes/import-template', [QuoteSpreadsheetController::class, 'template'])->name('quotes.import-template');
     Route::post('quotes/{quote}/items/import-preview', [QuoteSpreadsheetController::class, 'preview'])->name('quotes.items.import.preview');
@@ -195,4 +197,18 @@ Route::middleware([
     Route::post('projects/{project}/certificates/{certificate}/invoice', [CustomerCertificateController::class, 'createInvoice'])->name('projects.certificates.invoice');
     Route::post('projects/{project}/certificates/{certificate}/retention-releases', [CustomerRetentionReleaseController::class, 'store'])->name('projects.certificates.retention-releases.store');
     Route::post('projects/{project}/certificates/{certificate}/retention-releases/{release}/cancel', [CustomerRetentionReleaseController::class, 'cancel'])->name('projects.certificates.retention-releases.cancel');
+});
+
+// ربط المصروفات بالمشاريع: الرابط ده بيخدم شاشة المصروفات في النظام الأساسي، ومتسجل هنا علشان يفضل مع الموديول
+Route::middleware([
+    'web',
+    'SetSessionData',
+    'auth',
+    'language',
+    'timezone',
+    'AdminSidebarMenu',
+])->group(function () {
+    Route::get('expenses/construction-projects/{project}/items', [\App\Http\Controllers\ExpenseController::class, 'constructionProjectItems'])
+        ->whereNumber('project')
+        ->name('expenses.construction-project-items');
 });
