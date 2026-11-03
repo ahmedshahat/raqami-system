@@ -70,7 +70,9 @@ class SellCreateV2Test extends TestCase
     public function test_edit_opens_the_new_screen_and_switching_returns_to_the_same_invoice(): void
     {
         $sell = \App\Transaction::where('business_id', $this->user->business_id)->where('type', 'sell')
-            ->where('status', 'final')->whereHas('sell_lines')->latest('id')->firstOrFail();
+            ->where('status', 'final')->whereHas('sell_lines')
+            ->whereDoesntHave('return_parent') // الفاتورة اللي ليها مرتجع مش بتتعدّل
+            ->latest('id')->firstOrFail();
         $this->user->forceFill(['use_classic_sell_create' => 0])->save();
 
         $html = $this->get(action([\App\Http\Controllers\SellController::class, 'edit'], [$sell->id]))->assertOk()->getContent();

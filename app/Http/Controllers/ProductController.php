@@ -1533,7 +1533,10 @@ class ProductController extends Controller
         $common_settings = session()->get('business.common_settings');
         $warranties = Warranty::forDropdown($business_id);
 
-        return view('product.partials.quick_add_product')
+        // شاشة الكاشير الجديدة ليها نافذة بتصميم رقمي (?v2=1)، والشراء والكاشير القديم على القديمة
+        $view = request()->boolean('v2') ? 'product.partials.quick_add_product_v2' : 'product.partials.quick_add_product';
+
+        return view($view)
                 ->with(compact('categories', 'brands', 'units', 'taxes', 'barcode_types', 'default_profit_percent', 'tax_attributes', 'product_name', 'locations', 'product_for', 'enable_expiry', 'enable_lot', 'module_form_parts', 'business_locations', 'common_settings', 'warranties'));
     }
 

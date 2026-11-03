@@ -94,7 +94,12 @@
             @if($request->segment(1) != 'customer-display' && !$pos_layout)
                 @include('layouts.partials.header')
             @elseif($request->segment(1) != 'customer-display')
-                @include('layouts.partials.header-pos')
+                {{-- شاشة الكاشير الجديدة بتحط شريطها الخاص (sale_pos.partials.v2_header) --}}
+                @hasSection('pos_header')
+                    @yield('pos_header')
+                @else
+                    @include('layouts.partials.header-pos')
+                @endif
             @endif
             <!-- empty div for vuejs -->
             <div id="app">

@@ -257,6 +257,10 @@ class CashRegisterUtil extends Util
             'cash_registers.closing_note',
             'cash_registers.location_id',
             'cash_registers.denominations',
+            'cash_registers.closing_amount',
+            'cash_registers.status as register_status',
+            'cash_registers.total_card_slips as closing_card_slips',
+            'cash_registers.total_cheques as closing_cheques',
             DB::raw("SUM(IF(transaction_type='initial', amount, 0)) as cash_in_hand"),
             DB::raw("SUM(IF(transaction_type='sell', amount, IF(transaction_type='refund', -1 * amount, 0))) as total_sale"),
             DB::raw("SUM(IF(transaction_type='expense', IF(transaction_type='refund', -1 * amount, amount), 0)) as total_expense"),
@@ -387,7 +391,8 @@ class CashRegisterUtil extends Util
                     DB::raw('SUM(tax_amount) as total_tax'),
                     DB::raw('SUM(IF(discount_type = "percentage", total_before_tax*discount_amount/100, discount_amount)) as total_discount'),
                     DB::raw('SUM(final_total) as total_sales'),
-                    DB::raw('SUM(shipping_charges) as total_shipping_charges')
+                    DB::raw('SUM(shipping_charges) as total_shipping_charges'),
+                    DB::raw('COUNT(transactions.id) as total_invoices')
                 )
                 ->first();
 
